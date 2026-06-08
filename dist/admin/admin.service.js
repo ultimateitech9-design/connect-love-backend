@@ -1,0 +1,203 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", {
+    value: true
+});
+Object.defineProperty(exports, "AdminService", {
+    enumerable: true,
+    get: function() {
+        return AdminService;
+    }
+});
+const _common = require("@nestjs/common");
+const _typeorm = require("@nestjs/typeorm");
+const _typeorm1 = require("typeorm");
+const _userentity = require("../users/user.entity");
+const _contactentity = require("../support/contact.entity");
+const _paymententity = require("../platform/payment.entity");
+const _verificationrequestentity = require("../platform/verification-request.entity");
+function _ts_decorate(decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+}
+function _ts_metadata(k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+}
+function _ts_param(paramIndex, decorator) {
+    return function(target, key) {
+        decorator(target, key, paramIndex);
+    };
+}
+let AdminService = class AdminService {
+    async getStats() {
+        const totalUsers = await this.userRepo.count();
+        const premiumUsers = await this.userRepo.count({
+            where: [
+                {
+                    plan: 'gold'
+                },
+                {
+                    plan: 'platinum'
+                }
+            ]
+        });
+        const activeUsers = await this.userRepo.count({
+            where: {
+                status: 'active'
+            }
+        });
+        const openTickets = await this.contactRepo.count({
+            where: {
+                status: 'open'
+            }
+        });
+        const revenue = await this.paymentRepo.createQueryBuilder('payment').select('COALESCE(SUM(payment.amount), 0)', 'total').where('payment.status = :status', {
+            status: 'successful'
+        }).getRawOne();
+        return {
+            totalUsers,
+            premiumUsers,
+            activeUsers,
+            openTickets,
+            revenueMtd: Number(revenue?.total || 0)
+        };
+    }
+    async getAllUsers(page = 1, limit = 20) {
+        const [users, total] = await this.userRepo.findAndCount({
+            order: {
+                createdAt: 'DESC'
+            },
+            skip: (page - 1) * limit,
+            take: limit
+        });
+        return {
+            users,
+            total,
+            page,
+            limit
+        };
+    }
+    async updateUserStatus(id, status) {
+        await this.userRepo.update(id, {
+            status: status
+        });
+        return {
+            message: `User ${id} status updated to ${status}`
+        };
+    }
+    async getAllContacts() {
+        return this.contactRepo.find({
+            order: {
+                createdAt: 'DESC'
+            }
+        });
+    }
+    async getPayments() {
+        return this.paymentRepo.find({
+            relations: [
+                'user'
+            ],
+            order: {
+                createdAt: 'DESC'
+            },
+            take: 100
+        });
+    }
+    async getVerificationQueue() {
+        return this.verificationRepo.find({
+            relations: [
+                'user'
+            ],
+            order: {
+                createdAt: 'DESC'
+            },
+            take: 100
+        });
+    }
+    async getSubscriptions() {
+        const users = await this.userRepo.find({
+            order: {
+                createdAt: 'DESC'
+            }
+        });
+        const free = users.filter((user)=>user.plan === 'free').length;
+        const gold = users.filter((user)=>user.plan === 'gold').length;
+        const platinum = users.filter((user)=>user.plan === 'platinum').length;
+        return {
+            totals: {
+                free,
+                plus: gold,
+                premium: platinum
+            },
+            users: users.filter((user)=>user.plan !== 'free').map((user)=>({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    plan: user.plan === 'platinum' ? 'Premium' : 'Plus',
+                    joined: user.createdAt
+                }))
+        };
+    }
+    async getAnalytics() {
+        const users = await this.userRepo.find();
+        const genderRatio = Object.entries(users.reduce((acc, user)=>{
+            const key = user.gender || 'unknown';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {})).map(([name, value])=>({
+                name,
+                value
+            }));
+        const geo = Object.entries(users.reduce((acc, user)=>{
+            const key = user.city || 'Unknown';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {})).map(([city, count])=>({
+                city,
+                users: count
+            }));
+        const payments = await this.paymentRepo.find({
+            where: {
+                status: 'successful'
+            }
+        });
+        const revenueMonthly = payments.reduce((acc, payment)=>{
+            const month = payment.createdAt.toLocaleString('en-US', {
+                month: 'short'
+            });
+            acc[month] = (acc[month] || 0) + Number(payment.amount);
+            return acc;
+        }, {});
+        return {
+            genderRatio,
+            geo,
+            revenueMonthly: Object.entries(revenueMonthly).map(([m, rev])=>({
+                    m,
+                    rev
+                }))
+        };
+    }
+    constructor(userRepo, contactRepo, paymentRepo, verificationRepo){
+        this.userRepo = userRepo;
+        this.contactRepo = contactRepo;
+        this.paymentRepo = paymentRepo;
+        this.verificationRepo = verificationRepo;
+    }
+};
+AdminService = _ts_decorate([
+    (0, _common.Injectable)(),
+    _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(1, (0, _typeorm.InjectRepository)(_contactentity.Contact)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_paymententity.Payment)),
+    _ts_param(3, (0, _typeorm.InjectRepository)(_verificationrequestentity.VerificationRequest)),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
+    ])
+], AdminService);
+
+//# sourceMappingURL=admin.service.js.map

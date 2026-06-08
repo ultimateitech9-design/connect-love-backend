@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../src/auth/dto/login.dto.ts"],"sourcesContent":["import { IsEmail, IsString, MinLength } from 'class-validator';\n\nexport class LoginDto {\n  @IsEmail()\n  email: string;\n\n  @IsString()\n  @MinLength(6)\n  password: string;\n}\n"],"names":["LoginDto"],"mappings":";;;;+BAEaA;;;eAAAA;;;gCAFgC;;;;;;;;;;AAEtC,IAAA,AAAMA,WAAN,MAAMA;AAOb"}

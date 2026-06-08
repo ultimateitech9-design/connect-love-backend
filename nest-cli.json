@@ -1,0 +1,18 @@
+{
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "builder": "swc",
+    "typeCheck": true,
+    "plugins": [],
+    "watchAssets": false
+  },
+  "watchOptions": {
+    "excludeDirectories": [
+      "node_modules",
+      "dist",
+      ".git",
+      ".next"
+    ]
+  }
+}
