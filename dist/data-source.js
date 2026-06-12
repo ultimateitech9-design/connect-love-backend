@@ -22,6 +22,7 @@ const _platformnotificationentity = require("./platform/platform-notification.en
 const _auditlogentity = require("./platform/audit-log.entity");
 const _platformsettingentity = require("./platform/platform-setting.entity");
 const _roleentity = require("./platform/role.entity");
+const _videocallentity = require("./messages/video-call.entity");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -69,7 +70,7 @@ const _default = new _typeorm.DataSource({
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306', 10),
     username: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'root',
+    password: process.env.DB_PASSWORD ?? 'root',
     database: process.env.DB_NAME || 'dating_web_app',
     entities: [
         _userentity.User,
@@ -82,7 +83,8 @@ const _default = new _typeorm.DataSource({
         _platformnotificationentity.PlatformNotification,
         _auditlogentity.AuditLog,
         _platformsettingentity.PlatformSetting,
-        _roleentity.PlatformRole
+        _roleentity.PlatformRole,
+        _videocallentity.VideoCall
     ],
     migrations: [
         __dirname + '/migrations/*{.ts,.js}'

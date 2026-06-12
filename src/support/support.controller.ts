@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { SupportService } from './support.service';
 import { CreateContactDto } from './dto/create-contact.dto';
@@ -18,5 +18,23 @@ export class SupportController {
   @Get('contacts')
   findAll() {
     return this.supportService.findAll();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('overview')
+  overview() {
+    return this.supportService.overview();
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('tickets')
+  tickets(@Query('status') status?: string) {
+    return this.supportService.findTickets(status);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('tickets/:id/status')
+  updateTicket(@Param('id') id: string, @Body('status') status: string) {
+    return this.supportService.updateStatus(Number(id), status);
   }
 }

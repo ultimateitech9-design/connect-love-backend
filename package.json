@@ -10,8 +10,9 @@
     "start:prod": "node dist/main",
     "lint": "tsc --noEmit",
     "db:create": "node scripts/create-database.js",
-    "db:seed": "node scripts/seed-demo.js",
-    "db:setup": "npm run db:create && npm run migration:run && npm run db:seed",
+    "db:seed": "node scripts/seed-core.js",
+    "db:seed:core": "node scripts/seed-core.js",
+    "db:setup": "npm run db:create && npm run migration:run && npm run db:seed:core",
     "migration:run": "npm run build && typeorm migration:run -d dist/data-source.js",
     "migration:revert": "npm run build && typeorm migration:revert -d dist/data-source.js"
   },

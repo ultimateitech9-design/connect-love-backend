@@ -35,7 +35,7 @@ let InitialDatingSchema1780570000000 = class InitialDatingSchema1780570000000 {
         lastSeen timestamp NULL,
         showOnlineStatus tinyint NOT NULL DEFAULT 1,
         showDistance tinyint NOT NULL DEFAULT 1,
-        photosVisibleToNonMatches tinyint NOT NULL DEFAULT 0,
+        photosVisibleToNonMatches tinyint NOT NULL DEFAULT 1,
         onlyShowVerifiedProfiles tinyint NOT NULL DEFAULT 0,
         notifyMessages tinyint NOT NULL DEFAULT 1,
         notifyMatches tinyint NOT NULL DEFAULT 1,

@@ -72,10 +72,14 @@ function _ts_param(paramIndex, decorator) {
 }
 let AuthService = class AuthService {
     decryptOrUsePlainPassword(password) {
-        const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
-        const bytes = _cryptojs.AES.decrypt(password, secret);
-        const decrypted = bytes.toString(_cryptojs.enc.Utf8);
-        return decrypted || password;
+        try {
+            const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
+            const bytes = _cryptojs.AES.decrypt(password, secret);
+            const decrypted = bytes.toString(_cryptojs.enc.Utf8);
+            return decrypted || password;
+        } catch  {
+            return password;
+        }
     }
     signUserToken(user) {
         return this.jwtService.sign({
@@ -100,7 +104,10 @@ let AuthService = class AuthService {
             email: dto.email,
             password: hashed,
             birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
-            gender: dto.gender
+            gender: dto.gender,
+            city: dto.city,
+            locationLatitude: dto.locationLatitude,
+            locationLongitude: dto.locationLongitude
         });
         const saved = await this.userRepo.save(user);
         const { password: _, ...safe } = saved;
@@ -114,6 +121,9 @@ let AuthService = class AuthService {
             email: dto.email
         }).getOne();
         if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (user.role !== 'user') {
+            throw new _common.UnauthorizedException('Please use the management login for this account.');
+        }
         const match = await _bcryptjs.compare(dto.password, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
         const token = this.signUserToken(user);

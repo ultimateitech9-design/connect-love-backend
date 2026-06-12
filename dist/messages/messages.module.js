@@ -15,6 +15,9 @@ const _messagesservice = require("./messages.service");
 const _messagescontroller = require("./messages.controller");
 const _matchentity = require("../matches/match.entity");
 const _messagesgateway = require("./messages.gateway");
+const _videocallentity = require("./video-call.entity");
+const _videocallsservice = require("./video-calls.service");
+const _videocallscontroller = require("./video-calls.controller");
 const _usersmodule = require("../users/users.module");
 const _matchesmodule = require("../matches/matches.module");
 const _authmodule = require("../auth/auth.module");
@@ -31,7 +34,8 @@ MessagesModule = _ts_decorate([
         imports: [
             _typeorm.TypeOrmModule.forFeature([
                 _messageentity.Message,
-                _matchentity.MatchRelation
+                _matchentity.MatchRelation,
+                _videocallentity.VideoCall
             ]),
             _usersmodule.UsersModule,
             _matchesmodule.MatchesModule,
@@ -39,13 +43,16 @@ MessagesModule = _ts_decorate([
         ],
         providers: [
             _messagesservice.MessagesService,
+            _videocallsservice.VideoCallsService,
             _messagesgateway.MessagesGateway
         ],
         controllers: [
-            _messagescontroller.MessagesController
+            _messagescontroller.MessagesController,
+            _videocallscontroller.VideoCallsController
         ],
         exports: [
-            _messagesservice.MessagesService
+            _messagesservice.MessagesService,
+            _videocallsservice.VideoCallsService
         ]
     })
 ], MessagesModule);

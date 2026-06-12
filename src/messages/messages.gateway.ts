@@ -10,6 +10,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
+import { VideoCallsService } from './video-calls.service';
 import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
 import { MatchStatus } from '../matches/match.entity';
@@ -30,10 +31,26 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   constructor(
     private readonly messagesService: MessagesService,
+    private readonly videoCallsService: VideoCallsService,
     private readonly usersService: UsersService,
     private readonly matchesService: MatchesService,
     private readonly jwtService: JwtService,
   ) {}
+
+  private getUserIdForSocket(client: Socket): string | undefined {
+    for (const [userId, sockets] of this.connectedUsers.entries()) {
+      if (sockets.has(client.id)) return userId;
+    }
+    return undefined;
+  }
+
+  private emitToUser(userId: string, event: string, payload: unknown) {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets) return;
+    for (const socketId of sockets) {
+      this.server.to(socketId).emit(event, payload);
+    }
+  }
 
   async handleConnection(client: Socket) {
     const token = (client.handshake.auth?.token || client.handshake.query.token) as string | undefined;
@@ -106,13 +123,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() data: { conversationId: string; receiverId: string; content: string },
     @ConnectedSocket() client: Socket,
   ) {
-    let senderId: string | undefined;
-    for (const [userId, sockets] of this.connectedUsers.entries()) {
-      if (sockets.has(client.id)) {
-        senderId = userId;
-        break;
-      }
-    }
+    const senderId = this.getUserIdForSocket(client);
     if (!senderId) return { error: 'Not authenticated' };
 
     let savedMessage;
@@ -123,12 +134,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     // Emit to recipient if online
-    const recipientSockets = this.connectedUsers.get(data.receiverId);
-    if (recipientSockets) {
-      for (const socketId of recipientSockets) {
-        this.server.to(socketId).emit('receiveMessage', savedMessage);
-      }
-    }
+    this.emitToUser(data.receiverId, 'receiveMessage', savedMessage);
     
     // Emit back to sender (optional, can be optimistic on client)
     this.server.to(client.id).emit('receiveMessage', savedMessage);
@@ -141,19 +147,81 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() data: { receiverId: string; isTyping: boolean },
     @ConnectedSocket() client: Socket,
   ) {
-    let senderId: string | undefined;
-    for (const [userId, sockets] of this.connectedUsers.entries()) {
-      if (sockets.has(client.id)) {
-        senderId = userId;
-        break;
-      }
-    }
+    const senderId = this.getUserIdForSocket(client);
     
-    const recipientSockets = this.connectedUsers.get(data.receiverId);
-    if (recipientSockets) {
-      for (const socketId of recipientSockets) {
-        this.server.to(socketId).emit('typingStatus', { userId: senderId, isTyping: data.isTyping });
-      }
+    this.emitToUser(data.receiverId, 'typingStatus', { userId: senderId, isTyping: data.isTyping });
+  }
+
+  @SubscribeMessage('startVideoCall')
+  async handleStartVideoCall(
+    @MessageBody() data: { conversationId: string; receiverId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const callerId = this.getUserIdForSocket(client);
+    if (!callerId) return { error: 'Not authenticated' };
+
+    try {
+      const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId);
+      const payload = { call, callerId, conversationId: data.conversationId };
+      this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
+      this.server.to(client.id).emit('videoCallStarted', payload);
+      return { event: 'videoCallStarted', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not start call' };
     }
+  }
+
+  @SubscribeMessage('acceptVideoCall')
+  async handleAcceptVideoCall(
+    @MessageBody() data: { callId: string; callerId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const receiverId = this.getUserIdForSocket(client);
+    if (!receiverId) return { error: 'Not authenticated' };
+
+    try {
+      const call = await this.videoCallsService.accept(data.callId, receiverId);
+      const payload = { call, receiverId };
+      this.emitToUser(data.callerId, 'videoCallAccepted', payload);
+      this.server.to(client.id).emit('videoCallAccepted', payload);
+      return { event: 'videoCallAccepted', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not accept call' };
+    }
+  }
+
+  @SubscribeMessage('endVideoCall')
+  async handleEndVideoCall(
+    @MessageBody() data: { callId: string; otherUserId: string; status?: 'ended' | 'rejected' | 'missed' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const call = await this.videoCallsService.finish(data.callId, userId, data.status || 'ended');
+      const payload = { call, endedBy: userId };
+      this.emitToUser(data.otherUserId, 'videoCallEnded', payload);
+      this.server.to(client.id).emit('videoCallEnded', payload);
+      return { event: 'videoCallEnded', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not end call' };
+    }
+  }
+
+  @SubscribeMessage('videoSignal')
+  handleVideoSignal(
+    @MessageBody() data: { receiverId: string; callId: string; signalType: 'offer' | 'answer' | 'ice'; payload: unknown },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const senderId = this.getUserIdForSocket(client);
+    if (!senderId) return { error: 'Not authenticated' };
+
+    this.emitToUser(data.receiverId, 'videoSignal', {
+      callId: data.callId,
+      senderId,
+      signalType: data.signalType,
+      payload: data.payload,
+    });
   }
 }

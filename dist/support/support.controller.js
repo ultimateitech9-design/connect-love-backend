@@ -35,6 +35,15 @@ let SupportController = class SupportController {
     findAll() {
         return this.supportService.findAll();
     }
+    overview() {
+        return this.supportService.overview();
+    }
+    tickets(status) {
+        return this.supportService.findTickets(status);
+    }
+    updateTicket(id, status) {
+        return this.supportService.updateStatus(Number(id), status);
+    }
     constructor(supportService){
         this.supportService = supportService;
     }
@@ -55,6 +64,35 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "findAll", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Get)('overview'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", void 0)
+], SupportController.prototype, "overview", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Get)('tickets'),
+    _ts_param(0, (0, _common.Query)('status')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SupportController.prototype, "tickets", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Patch)('tickets/:id/status'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)('status')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SupportController.prototype, "updateTicket", null);
 SupportController = _ts_decorate([
     (0, _common.Controller)('support'),
     _ts_metadata("design:type", Function),

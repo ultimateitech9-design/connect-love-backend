@@ -247,16 +247,6 @@ let MatchesService = class MatchesService {
             deleted: true
         };
     }
-    async simulateIncoming(receiverId) {
-        // create a fake user ID for the incoming request
-        const mockSenderId = `mock_${Math.floor(Math.random() * 1000)}`;
-        const match = this.matchesRepository.create({
-            senderId: mockSenderId,
-            receiverId,
-            status: _matchentity.MatchStatus.PENDING
-        });
-        return this.matchesRepository.save(match);
-    }
     constructor(matchesRepository, msgRepo, userRepo){
         this.matchesRepository = matchesRepository;
         this.msgRepo = msgRepo;

@@ -19,10 +19,14 @@ export class AuthService {
   ) {}
 
   private decryptOrUsePlainPassword(password: string): string {
-    const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
-    const bytes = CryptoJS.AES.decrypt(password, secret);
-    const decrypted = bytes.toString(CryptoJS.enc.Utf8);
-    return decrypted || password;
+    try {
+      const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
+      const bytes = CryptoJS.AES.decrypt(password, secret);
+      const decrypted = bytes.toString(CryptoJS.enc.Utf8);
+      return decrypted || password;
+    } catch {
+      return password;
+    }
   }
 
   private signUserToken(user: User) {
@@ -47,6 +51,9 @@ export class AuthService {
       password: hashed,
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
       gender: dto.gender,
+      city: dto.city,
+      locationLatitude: dto.locationLatitude,
+      locationLongitude: dto.locationLongitude,
     });
     const saved = await this.userRepo.save(user);
     const { password: _, ...safe } = saved as any;
@@ -61,6 +68,9 @@ export class AuthService {
       .getOne();
 
     if (!user) throw new UnauthorizedException('Invalid email or password.');
+    if (user.role !== 'user') {
+      throw new UnauthorizedException('Please use the management login for this account.');
+    }
 
     const match = await bcrypt.compare(dto.password, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');

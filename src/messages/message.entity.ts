@@ -30,7 +30,7 @@ export class Message {
   @JoinColumn({ name: 'receiverId' })
   receiver: User;
 
-  @Column('text')
+  @Column('mediumtext')
   content: string;
 
   @Column({ default: false })

@@ -96,6 +96,20 @@ _ts_decorate([
 ], User.prototype, "city", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        nullable: true,
+        type: 'double'
+    }),
+    _ts_metadata("design:type", Number)
+], User.prototype, "locationLatitude", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
+        type: 'double'
+    }),
+    _ts_metadata("design:type", Number)
+], User.prototype, "locationLongitude", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'json',
         nullable: true
     }),
@@ -209,7 +223,7 @@ _ts_decorate([
 ], User.prototype, "showDistance", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
-        default: false
+        default: true
     }),
     _ts_metadata("design:type", Boolean)
 ], User.prototype, "photosVisibleToNonMatches", void 0);

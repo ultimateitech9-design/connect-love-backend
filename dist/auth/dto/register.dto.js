@@ -44,5 +44,21 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], RegisterDto.prototype, "gender", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(150),
+    _ts_metadata("design:type", String)
+], RegisterDto.prototype, "city", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsLatitude)(),
+    _ts_metadata("design:type", Number)
+], RegisterDto.prototype, "locationLatitude", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsLongitude)(),
+    _ts_metadata("design:type", Number)
+], RegisterDto.prototype, "locationLongitude", void 0);
 
 //# sourceMappingURL=register.dto.js.map

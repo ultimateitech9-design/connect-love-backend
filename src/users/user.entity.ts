@@ -50,6 +50,12 @@ export class User {
   @Column({ nullable: true, length: 150 })
   city: string;
 
+  @Column({ nullable: true, type: 'double' })
+  locationLatitude: number;
+
+  @Column({ nullable: true, type: 'double' })
+  locationLongitude: number;
+
   @Column({ type: 'json', nullable: true })
   interests: string[];
 
@@ -105,7 +111,7 @@ export class User {
   @Column({ default: true })
   showDistance: boolean;
 
-  @Column({ default: false })
+  @Column({ default: true })
   photosVisibleToNonMatches: boolean;
 
   @Column({ default: false })

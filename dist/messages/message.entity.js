@@ -56,7 +56,7 @@ _ts_decorate([
     _ts_metadata("design:type", typeof _userentity.User === "undefined" ? Object : _userentity.User)
 ], Message.prototype, "receiver", void 0);
 _ts_decorate([
-    (0, _typeorm.Column)('text'),
+    (0, _typeorm.Column)('mediumtext'),
     _ts_metadata("design:type", String)
 ], Message.prototype, "content", void 0);
 _ts_decorate([

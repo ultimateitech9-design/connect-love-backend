@@ -1,16 +1,75 @@
-import { Controller, Get } from '@nestjs/common';
+import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
 import { Contact } from '../support/contact.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { Payment } from '../platform/payment.entity';
 import { SubscriptionPlan } from '../platform/subscription-plan.entity';
-import { VerificationRequest } from '../platform/verification-request.entity';
-import { PlatformNotification } from '../platform/platform-notification.entity';
+import { VerificationRequest, VerificationStatus } from '../platform/verification-request.entity';
+import { NotificationStatus, PlatformNotification } from '../platform/platform-notification.entity';
 import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
+import { IsEmail, IsString, MinLength, IsOptional, IsNumber } from 'class-validator';
+
+export class CreatePlatformUserDto {
+  @IsString()
+  @MinLength(2)
+  name: string;
+
+  @IsEmail()
+  email: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+}
+
+export class CreateNotificationDto {
+  @IsString()
+  campaign: string;
+
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  audience?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class CreateRoleDto {
+  @IsString()
+  role: string;
+
+  @IsOptional()
+  @IsNumber()
+  permissions?: number;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
+export class CreateInvoiceDto {
+  @IsOptional()
+  @IsString()
+  plan?: string;
+
+  @IsOptional()
+  @IsNumber()
+  amount?: number;
+}
 
 @Controller('api')
 export class PlatformApiController {
@@ -36,6 +95,33 @@ export class PlatformApiController {
     @InjectRepository(PlatformRole)
     private readonly roleRepo: Repository<PlatformRole>,
   ) {}
+
+  private dayKey(date: Date) {
+    return date.toLocaleString('en-US', { weekday: 'short' });
+  }
+
+  private normalizeRole(value?: string) {
+    return String(value || 'user').toLowerCase().replace(/[- ]/g, '_');
+  }
+
+  private initials(name: string) {
+    return name
+      .split(' ')
+      .map((part) => part[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  private async audit(module: string, action: string, activity: string) {
+    await this.auditRepo.save(this.auditRepo.create({
+      user: 'system',
+      module,
+      action,
+      activity,
+      ipAddress: '127.0.0.1',
+    }));
+  }
 
   @Get('dashboard')
   async dashboard() {
@@ -83,15 +169,94 @@ export class PlatformApiController {
   async users() {
     const users = await this.userRepo.find({ order: { createdAt: 'DESC' }, take: 100 });
     return {
-      users: users.map((user, index) => ({
-        id: index + 1,
+      users: users.map((user) => ({
+        id: user.id,
         name: user.name,
         email: user.email,
+        role: user.role,
+        plan: user.plan,
         account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
+        city: user.city || 'Unknown',
+        joined: user.createdAt,
+        lastActive: user.lastSeen || user.updatedAt,
+        isVerified: user.isVerified,
         status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review',
       })),
     };
   }
+
+  @Post('users')
+  async createUser(@Body() body: CreatePlatformUserDto) {
+    const existing = await this.userRepo.findOne({ where: { email: body.email } });
+    if (existing) return { message: 'A user with this email already exists.', user: existing };
+
+    const role = this.normalizeRole(body.role) as any;
+    const password = await bcrypt.hash(body.password, 12);
+    const user = await this.userRepo.save(this.userRepo.create({
+      name: body.name,
+      email: body.email,
+      password,
+      role,
+      plan: role === 'user' ? 'free' : 'platinum',
+      status: 'active',
+      isVerified: role !== 'user',
+      onboardingCompleted: role !== 'user',
+    }));
+    await this.audit('Users', 'Create', `Created ${role} account ${user.email}`);
+    const { password: _, ...safe } = user as any;
+    return { user: safe };
+  }
+
+  @Get('users/:id')
+  async getUserDetails(@Param('id') id: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        age: user.age,
+        birthDate: user.birthDate,
+        gender: user.gender,
+        profession: user.profession,
+        height: user.height,
+        city: user.city,
+        bio: user.bio,
+        interests: user.interests || [],
+        personality: user.personalityWords || [],
+        hobbies: user.hobbies || [],
+        avatarUrl: user.avatarUrl,
+        photos: user.photos || [],
+        isVerified: user.isVerified,
+        plan: user.plan,
+        role: user.role,
+        status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review',
+        joined: user.createdAt,
+        lastActive: user.lastSeen || user.updatedAt,
+      }
+    };
+  }
+
+  @Patch('users/:id/status')
+  async updateUserStatus(@Param('id') id: string, @Body('status') status: 'active' | 'suspended' | 'banned' | 'pending_verification') {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+    user.status = status;
+    await this.userRepo.save(user);
+    await this.audit('Users', 'Update Status', `Updated user ${user.email} status to ${status}`);
+    return { success: true, user };
+  }
+
+  @Delete('users/:id')
+  async deleteUser(@Param('id') id: string) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+    await this.userRepo.remove(user);
+    await this.audit('Users', 'Delete', `Deleted user account ${user.email}`);
+    return { success: true };
+  }
+
 
   @Get('verification')
   async verification() {
@@ -102,12 +267,17 @@ export class PlatformApiController {
     });
 
     return {
-      queue: pending.map((request, index) => ({
-          id: index + 1,
+      queue: pending.map((request) => ({
+          id: request.id,
           name: request.user?.name || 'Unknown user',
+          email: request.user?.email || '',
           idType: request.idType,
           priority: request.priority === 'high' ? 'High' : request.priority === 'low' ? 'Low' : 'Normal',
           status: request.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+          date: request.createdAt,
+          documents: request.documents || [],
+          photo: request.user?.avatarUrl || null,
+          birthDate: request.user?.birthDate || null,
         })),
     };
   }
@@ -169,6 +339,7 @@ export class PlatformApiController {
     const notifications = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
     return {
       notifications: notifications.map((notification) => ({
+        id: notification.id,
         campaign: notification.campaign,
         type: notification.type,
         audience: notification.audience,
@@ -177,15 +348,51 @@ export class PlatformApiController {
     };
   }
 
+  @Post('notifications')
+  async createNotification(@Body() body: CreateNotificationDto) {
+    const notification = await this.notificationRepo.save(this.notificationRepo.create({
+      campaign: body.campaign || 'Untitled campaign',
+      type: body.type || 'Push',
+      audience: body.audience || 'All users',
+      status: (body.status as NotificationStatus) || 'draft',
+    }));
+    await this.audit('Notifications', 'Create', `Created notification campaign ${notification.campaign}`);
+    return notification;
+  }
+
+  @Patch('notifications/:id/status')
+  async updateNotificationStatus(@Param('id') id: string, @Body('status') status: NotificationStatus) {
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) return { message: 'Notification campaign not found.' };
+    notification.status = status;
+    await this.notificationRepo.save(notification);
+    await this.audit('Notifications', 'Update', `Changed ${notification.campaign} to ${status}`);
+    return notification;
+  }
+
+  @Delete('notifications/:id')
+  async deleteNotification(@Param('id') id: string) {
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) return { deleted: true };
+    await this.notificationRepo.remove(notification);
+    await this.audit('Notifications', 'Delete', `Deleted notification campaign ${notification.campaign}`);
+    return { deleted: true };
+  }
+
   @Get('security')
   async security() {
-    const logs = await this.auditRepo.find({ order: { createdAt: 'ASC' }, take: 7 });
+    const logs = await this.auditRepo.find({ order: { createdAt: 'ASC' } });
+    const weekly = logs.reduce<Record<string, { day: string; success: number; failed: number }>>((acc, log) => {
+      const day = log.createdAt.toLocaleDateString('en-US', { weekday: 'short' });
+      acc[day] ||= { day, success: 0, failed: 0 };
+      if (log.action.toLowerCase().includes('fail')) acc[day].failed += 1;
+      else if (log.action.toLowerCase().includes('login')) acc[day].success += 1;
+      return acc;
+    }, {});
+    const blockedAccounts = await this.userRepo.count({ where: { status: 'banned' } });
     return {
-      loginActivity: logs.map((log, index) => ({
-        day: log.createdAt.toLocaleDateString('en-US', { weekday: 'short' }),
-        success: 80 + index * 7,
-        failed: log.action.toLowerCase().includes('failed') ? 1 : 0,
-      })),
+      loginActivity: Object.values(weekly),
+      blockedAccounts,
     };
   }
 
@@ -201,6 +408,13 @@ export class PlatformApiController {
         premiumMemberships: value.premiumMemberships ?? true,
       },
     };
+  }
+
+  @Patch('settings')
+  async updateSettings(@Body() settings: Record<string, boolean>) {
+    await this.settingRepo.save(this.settingRepo.create({ key: 'platform_flags', value: settings }));
+    await this.audit('Settings', 'Update', 'Updated platform settings');
+    return { settings };
   }
 
   @Get('roles')
@@ -225,6 +439,296 @@ export class PlatformApiController {
     };
   }
 
+  @Post('roles')
+  async createRole(@Body() body: CreateRoleDto) {
+    const role = await this.roleRepo.save(this.roleRepo.create({
+      role: body.role,
+      permissions: body.permissions ?? 1,
+      status: body.status || 'Active',
+    }));
+    await this.audit('Roles', 'Create', `Created role ${role.role}`);
+    return role;
+  }
+
+  @Patch('roles/:id')
+  async updateRole(@Param('id') id: string, @Body() body: Partial<PlatformRole>) {
+    const role = await this.roleRepo.findOne({ where: { id } });
+    if (!role) return { message: 'Role not found.' };
+    Object.assign(role, body);
+    await this.roleRepo.save(role);
+    await this.audit('Roles', 'Update', `Updated role ${role.role}`);
+    return role;
+  }
+
+  @Patch('verification/:id/status')
+  async updateVerification(@Param('id') id: string, @Body('status') status: VerificationStatus) {
+    const request = await this.verificationRepo.findOne({ where: { id }, relations: ['user'] });
+    if (!request) return { message: 'Verification request not found.' };
+    request.status = status;
+    await this.verificationRepo.save(request);
+    if (status === 'approved' || status === 'rejected') {
+      await this.userRepo.update(request.userId, { isVerified: status === 'approved' });
+    }
+    await this.audit('Verification', 'Update', `Verification ${id} marked ${status}`);
+    return request;
+  }
+
+  @Get('marketing/overview')
+  async marketingOverview() {
+    const users = await this.userRepo.find({ order: { createdAt: 'ASC' } });
+    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
+    const weekly: Record<string, { day: string; spend: number; users: number }> = {};
+    users.forEach((user) => {
+      const day = this.dayKey(user.createdAt);
+      weekly[day] ||= { day, spend: 0, users: 0 };
+      weekly[day].users += 1;
+      weekly[day].spend += 300 + weekly[day].users * 18;
+    });
+    const channelData = [
+      { channel: 'Organic', value: users.filter((u) => u.plan === 'free').length },
+      { channel: 'Premium Referral', value: users.filter((u) => u.plan !== 'free').length },
+      { channel: 'Campaigns', value: campaigns.length },
+      { channel: 'Support Leads', value: await this.contactRepo.count() },
+    ];
+    const totalSpend = Object.values(weekly).reduce((sum, row) => sum + row.spend, 0);
+    const premiumUsers = users.filter((u) => u.plan !== 'free').length;
+    const conversionRate = users.length ? ((premiumUsers / users.length) * 100).toFixed(1) : '0.0';
+    return {
+      kpis: [
+        { label: 'Total Marketing Spend', value: `$${totalSpend.toLocaleString()}`, delta: '+8.4%' },
+        { label: 'New Users Acquired', value: users.length.toLocaleString(), delta: '+4.2%' },
+        { label: 'Active Campaigns', value: String(campaigns.filter((c) => c.status === 'active').length), delta: `${campaigns.length} total` },
+        { label: 'Cost Per Acquisition', value: `$${users.length ? (totalSpend / users.length).toFixed(2) : '0.00'}`, delta: '-2.1%' },
+        { label: 'Conversion Rate', value: `${conversionRate}%`, delta: '+1.1%' },
+      ],
+      spendTrend: Object.values(weekly),
+      channelData,
+    };
+  }
+
+  @Get('marketing/campaigns')
+  async marketingCampaigns() {
+    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
+    return {
+      campaigns: campaigns.map((c, index) => ({
+        id: c.id,
+        name: c.campaign,
+        channel: c.type,
+        status: c.status,
+        audience: c.audience,
+        spend: 1200 + index * 730,
+        conversions: 80 + index * 31,
+        roi: 1.8 + index * 0.2,
+      })),
+    };
+  }
+
+  @Get('marketing/reports')
+  async marketingReports() {
+    const users = await this.userRepo.find({ select: ['createdAt', 'plan'] });
+    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
+    const contacts = await this.contactRepo.count();
+    const premiumUsers = users.filter((user) => user.plan !== 'free').length;
+
+    return {
+      reports: [
+        {
+          title: 'Daily Report',
+          desc: 'Users, campaigns, and support leads created today.',
+          meta: `${users.filter((user) => user.createdAt.toDateString() === new Date().toDateString()).length} users today`,
+          type: 'daily',
+        },
+        {
+          title: 'Users Report',
+          desc: 'Live user acquisition and premium conversion summary.',
+          meta: `${users.length} users, ${premiumUsers} premium`,
+          type: 'users',
+        },
+        {
+          title: 'Campaigns Report',
+          desc: 'Notification campaigns currently stored in the platform.',
+          meta: `${campaigns.length} campaigns`,
+          type: 'campaigns',
+        },
+        {
+          title: 'Leads Report',
+          desc: 'Support/contact leads submitted from the website.',
+          meta: `${contacts} leads`,
+          type: 'leads',
+        },
+      ],
+    };
+  }
+
+  @Get('sales/overview')
+  async salesOverview() {
+    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'ASC' } });
+    const users = await this.userRepo.find();
+    const revenueData: Record<string, { day: string; revenue: number; signups: number }> = {};
+    payments.forEach((payment) => {
+      const day = this.dayKey(payment.createdAt);
+      revenueData[day] ||= { day, revenue: 0, signups: 0 };
+      revenueData[day].revenue += Number(payment.amount);
+    });
+    users.forEach((user) => {
+      const day = this.dayKey(user.createdAt);
+      revenueData[day] ||= { day, revenue: 0, signups: 0 };
+      revenueData[day].signups += 1;
+    });
+    const planSplit = Object.entries(users.reduce<Record<string, number>>((acc, user) => {
+      acc[user.plan] = (acc[user.plan] || 0) + 1;
+      return acc;
+    }, {})).map(([name, value]) => ({ name, value }));
+    return {
+      kpis: [
+        { label: 'Total Subscriptions', value: String(users.filter((u) => u.plan !== 'free').length), delta: 8.4 },
+        { label: 'New Premium Users', value: String(users.filter((u) => u.plan !== 'free').length), delta: 4.1 },
+        { label: 'Renewal Rate', value: '78.6%', delta: 2.3 },
+        { label: 'Conversion Rate', value: `${users.length ? ((users.filter((u) => u.plan !== 'free').length / users.length) * 100).toFixed(1) : '0.0'}%`, delta: -1.1 },
+      ],
+      revenueData: Object.values(revenueData),
+      planSplit,
+      recentUpgrades: payments.slice(-5).reverse().map((p) => ({
+        name: p.user?.name || 'Deleted user',
+        plan: p.planName,
+        amt: `$${Number(p.amount).toFixed(2)}`,
+        t: p.createdAt.toLocaleString(),
+      })),
+    };
+  }
+
+  @Get('sales/trends')
+  async salesTrends() {
+    const payments = await this.paymentRepo.find({ order: { createdAt: 'ASC' } });
+    const successful = payments.filter((payment) => payment.status === 'successful');
+    const now = new Date();
+    const monthKey = (date: Date) => date.toLocaleString('en-US', { month: 'short' });
+    const weekOfMonth = (date: Date) => `W${Math.ceil(date.getDate() / 7)}`;
+    const sameDay = (date: Date) => date.toDateString() === now.toDateString();
+    const sameMonth = (date: Date) => date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+
+    const monthly = Object.values(successful.reduce<Record<string, { m: string; sales: number; growth: number }>>((acc, payment) => {
+      const key = monthKey(payment.createdAt);
+      acc[key] ||= { m: key, sales: 0, growth: 0 };
+      acc[key].sales += Number(payment.amount);
+      return acc;
+    }, {})).map((row, index, rows) => ({
+      ...row,
+      growth: index > 0 && rows[index - 1].sales > 0 ? Number((((row.sales - rows[index - 1].sales) / rows[index - 1].sales) * 100).toFixed(1)) : 0,
+    }));
+
+    const weekly = Object.values(successful.filter((payment) => sameMonth(payment.createdAt)).reduce<Record<string, { w: string; sales: number }>>((acc, payment) => {
+      const key = weekOfMonth(payment.createdAt);
+      acc[key] ||= { w: key, sales: 0 };
+      acc[key].sales += Number(payment.amount);
+      return acc;
+    }, {}));
+
+    const todaySales = successful.filter((payment) => sameDay(payment.createdAt)).reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const weekSales = successful.filter((payment) => sameMonth(payment.createdAt) && weekOfMonth(payment.createdAt) === weekOfMonth(now)).reduce((sum, payment) => sum + Number(payment.amount), 0);
+    const monthSales = successful.filter((payment) => sameMonth(payment.createdAt)).reduce((sum, payment) => sum + Number(payment.amount), 0);
+
+    return {
+      kpis: {
+        todaySales,
+        weekSales,
+        monthSales,
+        threeMonthGrowth: monthly.slice(-3).reduce((sum, row) => sum + row.growth, 0),
+      },
+      monthly,
+      weekly,
+    };
+  }
+
+  @Get('sales/plans')
+  async salesPlans() {
+    const plans = await this.planRepo.find({ order: { sortOrder: 'ASC' } });
+    const users = await this.userRepo.find({ select: ['plan', 'city'] });
+    return {
+      plans: plans.map((plan) => ({
+        id: plan.id,
+        name: plan.displayName,
+        price: Number(plan.price),
+        features: plan.features || [],
+        status: plan.status,
+        subscribers: users.filter((u) => u.plan === plan.name).length,
+      })),
+      topMarkets: Object.entries(users.reduce<Record<string, number>>((acc, user) => {
+        const city = user.city || 'Unknown';
+        acc[city] = (acc[city] || 0) + 1;
+        return acc;
+      }, {})).map(([city, value]) => ({ city, value })).slice(0, 8),
+    };
+  }
+
+  @Get('finance/refunds')
+  async financeRefunds() {
+    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
+    return {
+      refunds: payments.map((p) => ({
+        id: p.id,
+        user: p.user?.name || 'Deleted user',
+        plan: p.planName,
+        amount: Number(p.amount),
+        status: p.status === 'refunded' ? 'Approved' : p.status === 'failed' ? 'Rejected' : 'Requests',
+        date: p.createdAt.toISOString().slice(0, 10),
+      })),
+    };
+  }
+
+  @Get('finance/notifications')
+  async financeNotifications() {
+    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' }, take: 20 });
+    return {
+      notifications: payments.map((payment) => ({
+        id: payment.id,
+        title: payment.status === 'failed' ? 'Payment Failed' : payment.status === 'refunded' ? 'Refund Processed' : payment.status === 'successful' ? 'Payment Received' : 'Payment Pending',
+        message: `${payment.user?.name || payment.user?.email || 'Unassigned user'} - ${payment.planName} - ${payment.currency} ${Number(payment.amount).toFixed(2)}`,
+        time: payment.createdAt,
+        type: payment.status === 'failed' ? 'error' : payment.status === 'successful' ? 'success' : 'info',
+      })),
+    };
+  }
+
+  @Patch('finance/payments/:id/refund')
+  async refundPayment(@Param('id') id: string) {
+    const payment = await this.paymentRepo.findOne({ where: { id }, relations: ['user'] });
+    if (!payment) return { message: 'Payment not found.' };
+    payment.status = 'refunded';
+    await this.paymentRepo.save(payment);
+    await this.audit('Finance', 'Refund', `Refunded payment ${id}`);
+    return payment;
+  }
+
+  @Get('finance/invoices')
+  async invoices() {
+    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
+    return {
+      invoices: payments.map((p, index) => ({
+        id: `INV-${String(index + 1).padStart(4, '0')}`,
+        customer: p.user?.name || 'Deleted user',
+        email: p.user?.email || '',
+        plan: p.planName,
+        amount: Number(p.amount),
+        status: p.status === 'successful' ? 'Paid' : p.status === 'failed' ? 'Overdue' : 'Unpaid',
+        due: p.createdAt.toISOString().slice(0, 10),
+        paymentId: p.id,
+      })),
+    };
+  }
+
+  @Post('finance/invoices')
+  async createInvoice(@Body() body: CreateInvoiceDto) {
+    const payment = await this.paymentRepo.save(this.paymentRepo.create({
+      planName: body.plan || 'Invoice',
+      amount: Number(body.amount || 0).toFixed(2),
+      currency: 'USD',
+      status: 'pending',
+    }));
+    await this.audit('Finance', 'Invoice', `Created invoice payment ${payment.id}`);
+    return payment;
+  }
+
   @Get('logs')
   async logs() {
     const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 100 });
@@ -243,29 +747,25 @@ export class PlatformApiController {
   @Get('super-admin')
   async superAdmin() {
     const superAdmin = await this.userRepo.findOne({ where: { role: 'super_admin' } });
+    if (!superAdmin) throw new NotFoundException('Super admin account not found. Run npm run db:setup in the backend.');
     const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 5 });
-    const initials = (superAdmin?.name || 'Super Admin')
-      .split(' ')
-      .map((part) => part[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
+    const ipWhitelist = [...new Set(logs.map((log) => log.ipAddress).filter(Boolean))];
 
     return {
       superAdmin: {
         profile: {
-          id: superAdmin?.id || 'SA-001',
-          name: superAdmin?.name || 'Super Admin',
-          email: superAdmin?.email || 'superadmin@connectlove.local',
-          phone: '+1 555 0100',
+          id: superAdmin.id,
+          name: superAdmin.name,
+          email: superAdmin.email,
+          phone: '',
           role: 'Super Admin',
-          status: superAdmin?.status || 'active',
-          initials,
-          joinedAt: superAdmin?.createdAt?.toISOString().split('T')[0] || '2026-01-01',
-          lastLogin: logs[0]?.createdAt?.toLocaleString() || 'Today',
-          lastActive: superAdmin?.lastSeen?.toLocaleString() || 'Just now',
-          twoFactorEnabled: true,
-          ipWhitelist: ['127.0.0.1'],
+          status: superAdmin.status,
+          initials: this.initials(superAdmin.name),
+          joinedAt: superAdmin.createdAt.toISOString().split('T')[0],
+          lastLogin: logs.find((log) => log.action.toLowerCase().includes('login'))?.createdAt?.toLocaleString() || '',
+          lastActive: superAdmin.lastSeen?.toLocaleString() || '',
+          twoFactorEnabled: false,
+          ipWhitelist,
           timezone: 'Asia/Calcutta',
           sessionTimeout: '24 hours',
         },
@@ -278,7 +778,15 @@ export class PlatformApiController {
         modules: [
           { name: 'Dashboard', icon: 'LayoutDashboard', route: '/super-admin', access: true, actions: [{ label: 'View', allowed: true }] },
           { name: 'Users', icon: 'Users', route: '/super-admin/users', access: true, actions: [{ label: 'Manage', allowed: true }] },
+          { name: 'Verification', icon: 'ShieldCheck', route: '/super-admin/verification', access: true, actions: [{ label: 'Review', allowed: true }] },
+          { name: 'Payments', icon: 'CreditCard', route: '/super-admin/payments', access: true, actions: [{ label: 'Manage', allowed: true }] },
+          { name: 'Reports', icon: 'Flag', route: '/super-admin/reports', access: true, actions: [{ label: 'Moderate', allowed: true }] },
+          { name: 'Notifications', icon: 'Bell', route: '/super-admin/notifications', access: true, actions: [{ label: 'Send', allowed: true }] },
           { name: 'Security', icon: 'Lock', route: '/super-admin/security', access: true, actions: [{ label: 'Audit', allowed: true }] },
+          { name: 'Settings', icon: 'Settings', route: '/super-admin/settings', access: true, actions: [{ label: 'Configure', allowed: true }] },
+          { name: 'Roles & Permissions', icon: 'KeyRound', route: '/super-admin/roles', access: true, actions: [{ label: 'Manage', allowed: true }] },
+          { name: 'System Logs', icon: 'ScrollText', route: '/super-admin/logs', access: true, actions: [{ label: 'View', allowed: true }] },
+          { name: 'Super Admin Profile', icon: 'User', route: '/super-admin/super-admin', access: true, actions: [{ label: 'Update', allowed: true }] },
         ],
         activityLog: logs.map((log) => ({
           action: log.activity,

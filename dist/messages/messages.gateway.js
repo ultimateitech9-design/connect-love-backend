@@ -12,6 +12,7 @@ const _websockets = require("@nestjs/websockets");
 const _socketio = require("socket.io");
 const _jwt = require("@nestjs/jwt");
 const _messagesservice = require("./messages.service");
+const _videocallsservice = require("./video-calls.service");
 const _usersservice = require("../users/users.service");
 const _matchesservice = require("../matches/matches.service");
 const _matchentity = require("../matches/match.entity");
@@ -30,6 +31,19 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let MessagesGateway = class MessagesGateway {
+    getUserIdForSocket(client) {
+        for (const [userId, sockets] of this.connectedUsers.entries()){
+            if (sockets.has(client.id)) return userId;
+        }
+        return undefined;
+    }
+    emitToUser(userId, event, payload) {
+        const sockets = this.connectedUsers.get(userId);
+        if (!sockets) return;
+        for (const socketId of sockets){
+            this.server.to(socketId).emit(event, payload);
+        }
+    }
     async handleConnection(client) {
         const token = client.handshake.auth?.token || client.handshake.query.token;
         let userId;
@@ -96,13 +110,7 @@ let MessagesGateway = class MessagesGateway {
         }
     }
     async handleSendMessage(data, client) {
-        let senderId;
-        for (const [userId, sockets] of this.connectedUsers.entries()){
-            if (sockets.has(client.id)) {
-                senderId = userId;
-                break;
-            }
-        }
+        const senderId = this.getUserIdForSocket(client);
         if (!senderId) return {
             error: 'Not authenticated'
         };
@@ -115,12 +123,7 @@ let MessagesGateway = class MessagesGateway {
             };
         }
         // Emit to recipient if online
-        const recipientSockets = this.connectedUsers.get(data.receiverId);
-        if (recipientSockets) {
-            for (const socketId of recipientSockets){
-                this.server.to(socketId).emit('receiveMessage', savedMessage);
-            }
-        }
+        this.emitToUser(data.receiverId, 'receiveMessage', savedMessage);
         // Emit back to sender (optional, can be optimistic on client)
         this.server.to(client.id).emit('receiveMessage', savedMessage);
         return {
@@ -129,25 +132,97 @@ let MessagesGateway = class MessagesGateway {
         };
     }
     handleTyping(data, client) {
-        let senderId;
-        for (const [userId, sockets] of this.connectedUsers.entries()){
-            if (sockets.has(client.id)) {
-                senderId = userId;
-                break;
-            }
-        }
-        const recipientSockets = this.connectedUsers.get(data.receiverId);
-        if (recipientSockets) {
-            for (const socketId of recipientSockets){
-                this.server.to(socketId).emit('typingStatus', {
-                    userId: senderId,
-                    isTyping: data.isTyping
-                });
-            }
+        const senderId = this.getUserIdForSocket(client);
+        this.emitToUser(data.receiverId, 'typingStatus', {
+            userId: senderId,
+            isTyping: data.isTyping
+        });
+    }
+    async handleStartVideoCall(data, client) {
+        const callerId = this.getUserIdForSocket(client);
+        if (!callerId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId);
+            const payload = {
+                call,
+                callerId,
+                conversationId: data.conversationId
+            };
+            this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
+            this.server.to(client.id).emit('videoCallStarted', payload);
+            return {
+                event: 'videoCallStarted',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not start call'
+            };
         }
     }
-    constructor(messagesService, usersService, matchesService, jwtService){
+    async handleAcceptVideoCall(data, client) {
+        const receiverId = this.getUserIdForSocket(client);
+        if (!receiverId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const call = await this.videoCallsService.accept(data.callId, receiverId);
+            const payload = {
+                call,
+                receiverId
+            };
+            this.emitToUser(data.callerId, 'videoCallAccepted', payload);
+            this.server.to(client.id).emit('videoCallAccepted', payload);
+            return {
+                event: 'videoCallAccepted',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not accept call'
+            };
+        }
+    }
+    async handleEndVideoCall(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const call = await this.videoCallsService.finish(data.callId, userId, data.status || 'ended');
+            const payload = {
+                call,
+                endedBy: userId
+            };
+            this.emitToUser(data.otherUserId, 'videoCallEnded', payload);
+            this.server.to(client.id).emit('videoCallEnded', payload);
+            return {
+                event: 'videoCallEnded',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not end call'
+            };
+        }
+    }
+    handleVideoSignal(data, client) {
+        const senderId = this.getUserIdForSocket(client);
+        if (!senderId) return {
+            error: 'Not authenticated'
+        };
+        this.emitToUser(data.receiverId, 'videoSignal', {
+            callId: data.callId,
+            senderId,
+            signalType: data.signalType,
+            payload: data.payload
+        });
+    }
+    constructor(messagesService, videoCallsService, usersService, matchesService, jwtService){
         this.messagesService = messagesService;
+        this.videoCallsService = videoCallsService;
         this.usersService = usersService;
         this.matchesService = matchesService;
         this.jwtService = jwtService;
@@ -181,6 +256,50 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], MessagesGateway.prototype, "handleTyping", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('startVideoCall'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleStartVideoCall", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('acceptVideoCall'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleAcceptVideoCall", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('endVideoCall'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleEndVideoCall", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('videoSignal'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], MessagesGateway.prototype, "handleVideoSignal", null);
 MessagesGateway = _ts_decorate([
     (0, _websockets.WebSocketGateway)({
         cors: {
@@ -192,6 +311,7 @@ MessagesGateway = _ts_decorate([
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         typeof _messagesservice.MessagesService === "undefined" ? Object : _messagesservice.MessagesService,
+        typeof _videocallsservice.VideoCallsService === "undefined" ? Object : _videocallsservice.VideoCallsService,
         typeof _usersservice.UsersService === "undefined" ? Object : _usersservice.UsersService,
         typeof _matchesservice.MatchesService === "undefined" ? Object : _matchesservice.MatchesService,
         typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService

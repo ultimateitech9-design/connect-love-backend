@@ -1,4 +1,13 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsLatitude,
+  IsLongitude,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -19,4 +28,17 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   gender?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(150)
+  city?: string;
+
+  @IsOptional()
+  @IsLatitude()
+  locationLatitude?: number;
+
+  @IsOptional()
+  @IsLongitude()
+  locationLongitude?: number;
 }

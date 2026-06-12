@@ -12,6 +12,7 @@ import { PlatformNotification } from './platform/platform-notification.entity';
 import { AuditLog } from './platform/audit-log.entity';
 import { PlatformSetting } from './platform/platform-setting.entity';
 import { PlatformRole } from './platform/role.entity';
+import { VideoCall } from './messages/video-call.entity';
 
 dotenv.config();
 
@@ -20,7 +21,7 @@ export default new DataSource({
   host: process.env.DB_HOST || 'localhost',
   port: parseInt(process.env.DB_PORT || '3306', 10),
   username: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || 'root',
+  password: process.env.DB_PASSWORD ?? 'root',
   database: process.env.DB_NAME || 'dating_web_app',
   entities: [
     User,
@@ -34,6 +35,7 @@ export default new DataSource({
     AuditLog,
     PlatformSetting,
     PlatformRole,
+    VideoCall,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

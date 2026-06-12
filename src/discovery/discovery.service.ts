@@ -29,7 +29,8 @@ export class DiscoveryService {
         return `NOT EXISTS ${subQuery}`;
       })
       // Only show active and verified users
-      .andWhere('user.status = :status', { status: 'active' });
+      .andWhere('user.status = :status', { status: 'active' })
+      .andWhere('user.role = :role', { role: 'user' });
 
     if (currentUser?.onlyShowVerifiedProfiles) {
       query.andWhere('user.isVerified = :verified', { verified: true });
@@ -49,8 +50,8 @@ export class DiscoveryService {
         personality: user.personalityWords || [],
         hobbies: user.hobbies || [],
         interests: user.interests || [],
-        distanceMi: 1 + Math.floor(Math.random() * 9),
-        goals: user.plan === 'free' ? 'Long-term' : 'Premium match',
+        distanceMi: null,
+        goals: null,
       } as any;
     });
   }
