@@ -8,12 +8,13 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { User } from '../users/user.entity';
+import { AuditLog } from '../platform/audit-log.entity';
 
 dotenv.config();
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User]),
+    TypeOrmModule.forFeature([User, AuditLog]),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',

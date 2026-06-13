@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { Contact } from '../support/contact.entity';
 import { Payment } from '../platform/payment.entity';
 import { VerificationRequest } from '../platform/verification-request.entity';
+import * as bcrypt from 'bcryptjs';
+import { CreateManagementUserDto } from './dto/create-management-user.dto';
 
 @Injectable()
 export class AdminService {
@@ -40,12 +42,45 @@ export class AdminService {
   }
 
   async getAllUsers(page = 1, limit = 20) {
-    const [users, total] = await this.userRepo.findAndCount({
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
-    return { users, total, page, limit };
+    const safePage = Math.max(1, page || 1);
+    const safeLimit = Math.min(100, Math.max(1, limit || 20));
+    const total = await this.userRepo.count();
+    const rows = await this.userRepo
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.createdAt'])
+      .orderBy('user.createdAt', 'DESC')
+      .addOrderBy('user.id', 'DESC')
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
+      .getMany();
+    const ids = rows.map((row) => row.id);
+    const users = ids.length ? await this.userRepo.find({ where: { id: In(ids) } }) : [];
+    const position = new Map(ids.map((id, index) => [id, index]));
+    users.sort((left, right) => (position.get(left.id) ?? 0) - (position.get(right.id) ?? 0));
+    return { users, total, page: safePage, limit: safeLimit };
+  }
+
+  async createManagementUser(body: CreateManagementUserDto, creatorRole?: string) {
+    if (body.role === 'admin' && creatorRole !== 'super_admin') {
+      throw new ForbiddenException('Only a Super Admin can create an Admin ID.');
+    }
+    const email = body.email.trim().toLowerCase();
+    const existing = await this.userRepo.findOne({ where: { email } });
+    if (existing) throw new ConflictException('An ID with this email already exists.');
+
+    const user = await this.userRepo.save(this.userRepo.create({
+      name: body.name.trim(),
+      email,
+      password: await bcrypt.hash(body.password, 12),
+      role: body.role,
+      plan: 'platinum',
+      status: 'active',
+      isVerified: true,
+      onboardingCompleted: true,
+    }));
+
+    const { password: _, ...safeUser } = user as any;
+    return { message: 'Management ID created successfully.', user: safeUser };
   }
 
   async updateUserStatus(id: string, status: string) {

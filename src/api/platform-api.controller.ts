@@ -167,7 +167,23 @@ export class PlatformApiController {
 
   @Get('users')
   async users() {
-    const users = await this.userRepo.find({ order: { createdAt: 'DESC' }, take: 100 });
+    const users = await this.userRepo.find({
+      select: [
+        'id',
+        'name',
+        'email',
+        'role',
+        'plan',
+        'city',
+        'lastSeen',
+        'updatedAt',
+        'createdAt',
+        'isVerified',
+        'status',
+      ],
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
     return {
       users: users.map((user) => ({
         id: user.id,
@@ -190,7 +206,7 @@ export class PlatformApiController {
     const existing = await this.userRepo.findOne({ where: { email: body.email } });
     if (existing) return { message: 'A user with this email already exists.', user: existing };
 
-    const role = this.normalizeRole(body.role) as any;
+    const role = 'user';
     const password = await bcrypt.hash(body.password, 12);
     const user = await this.userRepo.save(this.userRepo.create({
       name: body.name,
@@ -731,14 +747,24 @@ export class PlatformApiController {
 
   @Get('logs')
   async logs() {
-    const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 100 });
+    const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 250 });
+    const now = Date.now();
     return {
       logs: logs.map((log) => ({
+        id: log.id,
         user: log.user,
         activity: log.activity,
         ipAddress: log.ipAddress,
         action: log.action,
         module: log.module,
+        role: log.role,
+        device: log.device,
+        loginAt: log.loginAt,
+        lastActivityAt: log.lastActivityAt,
+        logoutAt: log.logoutAt,
+        durationSeconds: log.loginAt
+          ? (log.durationSeconds ?? Math.max(0, Math.floor((now - new Date(log.loginAt).getTime()) / 1000)))
+          : null,
         createdAt: log.createdAt,
       })),
     };

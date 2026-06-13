@@ -9,7 +9,7 @@ import {
   Headers,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { LoginDto } from './dto/login.dto';
@@ -22,6 +22,24 @@ export class AuthController {
     private readonly blacklist: TokenBlacklistService,
   ) {}
 
+  private loginContext(request: Request) {
+    const forwarded = request.headers['x-forwarded-for'];
+    const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0];
+    const ipAddress = (forwardedIp && forwardedIp !== 'Unknown' ? forwardedIp : undefined)
+      || request.ip
+      || request.socket.remoteAddress
+      || 'Unknown';
+    return {
+      ipAddress: ipAddress.trim(),
+      device: String(request.headers['x-client-user-agent'] || request.headers['user-agent'] || 'Unknown device'),
+    };
+  }
+
+  private tokenFrom(authHeader: string | undefined, body?: { token?: string }) {
+    if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7).trim();
+    return body?.token;
+  }
+
   @Post('register')
   register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -29,17 +47,18 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  login(@Body() dto: LoginDto, @Req() request: Request) {
+    return this.authService.login(dto, this.loginContext(request));
   }
 
   @Post('admin/login')
   @HttpCode(HttpStatus.OK)
   async adminLogin(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.adminLogin(dto);
+    const result = await this.authService.adminLogin(dto, this.loginContext(request));
     
     // Set the token as an HTTP-only cookie
     response.cookie('admin_token', result.access_token, {
@@ -57,9 +76,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async superAdminLogin(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.superAdminLogin(dto);
+    const result = await this.authService.superAdminLogin(dto, this.loginContext(request));
     
     response.cookie('admin_token', result.access_token, {
       httpOnly: true,
@@ -76,9 +96,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async marketingLogin(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.marketingLogin(dto);
+    const result = await this.authService.marketingLogin(dto, this.loginContext(request));
     
     response.cookie('admin_token', result.access_token, {
       httpOnly: true,
@@ -95,9 +116,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async financeLogin(
     @Body() dto: LoginDto,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.financeLogin(dto);
+    const result = await this.authService.financeLogin(dto, this.loginContext(request));
     
     response.cookie('admin_token', result.access_token, {
       httpOnly: true,
@@ -114,9 +136,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   async managementLogin(
     @Body() dto: LoginDto & { role: string },
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
-    const result = await this.authService.managementLogin(dto);
+    const result = await this.authService.managementLogin(dto, this.loginContext(request));
 
     response.cookie('management_token', result.access_token, {
       httpOnly: true,
@@ -141,23 +164,23 @@ export class AuthController {
    */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  logout(
+  async logout(
     @Headers('authorization') authHeader: string | undefined,
     @Body() body: { token?: string },
   ) {
-    // Extract token from header first, then fall back to body (sendBeacon payload)
-    let token: string | undefined;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      token = authHeader.slice(7).trim();
-    } else if (body?.token) {
-      token = body.token;
-    }
+    const token = this.tokenFrom(authHeader, body);
 
     if (token) {
+      await this.authService.endSession(token);
       this.blacklist.blacklist(token);
     }
 
     return { message: 'Logged out successfully' };
+  }
+
+  @Post('activity')
+  @HttpCode(HttpStatus.OK)
+  activity(@Headers('authorization') authHeader: string | undefined) {
+    return this.authService.touchSession(this.tokenFrom(authHeader));
   }
 }

@@ -9,12 +9,20 @@ import * as CryptoJS from 'crypto-js';
 import { User } from '../users/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { AuditLog } from '../platform/audit-log.entity';
+
+export interface LoginContext {
+  ipAddress?: string;
+  device?: string;
+}
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(AuditLog)
+    private readonly auditRepo: Repository<AuditLog>,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -29,13 +37,66 @@ export class AuthService {
     }
   }
 
-  private signUserToken(user: User) {
+  private signUserToken(user: User, sessionId?: string) {
     return this.jwtService.sign({
       sub: user.id,
       email: user.email,
       plan: user.plan,
       role: user.role || 'user',
+      sid: sessionId,
     });
+  }
+
+  private async startSession(user: User, context: LoginContext = {}) {
+    const now = new Date();
+    const log = await this.auditRepo.save(this.auditRepo.create({
+      userId: user.id,
+      user: user.name || user.email,
+      activity: 'Logged in',
+      ipAddress: context.ipAddress || 'Unknown',
+      action: 'Active',
+      module: 'Authentication',
+      role: user.role || 'user',
+      device: (context.device || 'Unknown device').slice(0, 255),
+      loginAt: now,
+      lastActivityAt: now,
+    }));
+    log.sessionId = log.id;
+    return this.auditRepo.save(log);
+  }
+
+  async touchSession(token?: string) {
+    const payload = this.readToken(token);
+    if (!payload?.sid) return { updated: false };
+    const log = await this.auditRepo.findOne({ where: { sessionId: payload.sid } });
+    if (!log || log.logoutAt) return { updated: false };
+    log.lastActivityAt = new Date();
+    log.durationSeconds = Math.max(0, Math.floor((log.lastActivityAt.getTime() - log.loginAt.getTime()) / 1000));
+    await this.auditRepo.save(log);
+    return { updated: true };
+  }
+
+  async endSession(token?: string) {
+    const payload = this.readToken(token);
+    if (!payload?.sid) return;
+    const log = await this.auditRepo.findOne({ where: { sessionId: payload.sid } });
+    if (!log || log.logoutAt) return;
+    const now = new Date();
+    log.logoutAt = now;
+    log.lastActivityAt = now;
+    log.durationSeconds = Math.max(0, Math.floor((now.getTime() - log.loginAt.getTime()) / 1000));
+    log.activity = 'Logged out';
+    log.action = 'Completed';
+    await this.auditRepo.save(log);
+  }
+
+  private readToken(token?: string): { sid?: string } | null {
+    if (!token) return null;
+    try {
+      return this.jwtService.verify(token) as { sid?: string };
+    } catch {
+      return null;
+    }
   }
 
   async register(dto: RegisterDto) {
@@ -60,7 +121,7 @@ export class AuthService {
     return { message: 'Account created successfully', user: safe };
   }
 
-  async login(dto: LoginDto) {
+  async login(dto: LoginDto, context: LoginContext = {}) {
     const user = await this.userRepo
       .createQueryBuilder('u')
       .addSelect('u.password')
@@ -75,7 +136,8 @@ export class AuthService {
     const match = await bcrypt.compare(dto.password, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
 
     return {
       access_token: token,
@@ -90,7 +152,7 @@ export class AuthService {
     };
   }
 
-  async adminLogin(dto: LoginDto) {
+  async adminLogin(dto: LoginDto, context: LoginContext = {}) {
     const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
 
     // 2. Find user
@@ -111,7 +173,8 @@ export class AuthService {
     const match = await bcrypt.compare(decryptedPassword, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
 
     return {
       access_token: token,
@@ -119,7 +182,7 @@ export class AuthService {
     };
   }
 
-  async superAdminLogin(dto: LoginDto) {
+  async superAdminLogin(dto: LoginDto, context: LoginContext = {}) {
     const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
 
     const user = await this.userRepo
@@ -137,7 +200,8 @@ export class AuthService {
     const match = await bcrypt.compare(decryptedPassword, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
 
     return {
       access_token: token,
@@ -145,7 +209,7 @@ export class AuthService {
     };
   }
 
-  async marketingLogin(dto: LoginDto) {
+  async marketingLogin(dto: LoginDto, context: LoginContext = {}) {
     const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
 
     const user = await this.userRepo
@@ -163,7 +227,8 @@ export class AuthService {
     const match = await bcrypt.compare(decryptedPassword, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
 
     return {
       access_token: token,
@@ -171,7 +236,7 @@ export class AuthService {
     };
   }
 
-  async financeLogin(dto: LoginDto) {
+  async financeLogin(dto: LoginDto, context: LoginContext = {}) {
     const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
 
     const user = await this.userRepo
@@ -189,7 +254,8 @@ export class AuthService {
     const match = await bcrypt.compare(decryptedPassword, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
 
     return {
       access_token: token,
@@ -197,7 +263,7 @@ export class AuthService {
     };
   }
 
-  async managementLogin(dto: LoginDto & { role: string }) {
+  async managementLogin(dto: LoginDto & { role: string }, context: LoginContext = {}) {
     const roleMap: Record<string, string[]> = {
       admin: ['admin', 'super_admin'],
       'super-admin': ['super_admin'],
@@ -227,7 +293,8 @@ export class AuthService {
     const match = await bcrypt.compare(password, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');
 
-    const token = this.signUserToken(user);
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
     return {
       access_token: token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role },

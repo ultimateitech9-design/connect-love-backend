@@ -1,9 +1,13 @@
-import { Controller, Get, Patch, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Param, Body, Query, UseGuards, Post, Req } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Request } from 'express';
 import { AdminService } from './admin.service';
+import { Roles, RolesGuard } from '../auth/roles.guard';
+import { CreateManagementUserDto } from './dto/create-management-user.dto';
 
 @Controller('admin')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('admin', 'super_admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
@@ -18,6 +22,11 @@ export class AdminController {
     @Query('limit') limit = '20',
   ) {
     return this.adminService.getAllUsers(+page, +limit);
+  }
+
+  @Post('management-users')
+  createManagementUser(@Body() body: CreateManagementUserDto, @Req() request: Request) {
+    return this.adminService.createManagementUser(body, (request.user as any)?.role);
   }
 
   @Patch('users/:id/status')
