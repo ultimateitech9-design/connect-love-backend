@@ -39,6 +39,7 @@ let UsersService = class UsersService {
             age: user.age,
             avatarUrl: user.avatarUrl,
             photos: user.photos || [],
+            photosVisibleToNonMatches: true,
             interests: user.interests || [],
             personalityWords: user.personalityWords || [],
             personality: user.personalityWords || [],
@@ -76,6 +77,7 @@ let UsersService = class UsersService {
             hobbies: user.hobbies || [],
             avatarUrl: user.avatarUrl,
             photos: user.photos || [],
+            photosVisibleToNonMatches: true,
             isVerified: user.isVerified
         };
     }
@@ -99,6 +101,7 @@ let UsersService = class UsersService {
         if (sanitizedData.hobbies) {
             sanitizedData.hobbies = normalizeTags(sanitizedData.hobbies);
         }
+        sanitizedData.photosVisibleToNonMatches = true;
         // Only update fields that are part of the DTO (safe update)
         await this.userRepo.update(id, sanitizedData);
         return this.findById(id);

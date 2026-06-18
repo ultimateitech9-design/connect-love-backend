@@ -284,6 +284,19 @@ let PlatformApiController = class PlatformApiController {
     }
     async users() {
         const users = await this.userRepo.find({
+            select: [
+                'id',
+                'name',
+                'email',
+                'role',
+                'plan',
+                'city',
+                'lastSeen',
+                'updatedAt',
+                'createdAt',
+                'isVerified',
+                'status'
+            ],
             order: {
                 createdAt: 'DESC'
             },
@@ -315,7 +328,7 @@ let PlatformApiController = class PlatformApiController {
             message: 'A user with this email already exists.',
             user: existing
         };
-        const role = this.normalizeRole(body.role);
+        const role = 'user';
         const password = await _bcryptjs.hash(body.password, 12);
         const user = await this.userRepo.save(this.userRepo.create({
             name: body.name,
@@ -1061,15 +1074,23 @@ let PlatformApiController = class PlatformApiController {
             order: {
                 createdAt: 'DESC'
             },
-            take: 100
+            take: 250
         });
+        const now = Date.now();
         return {
             logs: logs.map((log)=>({
+                    id: log.id,
                     user: log.user,
                     activity: log.activity,
                     ipAddress: log.ipAddress,
                     action: log.action,
                     module: log.module,
+                    role: log.role,
+                    device: log.device,
+                    loginAt: log.loginAt,
+                    lastActivityAt: log.lastActivityAt,
+                    logoutAt: log.logoutAt,
+                    durationSeconds: log.loginAt ? log.durationSeconds ?? Math.max(0, Math.floor((now - new Date(log.loginAt).getTime()) / 1000)) : null,
                     createdAt: log.createdAt
                 }))
         };

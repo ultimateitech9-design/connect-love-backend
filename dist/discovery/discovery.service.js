@@ -61,6 +61,7 @@ let DiscoveryService = class DiscoveryService {
                 avatarUrl: user.avatarUrl,
                 photo: user.avatarUrl,
                 photos: user.photos || [],
+                photosVisibleToNonMatches: true,
                 verified: user.isVerified,
                 personality: user.personalityWords || [],
                 hobbies: user.hobbies || [],

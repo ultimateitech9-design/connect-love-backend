@@ -19,6 +19,7 @@ import { MatchStatus } from '../matches/match.entity';
   cors: {
     origin: '*',
   },
+  maxHttpBufferSize: 12 * 1024 * 1024,
   pingInterval: 10000,
   pingTimeout: 5000,
 })
@@ -154,7 +155,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   @SubscribeMessage('startVideoCall')
   async handleStartVideoCall(
-    @MessageBody() data: { conversationId: string; receiverId: string },
+    @MessageBody() data: { conversationId: string; receiverId: string; callType?: 'audio' | 'video' },
     @ConnectedSocket() client: Socket,
   ) {
     const callerId = this.getUserIdForSocket(client);
@@ -162,7 +163,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId);
-      const payload = { call, callerId, conversationId: data.conversationId };
+      const payload = { call, callerId, conversationId: data.conversationId, callType: data.callType || 'video' };
       this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
       this.server.to(client.id).emit('videoCallStarted', payload);
       return { event: 'videoCallStarted', data: payload };

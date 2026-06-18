@@ -148,7 +148,8 @@ let MessagesGateway = class MessagesGateway {
             const payload = {
                 call,
                 callerId,
-                conversationId: data.conversationId
+                conversationId: data.conversationId,
+                callType: data.callType || 'video'
             };
             this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
             this.server.to(client.id).emit('videoCallStarted', payload);
@@ -305,6 +306,7 @@ MessagesGateway = _ts_decorate([
         cors: {
             origin: '*'
         },
+        maxHttpBufferSize: 12 * 1024 * 1024,
         pingInterval: 10000,
         pingTimeout: 5000
     }),

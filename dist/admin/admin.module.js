@@ -16,6 +16,7 @@ const _userentity = require("../users/user.entity");
 const _contactentity = require("../support/contact.entity");
 const _paymententity = require("../platform/payment.entity");
 const _verificationrequestentity = require("../platform/verification-request.entity");
+const _rolesguard = require("../auth/roles.guard");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -38,7 +39,8 @@ AdminModule = _ts_decorate([
             _admincontroller.AdminController
         ],
         providers: [
-            _adminservice.AdminService
+            _adminservice.AdminService,
+            _rolesguard.RolesGuard
         ]
     })
 ], AdminModule);

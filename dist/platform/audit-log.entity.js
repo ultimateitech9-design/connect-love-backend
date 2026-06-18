@@ -62,6 +62,55 @@ _ts_decorate([
     _ts_metadata("design:type", String)
 ], AuditLog.prototype, "module", void 0);
 _ts_decorate([
+    (0, _typeorm.Column)({
+        length: 36,
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], AuditLog.prototype, "sessionId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        length: 40,
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], AuditLog.prototype, "role", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        length: 255,
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], AuditLog.prototype, "device", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'datetime',
+        nullable: true
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], AuditLog.prototype, "loginAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'datetime',
+        nullable: true
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], AuditLog.prototype, "lastActivityAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'datetime',
+        nullable: true
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], AuditLog.prototype, "logoutAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'int',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Number)
+], AuditLog.prototype, "durationSeconds", void 0);
+_ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], AuditLog.prototype, "createdAt", void 0);

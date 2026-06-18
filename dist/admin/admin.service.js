@@ -15,6 +15,48 @@ const _userentity = require("../users/user.entity");
 const _contactentity = require("../support/contact.entity");
 const _paymententity = require("../platform/payment.entity");
 const _verificationrequestentity = require("../platform/verification-request.entity");
+const _bcryptjs = /*#__PURE__*/ _interop_require_wildcard(require("bcryptjs"));
+function _getRequireWildcardCache(nodeInterop) {
+    if (typeof WeakMap !== "function") return null;
+    var cacheBabelInterop = new WeakMap();
+    var cacheNodeInterop = new WeakMap();
+    return (_getRequireWildcardCache = function(nodeInterop) {
+        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
+    })(nodeInterop);
+}
+function _interop_require_wildcard(obj, nodeInterop) {
+    if (!nodeInterop && obj && obj.__esModule) {
+        return obj;
+    }
+    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
+        return {
+            default: obj
+        };
+    }
+    var cache = _getRequireWildcardCache(nodeInterop);
+    if (cache && cache.has(obj)) {
+        return cache.get(obj);
+    }
+    var newObj = {
+        __proto__: null
+    };
+    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
+    for(var key in obj){
+        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
+            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(newObj, key, desc);
+            } else {
+                newObj[key] = obj[key];
+            }
+        }
+    }
+    newObj.default = obj;
+    if (cache) {
+        cache.set(obj, newObj);
+    }
+    return newObj;
+}
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -64,18 +106,56 @@ let AdminService = class AdminService {
         };
     }
     async getAllUsers(page = 1, limit = 20) {
-        const [users, total] = await this.userRepo.findAndCount({
-            order: {
-                createdAt: 'DESC'
-            },
-            skip: (page - 1) * limit,
-            take: limit
-        });
+        const safePage = Math.max(1, page || 1);
+        const safeLimit = Math.min(100, Math.max(1, limit || 20));
+        const total = await this.userRepo.count();
+        const rows = await this.userRepo.createQueryBuilder('user').select([
+            'user.id',
+            'user.createdAt'
+        ]).orderBy('user.createdAt', 'DESC').addOrderBy('user.id', 'DESC').skip((safePage - 1) * safeLimit).take(safeLimit).getMany();
+        const ids = rows.map((row)=>row.id);
+        const users = ids.length ? await this.userRepo.find({
+            where: {
+                id: (0, _typeorm1.In)(ids)
+            }
+        }) : [];
+        const position = new Map(ids.map((id, index)=>[
+                id,
+                index
+            ]));
+        users.sort((left, right)=>(position.get(left.id) ?? 0) - (position.get(right.id) ?? 0));
         return {
             users,
             total,
-            page,
-            limit
+            page: safePage,
+            limit: safeLimit
+        };
+    }
+    async createManagementUser(body, creatorRole) {
+        if (body.role === 'admin' && creatorRole !== 'super_admin') {
+            throw new _common.ForbiddenException('Only a Super Admin can create an Admin ID.');
+        }
+        const email = body.email.trim().toLowerCase();
+        const existing = await this.userRepo.findOne({
+            where: {
+                email
+            }
+        });
+        if (existing) throw new _common.ConflictException('An ID with this email already exists.');
+        const user = await this.userRepo.save(this.userRepo.create({
+            name: body.name.trim(),
+            email,
+            password: await _bcryptjs.hash(body.password, 12),
+            role: body.role,
+            plan: 'platinum',
+            status: 'active',
+            isVerified: true,
+            onboardingCompleted: true
+        }));
+        const { password: _, ...safeUser } = user;
+        return {
+            message: 'Management ID created successfully.',
+            user: safeUser
         };
     }
     async updateUserStatus(id, status) {

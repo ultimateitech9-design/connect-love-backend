@@ -36,6 +36,7 @@ let MatchesService = class MatchesService {
             age: user.age,
             avatarUrl: user.avatarUrl,
             photos: user.photos || [],
+            photosVisibleToNonMatches: true,
             interests: user.interests || [],
             personality: user.personalityWords || [],
             hobbies: user.hobbies || []

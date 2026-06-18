@@ -15,6 +15,7 @@ const _jwt = require("@nestjs/jwt");
 const _bcryptjs = /*#__PURE__*/ _interop_require_wildcard(require("bcryptjs"));
 const _cryptojs = /*#__PURE__*/ _interop_require_wildcard(require("crypto-js"));
 const _userentity = require("../users/user.entity");
+const _auditlogentity = require("../platform/audit-log.entity");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -81,13 +82,76 @@ let AuthService = class AuthService {
             return password;
         }
     }
-    signUserToken(user) {
+    signUserToken(user, sessionId) {
         return this.jwtService.sign({
             sub: user.id,
             email: user.email,
             plan: user.plan,
-            role: user.role || 'user'
+            role: user.role || 'user',
+            sid: sessionId
         });
+    }
+    async startSession(user, context = {}) {
+        const now = new Date();
+        const log = await this.auditRepo.save(this.auditRepo.create({
+            userId: user.id,
+            user: user.name || user.email,
+            activity: 'Logged in',
+            ipAddress: context.ipAddress || 'Unknown',
+            action: 'Active',
+            module: 'Authentication',
+            role: user.role || 'user',
+            device: (context.device || 'Unknown device').slice(0, 255),
+            loginAt: now,
+            lastActivityAt: now
+        }));
+        log.sessionId = log.id;
+        return this.auditRepo.save(log);
+    }
+    async touchSession(token) {
+        const payload = this.readToken(token);
+        if (!payload?.sid) return {
+            updated: false
+        };
+        const log = await this.auditRepo.findOne({
+            where: {
+                sessionId: payload.sid
+            }
+        });
+        if (!log || log.logoutAt) return {
+            updated: false
+        };
+        log.lastActivityAt = new Date();
+        log.durationSeconds = Math.max(0, Math.floor((log.lastActivityAt.getTime() - log.loginAt.getTime()) / 1000));
+        await this.auditRepo.save(log);
+        return {
+            updated: true
+        };
+    }
+    async endSession(token) {
+        const payload = this.readToken(token);
+        if (!payload?.sid) return;
+        const log = await this.auditRepo.findOne({
+            where: {
+                sessionId: payload.sid
+            }
+        });
+        if (!log || log.logoutAt) return;
+        const now = new Date();
+        log.logoutAt = now;
+        log.lastActivityAt = now;
+        log.durationSeconds = Math.max(0, Math.floor((now.getTime() - log.loginAt.getTime()) / 1000));
+        log.activity = 'Logged out';
+        log.action = 'Completed';
+        await this.auditRepo.save(log);
+    }
+    readToken(token) {
+        if (!token) return null;
+        try {
+            return this.jwtService.verify(token);
+        } catch  {
+            return null;
+        }
     }
     async register(dto) {
         const existing = await this.userRepo.findOne({
@@ -116,7 +180,7 @@ let AuthService = class AuthService {
             user: safe
         };
     }
-    async login(dto) {
+    async login(dto, context = {}) {
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
         }).getOne();
@@ -126,7 +190,8 @@ let AuthService = class AuthService {
         }
         const match = await _bcryptjs.compare(dto.password, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -139,7 +204,7 @@ let AuthService = class AuthService {
             }
         };
     }
-    async adminLogin(dto) {
+    async adminLogin(dto, context = {}) {
         const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
         // 2. Find user
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
@@ -153,7 +218,8 @@ let AuthService = class AuthService {
         // 4. Verify password
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -164,7 +230,7 @@ let AuthService = class AuthService {
             }
         };
     }
-    async superAdminLogin(dto) {
+    async superAdminLogin(dto, context = {}) {
         const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
@@ -175,7 +241,8 @@ let AuthService = class AuthService {
         }
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -186,7 +253,7 @@ let AuthService = class AuthService {
             }
         };
     }
-    async marketingLogin(dto) {
+    async marketingLogin(dto, context = {}) {
         const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
@@ -197,7 +264,8 @@ let AuthService = class AuthService {
         }
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -208,7 +276,7 @@ let AuthService = class AuthService {
             }
         };
     }
-    async financeLogin(dto) {
+    async financeLogin(dto, context = {}) {
         const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
@@ -219,7 +287,8 @@ let AuthService = class AuthService {
         }
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -230,7 +299,7 @@ let AuthService = class AuthService {
             }
         };
     }
-    async managementLogin(dto) {
+    async managementLogin(dto, context = {}) {
         const roleMap = {
             admin: [
                 'admin',
@@ -271,7 +340,8 @@ let AuthService = class AuthService {
         const password = this.decryptOrUsePlainPassword(dto.password);
         const match = await _bcryptjs.compare(password, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const token = this.signUserToken(user);
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
             user: {
@@ -282,16 +352,19 @@ let AuthService = class AuthService {
             }
         };
     }
-    constructor(userRepo, jwtService){
+    constructor(userRepo, auditRepo, jwtService){
         this.userRepo = userRepo;
+        this.auditRepo = auditRepo;
         this.jwtService = jwtService;
     }
 };
 AuthService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(1, (0, _typeorm.InjectRepository)(_auditlogentity.AuditLog)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService
     ])
