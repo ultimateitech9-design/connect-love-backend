@@ -30,6 +30,16 @@ _ts_decorate([
     _ts_metadata("design:type", String)
 ], CreateContactDto.prototype, "email", void 0);
 _ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], CreateContactDto.prototype, "phone", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], CreateContactDto.prototype, "photoDataUrl", void 0);
+_ts_decorate([
     (0, _classvalidator.IsString)(),
     (0, _classvalidator.MinLength)(3),
     _ts_metadata("design:type", String)

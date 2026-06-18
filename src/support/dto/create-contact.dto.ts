@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateContactDto {
   @IsString()
@@ -7,6 +7,14 @@ export class CreateContactDto {
 
   @IsEmail()
   email: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsString()
+  photoDataUrl?: string;
 
   @IsString()
   @MinLength(3)

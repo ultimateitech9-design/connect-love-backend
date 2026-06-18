@@ -11,6 +11,12 @@ export class Contact {
   @Column({ length: 255 })
   email: string;
 
+  @Column({ length: 40, nullable: true })
+  phone?: string;
+
+  @Column({ name: 'photo_data_url', type: 'longtext', nullable: true })
+  photoDataUrl?: string;
+
   @Column({ length: 255 })
   subject: string;
 

@@ -38,6 +38,21 @@ _ts_decorate([
 ], Contact.prototype, "email", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        length: 40,
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], Contact.prototype, "phone", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        name: 'photo_data_url',
+        type: 'longtext',
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], Contact.prototype, "photoDataUrl", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         length: 255
     }),
     _ts_metadata("design:type", String)
