@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -10,6 +10,8 @@ const normalizeTags = (tags: string[]) => {
     .map(t => t.trim().toLowerCase().replace(/\b\w/g, l => l.toUpperCase()))
     .filter(Boolean))];
 };
+
+const KYC_MATCH_THRESHOLD = 60;
 
 @Injectable()
 export class UsersService {
@@ -24,6 +26,10 @@ export class UsersService {
       age: user.age,
       avatarUrl: user.avatarUrl,
       photos: user.photos || [],
+      kycLivePhoto: user.kycLivePhoto,
+      kycMatched: user.kycMatched,
+      kycMatchScore: user.kycMatchScore,
+      kycVerifiedAt: user.kycVerifiedAt,
       photosVisibleToNonMatches: true,
       interests: user.interests || [],
       personalityWords: user.personalityWords || [],
@@ -57,6 +63,8 @@ export class UsersService {
       hobbies: user.hobbies || [],
       avatarUrl: user.avatarUrl,
       photos: user.photos || [],
+      kycMatched: user.kycMatched,
+      kycMatchScore: user.kycMatchScore,
       photosVisibleToNonMatches: true,
       isVerified: user.isVerified,
     };
@@ -67,7 +75,17 @@ export class UsersService {
   }
 
   async update(id: string, data: UpdateProfileDto): Promise<any> {
-    const sanitizedData = { ...data };
+    const existingUser = await this.userRepo.findOne({ where: { id } });
+    if (!existingUser) throw new NotFoundException('User not found.');
+
+    const sanitizedData: any = { ...data };
+    if (sanitizedData.photos) {
+      const uniquePhotos = [...new Set(sanitizedData.photos.filter(Boolean))];
+      if (uniquePhotos.length > 5) {
+        throw new BadRequestException('Maximum 5 photos allowed.');
+      }
+      sanitizedData.photos = uniquePhotos;
+    }
     if (sanitizedData.interests) {
       sanitizedData.interests = normalizeTags(sanitizedData.interests);
     }
@@ -76,6 +94,29 @@ export class UsersService {
     }
     if (sanitizedData.hobbies) {
       sanitizedData.hobbies = normalizeTags(sanitizedData.hobbies);
+    }
+    if (sanitizedData.kycMatched) {
+      if (!sanitizedData.kycLivePhoto && !existingUser.kycLivePhoto) {
+        throw new BadRequestException('Video KYC frame is required.');
+      }
+      const kycMatchScore = sanitizedData.kycMatchScore ?? existingUser.kycMatchScore ?? 0;
+      if (kycMatchScore < KYC_MATCH_THRESHOLD) {
+        throw new BadRequestException(`Video KYC match score must be at least ${KYC_MATCH_THRESHOLD}%.`);
+      }
+      sanitizedData.kycVerifiedAt = existingUser.kycVerifiedAt || new Date();
+      sanitizedData.isVerified = true;
+    }
+
+    if (sanitizedData.onboardingCompleted) {
+      const photos = sanitizedData.photos ?? existingUser.photos ?? [];
+      const kycMatched = sanitizedData.kycMatched ?? existingUser.kycMatched;
+
+      if (!photos.length) {
+        throw new BadRequestException('Add at least one profile photo before completing onboarding.');
+      }
+      if (!kycMatched) {
+        throw new BadRequestException('Complete video KYC match before completing onboarding.');
+      }
     }
     sanitizedData.photosVisibleToNonMatches = true;
 

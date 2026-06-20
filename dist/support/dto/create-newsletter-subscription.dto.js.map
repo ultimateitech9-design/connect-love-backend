@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../src/support/dto/create-newsletter-subscription.dto.ts"],"sourcesContent":["import { IsEmail } from 'class-validator';\n\nexport class CreateNewsletterSubscriptionDto {\n  @IsEmail()\n  email: string;\n}\n"],"names":["CreateNewsletterSubscriptionDto"],"mappings":";;;;+BAEaA;;;eAAAA;;;gCAFW;;;;;;;;;;AAEjB,IAAA,AAAMA,kCAAN,MAAMA;AAGb"}

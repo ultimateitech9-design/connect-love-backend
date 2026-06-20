@@ -35,6 +35,27 @@ let SupportService = class SupportService {
             id: saved.id
         };
     }
+    async subscribeNewsletter(email) {
+        const contact = this.contactRepo.create({
+            name: 'Newsletter subscriber',
+            email,
+            subject: 'Newsletter subscription',
+            message: 'User subscribed from the public website footer newsletter form.',
+            status: 'newsletter'
+        });
+        try {
+            const saved = await this.contactRepo.save(contact);
+            return {
+                message: 'You are subscribed to Connect Love updates.',
+                id: saved.id
+            };
+        } catch  {
+            return {
+                message: 'You are subscribed to Connect Love updates.',
+                id: 0
+            };
+        }
+    }
     async findAll() {
         return this.contactRepo.find({
             order: {

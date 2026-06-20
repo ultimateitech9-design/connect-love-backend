@@ -138,6 +138,33 @@ _ts_decorate([
 ], User.prototype, "photos", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'longtext',
+        nullable: true
+    }),
+    _ts_metadata("design:type", String)
+], User.prototype, "kycLivePhoto", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        default: false
+    }),
+    _ts_metadata("design:type", Boolean)
+], User.prototype, "kycMatched", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
+        type: 'int'
+    }),
+    _ts_metadata("design:type", Number)
+], User.prototype, "kycMatchScore", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
+        type: 'timestamp'
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], User.prototype, "kycVerifiedAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'json',
         nullable: true
     }),

@@ -68,6 +68,18 @@ export class User {
   @Column({ type: 'json', nullable: true })
   photos: string[];
 
+  @Column({ type: 'longtext', nullable: true })
+  kycLivePhoto: string;
+
+  @Column({ default: false })
+  kycMatched: boolean;
+
+  @Column({ nullable: true, type: 'int' })
+  kycMatchScore: number;
+
+  @Column({ nullable: true, type: 'timestamp' })
+  kycVerifiedAt: Date;
+
   // Virtual getter for backward compatibility
   get avatarUrl(): string | null {
     return this.photos && this.photos.length > 0 ? this.photos[0] : null;

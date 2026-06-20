@@ -80,11 +80,31 @@ _ts_decorate([
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.ArrayMaxSize)(5, {
+        message: 'Maximum 5 photos allowed'
+    }),
     (0, _classvalidator.IsString)({
         each: true
     }),
     _ts_metadata("design:type", Array)
 ], UpdateProfileDto.prototype, "photos", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdateProfileDto.prototype, "kycLivePhoto", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], UpdateProfileDto.prototype, "kycMatched", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsNumber)(),
+    (0, _classvalidator.Min)(0),
+    (0, _classvalidator.Max)(100),
+    _ts_metadata("design:type", Number)
+], UpdateProfileDto.prototype, "kycMatchScore", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsArray)(),

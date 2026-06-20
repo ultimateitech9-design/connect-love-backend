@@ -36,11 +36,27 @@ let ProfilePhotosService = class ProfilePhotosService {
         if (!user) {
             throw new _common.NotFoundException('User not found');
         }
-        user.photos = photos;
+        const uniquePhotos = [
+            ...new Set((photos || []).filter(Boolean))
+        ];
+        if (uniquePhotos.length > 5) {
+            throw new _common.BadRequestException('Maximum 5 photos allowed');
+        }
+        const primaryPhotoChanged = user.photos?.[0] !== uniquePhotos[0];
+        user.photos = uniquePhotos;
+        if (primaryPhotoChanged) {
+            user.kycLivePhoto = null;
+            user.kycMatched = false;
+            user.kycMatchScore = null;
+            user.kycVerifiedAt = null;
+            user.isVerified = false;
+        }
         await this.userRepository.save(user);
         return {
             message: 'Photos updated successfully',
-            photos: user.photos
+            photos: user.photos,
+            isVerified: user.isVerified,
+            kycMatched: user.kycMatched
         };
     }
     constructor(userRepository){

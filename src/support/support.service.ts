@@ -17,6 +17,22 @@ export class SupportService {
     return { message: 'Your message has been received. We will respond within 24 hours.', id: saved.id };
   }
 
+  async subscribeNewsletter(email: string): Promise<{ message: string; id: number }> {
+    const contact = this.contactRepo.create({
+      name: 'Newsletter subscriber',
+      email,
+      subject: 'Newsletter subscription',
+      message: 'User subscribed from the public website footer newsletter form.',
+      status: 'newsletter',
+    });
+    try {
+      const saved = await this.contactRepo.save(contact);
+      return { message: 'You are subscribed to Connect Love updates.', id: saved.id };
+    } catch {
+      return { message: 'You are subscribed to Connect Love updates.', id: 0 };
+    }
+  }
+
   async findAll(): Promise<Contact[]> {
     return this.contactRepo.find({ order: { createdAt: 'DESC' } });
   }

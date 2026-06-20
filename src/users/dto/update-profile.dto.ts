@@ -1,4 +1,15 @@
-import { IsOptional, IsString, MaxLength, IsBoolean, IsArray, IsDateString } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsBoolean,
+  IsArray,
+  IsDateString,
+  IsNumber,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class UpdateProfileDto {
   @IsOptional()
@@ -47,8 +58,23 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(5, { message: 'Maximum 5 photos allowed' })
   @IsString({ each: true })
   photos?: string[];
+
+  @IsOptional()
+  @IsString()
+  kycLivePhoto?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  kycMatched?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  kycMatchScore?: number;
 
   @IsOptional()
   @IsArray()
