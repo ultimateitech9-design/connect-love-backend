@@ -13,13 +13,20 @@ export class DiscoveryService {
     private readonly matchRepo: Repository<MatchRelation>,
   ) {}
 
-  async getSuggestions(currentUserId: string): Promise<User[]> {
+  async getSuggestions(currentUserId: string, search?: string): Promise<User[]> {
     const currentUser = await this.userRepo.findOne({ where: { id: currentUserId } });
     // We want to find all users that are NOT the current user
-    // AND do not have any existing MatchRelation with the current user (either as sender or receiver).
     const query = this.userRepo.createQueryBuilder('user')
       .where('user.id != :currentUserId', { currentUserId })
-      .andWhere((qb) => {
+      // Only show active and verified users
+      .andWhere('user.status = :status', { status: 'active' })
+      .andWhere('user.role = :role', { role: 'user' });
+
+    if (search && search.trim()) {
+      query.andWhere('LOWER(user.name) LIKE :search', { search: `%${search.toLowerCase().trim()}%` });
+    } else {
+      // Default: exclude users already swiped/matched
+      query.andWhere((qb) => {
         const subQuery = qb.subQuery()
           .select('match.id')
           .from(MatchRelation, 'match')
@@ -27,12 +34,10 @@ export class DiscoveryService {
           .orWhere('(match.receiverId = :currentUserId AND match.senderId = user.id)')
           .getQuery();
         return `NOT EXISTS ${subQuery}`;
-      })
-      // Only show active and verified users
-      .andWhere('user.status = :status', { status: 'active' })
-      .andWhere('user.role = :role', { role: 'user' });
+      });
+    }
 
-    if (currentUser?.onlyShowVerifiedProfiles) {
+    if (currentUser?.onlyShowVerifiedProfiles && !(search && search.trim())) {
       query.andWhere('user.isVerified = :verified', { verified: true });
     }
 

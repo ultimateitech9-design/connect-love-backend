@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { DiscoveryService } from './discovery.service';
 
@@ -8,8 +8,8 @@ export class DiscoveryController {
   constructor(private readonly discoveryService: DiscoveryService) {}
 
   @Get()
-  async getSuggestions(@Request() req: any) {
-    return this.discoveryService.getSuggestions(req.user.userId);
+  async getSuggestions(@Request() req: any, @Query('search') search?: string) {
+    return this.discoveryService.getSuggestions(req.user.userId, search);
   }
 
   @Get('tags')

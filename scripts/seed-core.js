@@ -35,9 +35,9 @@ const roles = [
 ];
 
 const plans = [
-  ['plan-free', 'free', 'Basic Access', 0, 'USD', ['50 daily likes', 'Basic discovery filters'], 'active', 1],
-  ['plan-gold', 'gold', 'Premium Match', 9.99, 'USD', ['Unlimited likes', '5 super likes', 'Passport mode'], 'active', 2],
-  ['plan-platinum', 'platinum', 'Ultimate', 29.99, 'USD', ['Priority likes', 'See who likes you', 'VIP badge'], 'active', 3],
+  ['plan-free', 'free', 'Basic Plan', 0, 'INR', ['20 Likes per day', 'Basic Matching', 'Chat after Match', 'View Basic Profile'], 'active', 1],
+  ['plan-gold', 'gold', 'Premium Plan', 199, 'INR', ['Unlimited Likes', 'See Who Liked You', '5 Super Likes per day', 'Profile Boost (1 per week)', 'No Ads', 'Priority Matching'], 'active', 2],
+  ['plan-platinum', 'platinum', 'Elite Plan', 399, 'INR', ['Unlimited Likes', 'See Who Liked You', 'Unlimited Super Likes', 'Unlimited Profile Boost', 'Priority Matching', 'Advanced Filters', 'Top Search Ranking', 'Premium Badge', 'No Ads'], 'active', 3],
 ];
 
 function env(key) {

@@ -21,6 +21,20 @@ export class UsersController {
     return this.usersService.update(req.user.userId, dto);
   }
 
+  /** GET /users/me/export - returns a portable copy of the authenticated user's data */
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/export')
+  exportMe(@Request() req: any) {
+    return this.usersService.exportMe(req.user.userId);
+  }
+
+  /** PATCH /users/me/deactivate - pauses the account and removes it from discovery */
+  @UseGuards(AuthGuard('jwt'))
+  @Patch('me/deactivate')
+  deactivateMe(@Request() req: any) {
+    return this.usersService.deactivateMe(req.user.userId);
+  }
+
   /** DELETE /users/me — permanently delete the currently authenticated user's account and all associated data */
   @UseGuards(AuthGuard('jwt'))
   @Delete('me')

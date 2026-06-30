@@ -132,6 +132,9 @@ export class AuthService {
     if (user.role !== 'user') {
       throw new UnauthorizedException('Please use the management login for this account.');
     }
+    if (user.status !== 'active') {
+      throw new UnauthorizedException('This account is not active. Please contact support.');
+    }
 
     const match = await bcrypt.compare(dto.password, user.password);
     if (!match) throw new UnauthorizedException('Invalid email or password.');

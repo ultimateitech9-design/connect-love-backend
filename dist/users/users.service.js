@@ -164,6 +164,29 @@ let UsersService = class UsersService {
             message: `Your account and all associated data have been permanently deleted.`
         };
     }
+    async exportMe(id) {
+        const user = await this.findById(id);
+        return {
+            exportedAt: new Date().toISOString(),
+            user
+        };
+    }
+    async deactivateMe(id) {
+        const user = await this.userRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User not found.');
+        await this.userRepo.update(id, {
+            status: 'suspended',
+            isOnline: false,
+            lastSeen: new Date()
+        });
+        return {
+            message: 'Your account has been deactivated. Contact support when you want to reactivate it.'
+        };
+    }
     async updatePresence(userId, isOnline) {
         const updateData = {
             isOnline

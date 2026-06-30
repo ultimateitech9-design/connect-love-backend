@@ -26,8 +26,8 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DiscoveryController = class DiscoveryController {
-    async getSuggestions(req) {
-        return this.discoveryService.getSuggestions(req.user.userId);
+    async getSuggestions(req, search) {
+        return this.discoveryService.getSuggestions(req.user.userId, search);
     }
     async getTags() {
         return this.discoveryService.getPopularTags();
@@ -39,9 +39,11 @@ let DiscoveryController = class DiscoveryController {
 _ts_decorate([
     (0, _common.Get)(),
     _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Query)('search')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        Object
+        Object,
+        String
     ]),
     _ts_metadata("design:returntype", Promise)
 ], DiscoveryController.prototype, "getSuggestions", null);

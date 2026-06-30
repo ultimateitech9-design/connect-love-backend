@@ -188,6 +188,9 @@ let AuthService = class AuthService {
         if (user.role !== 'user') {
             throw new _common.UnauthorizedException('Please use the management login for this account.');
         }
+        if (user.status !== 'active') {
+            throw new _common.UnauthorizedException('This account is not active. Please contact support.');
+        }
         const match = await _bcryptjs.compare(dto.password, user.password);
         if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
         const session = await this.startSession(user, context);

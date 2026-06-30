@@ -12,7 +12,7 @@ import { NotificationStatus, PlatformNotification } from '../platform/platform-n
 import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
-import { IsEmail, IsString, MinLength, IsOptional, IsNumber } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray } from 'class-validator';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -71,6 +71,23 @@ export class CreateInvoiceDto {
   amount?: number;
 }
 
+export class SavePlanDto {
+  @IsString()
+  displayName: string;
+
+  @IsNumber()
+  price: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  features?: string[];
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+}
+
 @Controller('api')
 export class PlatformApiController {
   constructor(
@@ -111,6 +128,39 @@ export class PlatformApiController {
       .join('')
       .slice(0, 2)
       .toUpperCase();
+  }
+
+  private currencySymbol(currency?: string) {
+    return String(currency || 'USD').toUpperCase() === 'INR' ? '₹' : '$';
+  }
+
+  private normalizeSubscriptionPlan(plan: SubscriptionPlan) {
+    const canonical: Record<string, { displayName: string; price: number; currency: string; features: string[] }> = {
+      free: {
+        displayName: 'Basic Plan',
+        price: 0,
+        currency: 'INR',
+        features: ['20 Likes per day', 'Basic Matching', 'Chat after Match', 'View Basic Profile'],
+      },
+      gold: {
+        displayName: 'Premium Plan',
+        price: 199,
+        currency: 'INR',
+        features: ['Unlimited Likes', 'See Who Liked You', '5 Super Likes per day', 'Profile Boost (1 per week)', 'No Ads', 'Priority Matching'],
+      },
+      platinum: {
+        displayName: 'Elite Plan',
+        price: 399,
+        currency: 'INR',
+        features: ['Unlimited Likes', 'See Who Liked You', 'Unlimited Super Likes', 'Unlimited Profile Boost', 'Priority Matching', 'Advanced Filters', 'Top Search Ranking', 'Premium Badge', 'No Ads'],
+      },
+    };
+    return canonical[plan.name] || {
+      displayName: plan.displayName,
+      price: Number(plan.price),
+      currency: plan.currency,
+      features: plan.features || [],
+    };
   }
 
   private async audit(module: string, action: string, activity: string) {
@@ -313,17 +363,21 @@ export class PlatformApiController {
     });
 
     return {
-      plans: plans.map((plan) => ({
-        id: plan.id,
-        name: plan.displayName,
-        key: plan.name,
-        price: Number(plan.price) === 0 ? '$0' : `$${Number(plan.price).toFixed(2)}`,
-        rawPrice: Number(plan.price),
-        period: 'monthly',
-        features: plan.features || [],
-        subscribers: subscriberCounts[plan.name] || 0,
-        status: plan.status,
-      })),
+      plans: plans.map((plan) => {
+        const details = this.normalizeSubscriptionPlan(plan);
+        return {
+          id: plan.id,
+          name: details.displayName,
+          key: plan.name,
+          currency: details.currency,
+          price: details.price === 0 ? `${this.currencySymbol(details.currency)}0` : `${this.currencySymbol(details.currency)}${details.price.toFixed(2)}`,
+          rawPrice: details.price,
+          period: 'monthly',
+          features: details.features,
+          subscribers: subscriberCounts[plan.name] || 0,
+          status: plan.status,
+        };
+      }),
       transactions: transactions.map((payment) => ({
         id: payment.id,
         user: payment.user?.name || 'Deleted user',
@@ -362,6 +416,34 @@ export class PlatformApiController {
         status: notification.status.replace(/\b\w/g, (c) => c.toUpperCase()),
       })),
     };
+  }
+
+  @Post('plans')
+  async createPlan(@Body() body: SavePlanDto) {
+    const key = body.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const plan = await this.planRepo.save(this.planRepo.create({
+      name: key,
+      displayName: body.displayName,
+      price: Number(body.price || 0).toFixed(2),
+      features: body.features || [],
+      status: body.status === 'inactive' ? 'inactive' : 'active',
+      sortOrder: await this.planRepo.count() + 1,
+    }));
+    await this.audit('Finance', 'Plan created', `Created subscription plan ${plan.displayName}`);
+    return plan;
+  }
+
+  @Patch('plans/:id')
+  async updatePlan(@Param('id') id: string, @Body() body: SavePlanDto) {
+    const plan = await this.planRepo.findOne({ where: { id } });
+    if (!plan) throw new NotFoundException('Plan not found.');
+    plan.displayName = body.displayName;
+    plan.price = Number(body.price || 0).toFixed(2);
+    plan.features = body.features || plan.features;
+    plan.status = body.status === 'inactive' ? 'inactive' : 'active';
+    await this.planRepo.save(plan);
+    await this.audit('Finance', 'Plan updated', `Updated subscription plan ${plan.displayName}`);
+    return plan;
   }
 
   @Post('notifications')
@@ -661,14 +743,19 @@ export class PlatformApiController {
     const plans = await this.planRepo.find({ order: { sortOrder: 'ASC' } });
     const users = await this.userRepo.find({ select: ['plan', 'city'] });
     return {
-      plans: plans.map((plan) => ({
-        id: plan.id,
-        name: plan.displayName,
-        price: Number(plan.price),
-        features: plan.features || [],
-        status: plan.status,
-        subscribers: users.filter((u) => u.plan === plan.name).length,
-      })),
+      plans: plans.map((plan) => {
+        const details = this.normalizeSubscriptionPlan(plan);
+        return {
+          id: plan.id,
+          key: plan.name,
+          name: details.displayName,
+          price: details.price,
+          currency: details.currency,
+          features: details.features,
+          status: plan.status,
+          subscribers: users.filter((u) => u.plan === plan.name).length,
+        };
+      }),
       topMarkets: Object.entries(users.reduce<Record<string, number>>((acc, user) => {
         const city = user.city || 'Unknown';
         acc[city] = (acc[city] || 0) + 1;
@@ -713,6 +800,16 @@ export class PlatformApiController {
     payment.status = 'refunded';
     await this.paymentRepo.save(payment);
     await this.audit('Finance', 'Refund', `Refunded payment ${id}`);
+    return payment;
+  }
+
+  @Patch('finance/payments/:id/reject-refund')
+  async rejectRefund(@Param('id') id: string) {
+    const payment = await this.paymentRepo.findOne({ where: { id } });
+    if (!payment) throw new NotFoundException('Payment not found.');
+    payment.status = 'failed';
+    await this.paymentRepo.save(payment);
+    await this.audit('Finance', 'Refund rejected', `Rejected refund request for payment ${id}`);
     return payment;
   }
 

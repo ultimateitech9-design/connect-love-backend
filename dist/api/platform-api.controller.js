@@ -23,6 +23,9 @@ _export(exports, {
     },
     get PlatformApiController () {
         return PlatformApiController;
+    },
+    get SavePlanDto () {
+        return SavePlanDto;
     }
 });
 const _common = require("@nestjs/common");
@@ -165,6 +168,29 @@ _ts_decorate([
     (0, _classvalidator.IsNumber)(),
     _ts_metadata("design:type", Number)
 ], CreateInvoiceDto.prototype, "amount", void 0);
+let SavePlanDto = class SavePlanDto {
+};
+_ts_decorate([
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], SavePlanDto.prototype, "displayName", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsNumber)(),
+    _ts_metadata("design:type", Number)
+], SavePlanDto.prototype, "price", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.IsString)({
+        each: true
+    }),
+    _ts_metadata("design:type", Array)
+], SavePlanDto.prototype, "features", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], SavePlanDto.prototype, "status", void 0);
 let PlatformApiController = class PlatformApiController {
     dayKey(date) {
         return date.toLocaleString('en-US', {
@@ -176,6 +202,59 @@ let PlatformApiController = class PlatformApiController {
     }
     initials(name) {
         return name.split(' ').map((part)=>part[0]).join('').slice(0, 2).toUpperCase();
+    }
+    currencySymbol(currency) {
+        return String(currency || 'USD').toUpperCase() === 'INR' ? '₹' : '$';
+    }
+    normalizeSubscriptionPlan(plan) {
+        const canonical = {
+            free: {
+                displayName: 'Basic Plan',
+                price: 0,
+                currency: 'INR',
+                features: [
+                    '20 Likes per day',
+                    'Basic Matching',
+                    'Chat after Match',
+                    'View Basic Profile'
+                ]
+            },
+            gold: {
+                displayName: 'Premium Plan',
+                price: 199,
+                currency: 'INR',
+                features: [
+                    'Unlimited Likes',
+                    'See Who Liked You',
+                    '5 Super Likes per day',
+                    'Profile Boost (1 per week)',
+                    'No Ads',
+                    'Priority Matching'
+                ]
+            },
+            platinum: {
+                displayName: 'Elite Plan',
+                price: 399,
+                currency: 'INR',
+                features: [
+                    'Unlimited Likes',
+                    'See Who Liked You',
+                    'Unlimited Super Likes',
+                    'Unlimited Profile Boost',
+                    'Priority Matching',
+                    'Advanced Filters',
+                    'Top Search Ranking',
+                    'Premium Badge',
+                    'No Ads'
+                ]
+            }
+        };
+        return canonical[plan.name] || {
+            displayName: plan.displayName,
+            price: Number(plan.price),
+            currency: plan.currency,
+            features: plan.features || []
+        };
     }
     async audit(module, action, activity) {
         await this.auditRepo.save(this.auditRepo.create({
@@ -457,17 +536,21 @@ let PlatformApiController = class PlatformApiController {
             take: 100
         });
         return {
-            plans: plans.map((plan)=>({
+            plans: plans.map((plan)=>{
+                const details = this.normalizeSubscriptionPlan(plan);
+                return {
                     id: plan.id,
-                    name: plan.displayName,
+                    name: details.displayName,
                     key: plan.name,
-                    price: Number(plan.price) === 0 ? '$0' : `$${Number(plan.price).toFixed(2)}`,
-                    rawPrice: Number(plan.price),
+                    currency: details.currency,
+                    price: details.price === 0 ? `${this.currencySymbol(details.currency)}0` : `${this.currencySymbol(details.currency)}${details.price.toFixed(2)}`,
+                    rawPrice: details.price,
                     period: 'monthly',
-                    features: plan.features || [],
+                    features: details.features,
                     subscribers: subscriberCounts[plan.name] || 0,
                     status: plan.status
-                })),
+                };
+            }),
             transactions: transactions.map((payment)=>({
                     id: payment.id,
                     user: payment.user?.name || 'Deleted user',
@@ -526,6 +609,34 @@ let PlatformApiController = class PlatformApiController {
                     status: notification.status.replace(/\b\w/g, (c)=>c.toUpperCase())
                 }))
         };
+    }
+    async createPlan(body) {
+        const key = body.displayName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const plan = await this.planRepo.save(this.planRepo.create({
+            name: key,
+            displayName: body.displayName,
+            price: Number(body.price || 0).toFixed(2),
+            features: body.features || [],
+            status: body.status === 'inactive' ? 'inactive' : 'active',
+            sortOrder: await this.planRepo.count() + 1
+        }));
+        await this.audit('Finance', 'Plan created', `Created subscription plan ${plan.displayName}`);
+        return plan;
+    }
+    async updatePlan(id, body) {
+        const plan = await this.planRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!plan) throw new _common.NotFoundException('Plan not found.');
+        plan.displayName = body.displayName;
+        plan.price = Number(body.price || 0).toFixed(2);
+        plan.features = body.features || plan.features;
+        plan.status = body.status === 'inactive' ? 'inactive' : 'active';
+        await this.planRepo.save(plan);
+        await this.audit('Finance', 'Plan updated', `Updated subscription plan ${plan.displayName}`);
+        return plan;
     }
     async createNotification(body) {
         const notification = await this.notificationRepo.save(this.notificationRepo.create({
@@ -962,14 +1073,19 @@ let PlatformApiController = class PlatformApiController {
             ]
         });
         return {
-            plans: plans.map((plan)=>({
+            plans: plans.map((plan)=>{
+                const details = this.normalizeSubscriptionPlan(plan);
+                return {
                     id: plan.id,
-                    name: plan.displayName,
-                    price: Number(plan.price),
-                    features: plan.features || [],
+                    key: plan.name,
+                    name: details.displayName,
+                    price: details.price,
+                    currency: details.currency,
+                    features: details.features,
                     status: plan.status,
                     subscribers: users.filter((u)=>u.plan === plan.name).length
-                })),
+                };
+            }),
             topMarkets: Object.entries(users.reduce((acc, user)=>{
                 const city = user.city || 'Unknown';
                 acc[city] = (acc[city] || 0) + 1;
@@ -1035,6 +1151,18 @@ let PlatformApiController = class PlatformApiController {
         payment.status = 'refunded';
         await this.paymentRepo.save(payment);
         await this.audit('Finance', 'Refund', `Refunded payment ${id}`);
+        return payment;
+    }
+    async rejectRefund(id) {
+        const payment = await this.paymentRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!payment) throw new _common.NotFoundException('Payment not found.');
+        payment.status = 'failed';
+        await this.paymentRepo.save(payment);
+        await this.audit('Finance', 'Refund rejected', `Rejected refund request for payment ${id}`);
         return payment;
     }
     async invoices() {
@@ -1365,6 +1493,26 @@ _ts_decorate([
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "notifications", null);
 _ts_decorate([
+    (0, _common.Post)('plans'),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof SavePlanDto === "undefined" ? Object : SavePlanDto
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "createPlan", null);
+_ts_decorate([
+    (0, _common.Patch)('plans/:id'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof SavePlanDto === "undefined" ? Object : SavePlanDto
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "updatePlan", null);
+_ts_decorate([
     (0, _common.Post)('notifications'),
     _ts_param(0, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
@@ -1508,6 +1656,15 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "refundPayment", null);
+_ts_decorate([
+    (0, _common.Patch)('finance/payments/:id/reject-refund'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "rejectRefund", null);
 _ts_decorate([
     (0, _common.Get)('finance/invoices'),
     _ts_metadata("design:type", Function),

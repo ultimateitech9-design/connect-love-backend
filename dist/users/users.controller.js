@@ -33,6 +33,12 @@ let UsersController = class UsersController {
     /** PATCH /users/me — update the currently authenticated user's profile */ updateMe(req, dto) {
         return this.usersService.update(req.user.userId, dto);
     }
+    /** GET /users/me/export - returns a portable copy of the authenticated user's data */ exportMe(req) {
+        return this.usersService.exportMe(req.user.userId);
+    }
+    /** PATCH /users/me/deactivate - pauses the account and removes it from discovery */ deactivateMe(req) {
+        return this.usersService.deactivateMe(req.user.userId);
+    }
     /** DELETE /users/me — permanently delete the currently authenticated user's account and all associated data */ async deleteMe(req) {
         return this.usersService.removeMe(req.user.userId);
     }
@@ -74,6 +80,26 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateMe", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Get)('me/export'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "exportMe", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Patch)('me/deactivate'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "deactivateMe", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Delete)('me'),
