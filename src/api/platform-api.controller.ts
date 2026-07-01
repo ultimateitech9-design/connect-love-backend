@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
 import { Contact } from '../support/contact.entity';
@@ -331,9 +331,16 @@ export class PlatformApiController {
       order: { createdAt: 'DESC' },
       take: 50,
     });
+    const kycUsers = await this.userRepo.find({
+      where: { kycLivePhoto: Not(IsNull()), role: 'user' } as any,
+      order: { kycVerifiedAt: 'DESC', updatedAt: 'DESC' } as any,
+      take: 100,
+    });
+    const requestedUserIds = new Set(pending.map((request) => request.userId));
 
     return {
-      queue: pending.map((request) => ({
+      queue: [
+        ...pending.map((request) => ({
           id: request.id,
           name: request.user?.name || 'Unknown user',
           email: request.user?.email || '',
@@ -345,6 +352,22 @@ export class PlatformApiController {
           photo: request.user?.avatarUrl || null,
           birthDate: request.user?.birthDate || null,
         })),
+        ...kycUsers
+          .filter((user) => !requestedUserIds.has(user.id))
+          .map((user) => ({
+            id: `kyc-${user.id}`,
+            name: user.name || 'Unknown user',
+            email: user.email || '',
+            idType: 'Video KYC',
+            priority: user.kycMatched ? 'Normal' : 'High',
+            status: user.isVerified ? 'Approved' : user.kycMatched ? 'Pending' : 'Under Review',
+            date: user.kycVerifiedAt || user.updatedAt || user.createdAt,
+            documents: [user.kycLivePhoto].filter(Boolean),
+            photo: user.avatarUrl || user.photos?.[0] || null,
+            birthDate: user.birthDate || null,
+            matchScore: user.kycMatchScore,
+          })),
+      ],
     };
   }
 
@@ -560,6 +583,18 @@ export class PlatformApiController {
 
   @Patch('verification/:id/status')
   async updateVerification(@Param('id') id: string, @Body('status') status: VerificationStatus) {
+    if (id.startsWith('kyc-')) {
+      const userId = id.replace(/^kyc-/, '');
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) return { message: 'KYC user not found.' };
+      await this.userRepo.update(userId, {
+        isVerified: status === 'approved',
+        ...(status === 'rejected' ? { kycMatched: false, kycVerifiedAt: null } : {}),
+      } as any);
+      await this.audit('Verification', 'Update', `Video KYC ${userId} marked ${status}`);
+      return { id, userId, status };
+    }
+
     const request = await this.verificationRepo.findOne({ where: { id }, relations: ['user'] });
     if (!request) return { message: 'Verification request not found.' };
     request.status = status;

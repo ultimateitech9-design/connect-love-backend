@@ -496,19 +496,48 @@ let PlatformApiController = class PlatformApiController {
             },
             take: 50
         });
+        const kycUsers = await this.userRepo.find({
+            where: {
+                kycLivePhoto: (0, _typeorm1.Not)((0, _typeorm1.IsNull)()),
+                role: 'user'
+            },
+            order: {
+                kycVerifiedAt: 'DESC',
+                updatedAt: 'DESC'
+            },
+            take: 100
+        });
+        const requestedUserIds = new Set(pending.map((request)=>request.userId));
         return {
-            queue: pending.map((request)=>({
-                    id: request.id,
-                    name: request.user?.name || 'Unknown user',
-                    email: request.user?.email || '',
-                    idType: request.idType,
-                    priority: request.priority === 'high' ? 'High' : request.priority === 'low' ? 'Low' : 'Normal',
-                    status: request.status.replace('_', ' ').replace(/\b\w/g, (c)=>c.toUpperCase()),
-                    date: request.createdAt,
-                    documents: request.documents || [],
-                    photo: request.user?.avatarUrl || null,
-                    birthDate: request.user?.birthDate || null
-                }))
+            queue: [
+                ...pending.map((request)=>({
+                        id: request.id,
+                        name: request.user?.name || 'Unknown user',
+                        email: request.user?.email || '',
+                        idType: request.idType,
+                        priority: request.priority === 'high' ? 'High' : request.priority === 'low' ? 'Low' : 'Normal',
+                        status: request.status.replace('_', ' ').replace(/\b\w/g, (c)=>c.toUpperCase()),
+                        date: request.createdAt,
+                        documents: request.documents || [],
+                        photo: request.user?.avatarUrl || null,
+                        birthDate: request.user?.birthDate || null
+                    })),
+                ...kycUsers.filter((user)=>!requestedUserIds.has(user.id)).map((user)=>({
+                        id: `kyc-${user.id}`,
+                        name: user.name || 'Unknown user',
+                        email: user.email || '',
+                        idType: 'Video KYC',
+                        priority: user.kycMatched ? 'Normal' : 'High',
+                        status: user.isVerified ? 'Approved' : user.kycMatched ? 'Pending' : 'Under Review',
+                        date: user.kycVerifiedAt || user.updatedAt || user.createdAt,
+                        documents: [
+                            user.kycLivePhoto
+                        ].filter(Boolean),
+                        photo: user.avatarUrl || user.photos?.[0] || null,
+                        birthDate: user.birthDate || null,
+                        matchScore: user.kycMatchScore
+                    }))
+            ]
         };
     }
     async payments() {
@@ -783,6 +812,30 @@ let PlatformApiController = class PlatformApiController {
         return role;
     }
     async updateVerification(id, status) {
+        if (id.startsWith('kyc-')) {
+            const userId = id.replace(/^kyc-/, '');
+            const user = await this.userRepo.findOne({
+                where: {
+                    id: userId
+                }
+            });
+            if (!user) return {
+                message: 'KYC user not found.'
+            };
+            await this.userRepo.update(userId, {
+                isVerified: status === 'approved',
+                ...status === 'rejected' ? {
+                    kycMatched: false,
+                    kycVerifiedAt: null
+                } : {}
+            });
+            await this.audit('Verification', 'Update', `Video KYC ${userId} marked ${status}`);
+            return {
+                id,
+                userId,
+                status
+            };
+        }
         const request = await this.verificationRepo.findOne({
             where: {
                 id
