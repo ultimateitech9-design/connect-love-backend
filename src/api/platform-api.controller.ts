@@ -353,7 +353,7 @@ export class PlatformApiController {
           birthDate: request.user?.birthDate || null,
         })),
         ...kycUsers
-          .filter((user) => !requestedUserIds.has(user.id))
+          .filter((user) => !requestedUserIds.has(user.id) && !user.isVerified)
           .map((user) => ({
             id: `kyc-${user.id}`,
             name: user.name || 'Unknown user',
@@ -589,7 +589,13 @@ export class PlatformApiController {
       if (!user) return { message: 'KYC user not found.' };
       await this.userRepo.update(userId, {
         isVerified: status === 'approved',
-        ...(status === 'rejected' ? { kycMatched: false, kycVerifiedAt: null } : {}),
+        ...(status === 'approved' ? { kycVerifiedAt: user.kycVerifiedAt || new Date() } : {}),
+        ...(status === 'rejected' ? {
+          kycLivePhoto: null,
+          kycMatched: false,
+          kycMatchScore: null,
+          kycVerifiedAt: null,
+        } : {}),
       } as any);
       await this.audit('Verification', 'Update', `Video KYC ${userId} marked ${status}`);
       return { id, userId, status };

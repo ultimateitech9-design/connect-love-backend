@@ -522,7 +522,7 @@ let PlatformApiController = class PlatformApiController {
                         photo: request.user?.avatarUrl || null,
                         birthDate: request.user?.birthDate || null
                     })),
-                ...kycUsers.filter((user)=>!requestedUserIds.has(user.id)).map((user)=>({
+                ...kycUsers.filter((user)=>!requestedUserIds.has(user.id) && !user.isVerified).map((user)=>({
                         id: `kyc-${user.id}`,
                         name: user.name || 'Unknown user',
                         email: user.email || '',
@@ -824,8 +824,13 @@ let PlatformApiController = class PlatformApiController {
             };
             await this.userRepo.update(userId, {
                 isVerified: status === 'approved',
+                ...status === 'approved' ? {
+                    kycVerifiedAt: user.kycVerifiedAt || new Date()
+                } : {},
                 ...status === 'rejected' ? {
+                    kycLivePhoto: null,
                     kycMatched: false,
+                    kycMatchScore: null,
                     kycVerifiedAt: null
                 } : {}
             });
