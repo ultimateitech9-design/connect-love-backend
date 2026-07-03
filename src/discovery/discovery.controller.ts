@@ -8,8 +8,17 @@ export class DiscoveryController {
   constructor(private readonly discoveryService: DiscoveryService) {}
 
   @Get()
-  async getSuggestions(@Request() req: any, @Query('search') search?: string) {
-    return this.discoveryService.getSuggestions(req.user.userId, search);
+  async getSuggestions(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('ageMin') ageMin?: string,
+    @Query('ageMax') ageMax?: string,
+  ) {
+    return this.discoveryService.getSuggestions(req.user.userId, {
+      search,
+      ageMin: ageMin ? Number(ageMin) : undefined,
+      ageMax: ageMax ? Number(ageMax) : undefined,
+    });
   }
 
   @Get('tags')

@@ -27,13 +27,31 @@ function _ts_param(paramIndex, decorator) {
         decorator(target, key, paramIndex);
     };
 }
+const DEFAULT_MIN_AGE = 18;
+const DEFAULT_MAX_AGE = 90;
+function clampAge(value, fallback) {
+    return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
+}
+function toDateOnly(date) {
+    return date.toISOString().slice(0, 10);
+}
+function yearsAgo(years) {
+    const date = new Date();
+    date.setFullYear(date.getFullYear() - years);
+    return date;
+}
 let DiscoveryService = class DiscoveryService {
-    async getSuggestions(currentUserId, search) {
+    async getSuggestions(currentUserId, filters = {}) {
         const currentUser = await this.userRepo.findOne({
             where: {
                 id: currentUserId
             }
         });
+        const ageMin = clampAge(filters.ageMin, DEFAULT_MIN_AGE);
+        const ageMax = Math.max(ageMin, clampAge(filters.ageMax, DEFAULT_MAX_AGE));
+        const maxBirthDate = toDateOnly(yearsAgo(ageMin));
+        const minBirthDate = yearsAgo(ageMax + 1);
+        minBirthDate.setDate(minBirthDate.getDate() + 1);
         // We want to find all users that are NOT the current user
         const query = this.userRepo.createQueryBuilder('user').where('user.id != :currentUserId', {
             currentUserId
@@ -42,10 +60,13 @@ let DiscoveryService = class DiscoveryService {
             status: 'active'
         }).andWhere('user.role = :role', {
             role: 'user'
+        }).andWhere('user.birthDate IS NOT NULL').andWhere('user.birthDate BETWEEN :minBirthDate AND :maxBirthDate', {
+            minBirthDate: toDateOnly(minBirthDate),
+            maxBirthDate
         });
-        if (search && search.trim()) {
+        if (filters.search && filters.search.trim()) {
             query.andWhere('LOWER(user.name) LIKE :search', {
-                search: `%${search.toLowerCase().trim()}%`
+                search: `%${filters.search.toLowerCase().trim()}%`
             });
         } else {
             // Default: exclude users already swiped/matched
@@ -54,7 +75,7 @@ let DiscoveryService = class DiscoveryService {
                 return `NOT EXISTS ${subQuery}`;
             });
         }
-        if (currentUser?.onlyShowVerifiedProfiles && !(search && search.trim())) {
+        if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
             query.andWhere('user.isVerified = :verified', {
                 verified: true
             });

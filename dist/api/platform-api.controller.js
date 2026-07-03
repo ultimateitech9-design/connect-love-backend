@@ -26,6 +26,9 @@ _export(exports, {
     },
     get SavePlanDto () {
         return SavePlanDto;
+    },
+    get UpdatePlatformUserDto () {
+        return UpdatePlatformUserDto;
     }
 });
 const _common = require("@nestjs/common");
@@ -191,6 +194,100 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], SavePlanDto.prototype, "status", void 0);
+let UpdatePlatformUserDto = class UpdatePlatformUserDto {
+};
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "name", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsEmail)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "email", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "birthDate", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "gender", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "profession", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "height", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "city", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "bio", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.IsString)({
+        each: true
+    }),
+    _ts_metadata("design:type", Array)
+], UpdatePlatformUserDto.prototype, "interests", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.IsString)({
+        each: true
+    }),
+    _ts_metadata("design:type", Array)
+], UpdatePlatformUserDto.prototype, "hobbies", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.IsString)({
+        each: true
+    }),
+    _ts_metadata("design:type", Array)
+], UpdatePlatformUserDto.prototype, "personality", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsArray)(),
+    (0, _classvalidator.IsString)({
+        each: true
+    }),
+    _ts_metadata("design:type", Array)
+], UpdatePlatformUserDto.prototype, "photos", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "plan", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "status", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "role", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsBoolean)(),
+    _ts_metadata("design:type", Boolean)
+], UpdatePlatformUserDto.prototype, "isVerified", void 0);
 let PlatformApiController = class PlatformApiController {
     dayKey(date) {
         return date.toLocaleString('en-US', {
@@ -456,6 +553,102 @@ let PlatformApiController = class PlatformApiController {
                 joined: user.createdAt,
                 lastActive: user.lastSeen || user.updatedAt
             }
+        };
+    }
+    async updateUser(id, body) {
+        const user = await this.userRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User not found.');
+        if (body.email && body.email !== user.email) {
+            const existing = await this.userRepo.findOne({
+                where: {
+                    email: body.email
+                }
+            });
+            if (existing && existing.id !== id) return {
+                message: 'A user with this email already exists.',
+                user
+            };
+        }
+        const plan = [
+            'free',
+            'gold',
+            'platinum'
+        ].includes(String(body.plan)) ? body.plan : undefined;
+        const status = [
+            'active',
+            'suspended',
+            'banned',
+            'pending_verification'
+        ].includes(String(body.status)) ? body.status : undefined;
+        const role = [
+            'user',
+            'admin',
+            'super_admin',
+            'marketing',
+            'finance',
+            'sales',
+            'support'
+        ].includes(String(body.role)) ? body.role : undefined;
+        Object.assign(user, {
+            ...body.name !== undefined ? {
+                name: body.name
+            } : {},
+            ...body.email !== undefined ? {
+                email: body.email
+            } : {},
+            ...body.birthDate !== undefined ? {
+                birthDate: body.birthDate ? new Date(body.birthDate) : null
+            } : {},
+            ...body.gender !== undefined ? {
+                gender: body.gender
+            } : {},
+            ...body.profession !== undefined ? {
+                profession: body.profession
+            } : {},
+            ...body.height !== undefined ? {
+                height: body.height
+            } : {},
+            ...body.city !== undefined ? {
+                city: body.city
+            } : {},
+            ...body.bio !== undefined ? {
+                bio: body.bio
+            } : {},
+            ...body.interests !== undefined ? {
+                interests: body.interests
+            } : {},
+            ...body.hobbies !== undefined ? {
+                hobbies: body.hobbies
+            } : {},
+            ...body.personality !== undefined ? {
+                personalityWords: body.personality
+            } : {},
+            ...body.photos !== undefined ? {
+                photos: body.photos
+            } : {},
+            ...plan ? {
+                plan
+            } : {},
+            ...status ? {
+                status
+            } : {},
+            ...role ? {
+                role
+            } : {},
+            ...body.isVerified !== undefined ? {
+                isVerified: body.isVerified
+            } : {}
+        });
+        const saved = await this.userRepo.save(user);
+        await this.audit('Users', 'Update', `Updated user profile ${saved.email}`);
+        const { password: _, ...safe } = saved;
+        return {
+            success: true,
+            user: safe
         };
     }
     async updateUserStatus(id, status) {
@@ -1557,6 +1750,17 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "getUserDetails", null);
+_ts_decorate([
+    (0, _common.Patch)('users/:id'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof UpdatePlatformUserDto === "undefined" ? Object : UpdatePlatformUserDto
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "updateUser", null);
 _ts_decorate([
     (0, _common.Patch)('users/:id/status'),
     _ts_param(0, (0, _common.Param)('id')),

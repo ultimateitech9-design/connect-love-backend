@@ -26,8 +26,12 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DiscoveryController = class DiscoveryController {
-    async getSuggestions(req, search) {
-        return this.discoveryService.getSuggestions(req.user.userId, search);
+    async getSuggestions(req, search, ageMin, ageMax) {
+        return this.discoveryService.getSuggestions(req.user.userId, {
+            search,
+            ageMin: ageMin ? Number(ageMin) : undefined,
+            ageMax: ageMax ? Number(ageMax) : undefined
+        });
     }
     async getTags() {
         return this.discoveryService.getPopularTags();
@@ -40,9 +44,13 @@ _ts_decorate([
     (0, _common.Get)(),
     _ts_param(0, (0, _common.Request)()),
     _ts_param(1, (0, _common.Query)('search')),
+    _ts_param(2, (0, _common.Query)('ageMin')),
+    _ts_param(3, (0, _common.Query)('ageMax')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
+        String,
         String
     ]),
     _ts_metadata("design:returntype", Promise)

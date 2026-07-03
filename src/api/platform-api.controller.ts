@@ -12,7 +12,7 @@ import { NotificationStatus, PlatformNotification } from '../platform/platform-n
 import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
-import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray, IsBoolean } from 'class-validator';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -86,6 +86,76 @@ export class SavePlanDto {
   @IsOptional()
   @IsString()
   status?: string;
+}
+
+export class UpdatePlatformUserDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  birthDate?: string;
+
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @IsOptional()
+  @IsString()
+  profession?: string;
+
+  @IsOptional()
+  @IsString()
+  height?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  interests?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  hobbies?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  personality?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  photos?: string[];
+
+  @IsOptional()
+  @IsString()
+  plan?: string;
+
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isVerified?: boolean;
 }
 
 @Controller('api')
@@ -302,6 +372,45 @@ export class PlatformApiController {
         lastActive: user.lastSeen || user.updatedAt,
       }
     };
+  }
+
+  @Patch('users/:id')
+  async updateUser(@Param('id') id: string, @Body() body: UpdatePlatformUserDto) {
+    const user = await this.userRepo.findOne({ where: { id } });
+    if (!user) throw new NotFoundException('User not found.');
+
+    if (body.email && body.email !== user.email) {
+      const existing = await this.userRepo.findOne({ where: { email: body.email } });
+      if (existing && existing.id !== id) return { message: 'A user with this email already exists.', user };
+    }
+
+    const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
+    const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
+    const role = ['user', 'admin', 'super_admin', 'marketing', 'finance', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
+
+    Object.assign(user, {
+      ...(body.name !== undefined ? { name: body.name } : {}),
+      ...(body.email !== undefined ? { email: body.email } : {}),
+      ...(body.birthDate !== undefined ? { birthDate: body.birthDate ? new Date(body.birthDate) : null } : {}),
+      ...(body.gender !== undefined ? { gender: body.gender } : {}),
+      ...(body.profession !== undefined ? { profession: body.profession } : {}),
+      ...(body.height !== undefined ? { height: body.height } : {}),
+      ...(body.city !== undefined ? { city: body.city } : {}),
+      ...(body.bio !== undefined ? { bio: body.bio } : {}),
+      ...(body.interests !== undefined ? { interests: body.interests } : {}),
+      ...(body.hobbies !== undefined ? { hobbies: body.hobbies } : {}),
+      ...(body.personality !== undefined ? { personalityWords: body.personality } : {}),
+      ...(body.photos !== undefined ? { photos: body.photos } : {}),
+      ...(plan ? { plan } : {}),
+      ...(status ? { status } : {}),
+      ...(role ? { role } : {}),
+      ...(body.isVerified !== undefined ? { isVerified: body.isVerified } : {}),
+    });
+
+    const saved = await this.userRepo.save(user);
+    await this.audit('Users', 'Update', `Updated user profile ${saved.email}`);
+    const { password: _, ...safe } = saved as any;
+    return { success: true, user: safe };
   }
 
   @Patch('users/:id/status')

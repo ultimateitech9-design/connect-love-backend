@@ -4,6 +4,29 @@ import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { MatchRelation } from '../matches/match.entity';
 
+interface DiscoveryFilters {
+  search?: string;
+  ageMin?: number;
+  ageMax?: number;
+}
+
+const DEFAULT_MIN_AGE = 18;
+const DEFAULT_MAX_AGE = 90;
+
+function clampAge(value: number | undefined, fallback: number): number {
+  return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value!), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
+}
+
+function toDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function yearsAgo(years: number): Date {
+  const date = new Date();
+  date.setFullYear(date.getFullYear() - years);
+  return date;
+}
+
 @Injectable()
 export class DiscoveryService {
   constructor(
@@ -13,17 +36,28 @@ export class DiscoveryService {
     private readonly matchRepo: Repository<MatchRelation>,
   ) {}
 
-  async getSuggestions(currentUserId: string, search?: string): Promise<User[]> {
+  async getSuggestions(currentUserId: string, filters: DiscoveryFilters = {}): Promise<User[]> {
     const currentUser = await this.userRepo.findOne({ where: { id: currentUserId } });
+    const ageMin = clampAge(filters.ageMin, DEFAULT_MIN_AGE);
+    const ageMax = Math.max(ageMin, clampAge(filters.ageMax, DEFAULT_MAX_AGE));
+    const maxBirthDate = toDateOnly(yearsAgo(ageMin));
+    const minBirthDate = yearsAgo(ageMax + 1);
+    minBirthDate.setDate(minBirthDate.getDate() + 1);
+
     // We want to find all users that are NOT the current user
     const query = this.userRepo.createQueryBuilder('user')
       .where('user.id != :currentUserId', { currentUserId })
       // Only show active and verified users
       .andWhere('user.status = :status', { status: 'active' })
-      .andWhere('user.role = :role', { role: 'user' });
+      .andWhere('user.role = :role', { role: 'user' })
+      .andWhere('user.birthDate IS NOT NULL')
+      .andWhere('user.birthDate BETWEEN :minBirthDate AND :maxBirthDate', {
+        minBirthDate: toDateOnly(minBirthDate),
+        maxBirthDate,
+      });
 
-    if (search && search.trim()) {
-      query.andWhere('LOWER(user.name) LIKE :search', { search: `%${search.toLowerCase().trim()}%` });
+    if (filters.search && filters.search.trim()) {
+      query.andWhere('LOWER(user.name) LIKE :search', { search: `%${filters.search.toLowerCase().trim()}%` });
     } else {
       // Default: exclude users already swiped/matched
       query.andWhere((qb) => {
@@ -37,7 +71,7 @@ export class DiscoveryService {
       });
     }
 
-    if (currentUser?.onlyShowVerifiedProfiles && !(search && search.trim())) {
+    if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
       query.andWhere('user.isVerified = :verified', { verified: true });
     }
 
