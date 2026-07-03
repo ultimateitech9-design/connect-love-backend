@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { In, IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
 import { Contact } from '../support/contact.entity';
@@ -336,7 +336,15 @@ export class PlatformApiController {
       order: { kycVerifiedAt: 'DESC', updatedAt: 'DESC' } as any,
       take: 100,
     });
+    const reviewUsers = await this.userRepo.find({
+      where: [
+        { role: 'user', isVerified: false, status: In(['pending_verification', 'active']) } as any,
+      ],
+      order: { updatedAt: 'DESC', createdAt: 'DESC' } as any,
+      take: 100,
+    });
     const requestedUserIds = new Set(pending.map((request) => request.userId));
+    const kycUserIds = new Set(kycUsers.map((user) => user.id));
 
     return {
       queue: [
@@ -366,6 +374,20 @@ export class PlatformApiController {
             photo: user.avatarUrl || user.photos?.[0] || null,
             birthDate: user.birthDate || null,
             matchScore: user.kycMatchScore,
+          })),
+        ...reviewUsers
+          .filter((user) => !requestedUserIds.has(user.id) && !kycUserIds.has(user.id))
+          .map((user) => ({
+            id: `user-${user.id}`,
+            name: user.name || 'Unknown user',
+            email: user.email || '',
+            idType: user.status === 'pending_verification' ? 'Profile Verification' : 'Profile Review',
+            priority: user.status === 'pending_verification' ? 'High' : 'Low',
+            status: user.status === 'pending_verification' ? 'Pending' : 'Unverified',
+            date: user.updatedAt || user.createdAt,
+            documents: user.photos || [],
+            photo: user.avatarUrl || user.photos?.[0] || null,
+            birthDate: user.birthDate || null,
           })),
       ],
     };
@@ -583,6 +605,18 @@ export class PlatformApiController {
 
   @Patch('verification/:id/status')
   async updateVerification(@Param('id') id: string, @Body('status') status: VerificationStatus) {
+    if (id.startsWith('user-')) {
+      const userId = id.replace(/^user-/, '');
+      const user = await this.userRepo.findOne({ where: { id: userId } });
+      if (!user) return { message: 'Verification user not found.' };
+      await this.userRepo.update(userId, {
+        isVerified: status === 'approved',
+        status: status === 'rejected' ? 'pending_verification' : 'active',
+      } as any);
+      await this.audit('Verification', 'Update', `Profile verification ${userId} marked ${status}`);
+      return { id, userId, status };
+    }
+
     if (id.startsWith('kyc-')) {
       const userId = id.replace(/^kyc-/, '');
       const user = await this.userRepo.findOne({ where: { id: userId } });

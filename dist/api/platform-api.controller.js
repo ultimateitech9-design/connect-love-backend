@@ -507,7 +507,25 @@ let PlatformApiController = class PlatformApiController {
             },
             take: 100
         });
+        const reviewUsers = await this.userRepo.find({
+            where: [
+                {
+                    role: 'user',
+                    isVerified: false,
+                    status: (0, _typeorm1.In)([
+                        'pending_verification',
+                        'active'
+                    ])
+                }
+            ],
+            order: {
+                updatedAt: 'DESC',
+                createdAt: 'DESC'
+            },
+            take: 100
+        });
         const requestedUserIds = new Set(pending.map((request)=>request.userId));
+        const kycUserIds = new Set(kycUsers.map((user)=>user.id));
         return {
             queue: [
                 ...pending.map((request)=>({
@@ -536,6 +554,18 @@ let PlatformApiController = class PlatformApiController {
                         photo: user.avatarUrl || user.photos?.[0] || null,
                         birthDate: user.birthDate || null,
                         matchScore: user.kycMatchScore
+                    })),
+                ...reviewUsers.filter((user)=>!requestedUserIds.has(user.id) && !kycUserIds.has(user.id)).map((user)=>({
+                        id: `user-${user.id}`,
+                        name: user.name || 'Unknown user',
+                        email: user.email || '',
+                        idType: user.status === 'pending_verification' ? 'Profile Verification' : 'Profile Review',
+                        priority: user.status === 'pending_verification' ? 'High' : 'Low',
+                        status: user.status === 'pending_verification' ? 'Pending' : 'Unverified',
+                        date: user.updatedAt || user.createdAt,
+                        documents: user.photos || [],
+                        photo: user.avatarUrl || user.photos?.[0] || null,
+                        birthDate: user.birthDate || null
                     }))
             ]
         };
@@ -812,6 +842,27 @@ let PlatformApiController = class PlatformApiController {
         return role;
     }
     async updateVerification(id, status) {
+        if (id.startsWith('user-')) {
+            const userId = id.replace(/^user-/, '');
+            const user = await this.userRepo.findOne({
+                where: {
+                    id: userId
+                }
+            });
+            if (!user) return {
+                message: 'Verification user not found.'
+            };
+            await this.userRepo.update(userId, {
+                isVerified: status === 'approved',
+                status: status === 'rejected' ? 'pending_verification' : 'active'
+            });
+            await this.audit('Verification', 'Update', `Profile verification ${userId} marked ${status}`);
+            return {
+                id,
+                userId,
+                status
+            };
+        }
         if (id.startsWith('kyc-')) {
             const userId = id.replace(/^kyc-/, '');
             const user = await this.userRepo.findOne({
