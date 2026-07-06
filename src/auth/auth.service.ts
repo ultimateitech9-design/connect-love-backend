@@ -271,6 +271,7 @@ export class AuthService {
       admin: ['admin', 'super_admin'],
       'super-admin': ['super_admin'],
       marketing: ['marketing', 'super_admin'],
+      'data-entry': ['data_entry', 'super_admin'],
       finance: ['finance', 'super_admin'],
       sales: ['sales', 'super_admin'],
       support: ['support', 'admin', 'super_admin'],

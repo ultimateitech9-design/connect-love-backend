@@ -3,7 +3,7 @@ import {
 } from 'typeorm';
 
 export type UserPlan = 'free' | 'gold' | 'platinum';
-export type UserRole = 'user' | 'admin' | 'super_admin' | 'marketing' | 'finance' | 'sales' | 'support';
+export type UserRole = 'user' | 'admin' | 'super_admin' | 'marketing' | 'data_entry' | 'finance' | 'sales' | 'support';
 export type UserStatus = 'active' | 'suspended' | 'banned' | 'pending_verification';
 
 @Entity('users')
@@ -98,7 +98,7 @@ export class User {
 
   @Column({
     type: 'enum',
-    enum: ['user', 'admin', 'super_admin', 'marketing', 'finance', 'sales', 'support'],
+    enum: ['user', 'admin', 'super_admin', 'marketing', 'data_entry', 'finance', 'sales', 'support'],
     default: 'user',
   })
   role: UserRole;

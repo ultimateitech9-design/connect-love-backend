@@ -38,6 +38,7 @@ _ts_decorate([
     (0, _classvalidator.IsIn)([
         'admin',
         'marketing',
+        'data_entry',
         'finance',
         'sales',
         'support'

@@ -7,7 +7,7 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const managementAccounts = [
   ['ADMIN_USER', 'admin'],
-  ['MARKETING_USER', 'marketing'],
+  ['DATA_ENTRY_USER', 'data_entry'],
   ['FINANCE_USER', 'finance'],
   ['SALES_USER', 'sales'],
   ['SUPPORT_USER', 'support'],
@@ -28,7 +28,7 @@ const demoAccountPrefixes = [
 const roles = [
   ['role-super-admin', 'Super Admin', 42, 'Active'],
   ['role-admin', 'Admin', 32, 'Active'],
-  ['role-marketing', 'Marketing', 18, 'Active'],
+  ['role-data-entry', 'Data Entry', 18, 'Active'],
   ['role-finance', 'Finance', 18, 'Active'],
   ['role-sales', 'Sales', 16, 'Active'],
   ['role-support', 'Support', 20, 'Active'],
@@ -57,6 +57,10 @@ async function main() {
   for (const id of demoUserIds) {
     await connection.execute('DELETE FROM users WHERE id = ?', [id]);
   }
+  const legacyMarketingId = env('MARKETING_USER_ID') || 'marketing-1';
+  const legacyMarketingEmail = env('MARKETING_USER_EMAIL') || 'marketing@connectlove.com';
+  await connection.execute('DELETE FROM users WHERE id = ? OR email = ?', [legacyMarketingId, legacyMarketingEmail]);
+  await connection.execute("DELETE FROM platform_roles WHERE id = 'role-marketing' OR role = 'Marketing'");
   await connection.execute("DELETE FROM payments WHERE id IN ('pay-1','pay-2','pay-3','pay-4')");
   await connection.execute("DELETE FROM verification_requests WHERE id IN ('ver-1','ver-2')");
   await connection.execute("DELETE FROM platform_notifications WHERE id IN ('notif-1','notif-2','notif-3')");

@@ -203,6 +203,7 @@ _ts_decorate([
             'admin',
             'super_admin',
             'marketing',
+            'data_entry',
             'finance',
             'sales',
             'support'

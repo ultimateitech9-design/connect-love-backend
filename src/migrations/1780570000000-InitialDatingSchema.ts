@@ -22,7 +22,7 @@ export class InitialDatingSchema1780570000000 implements MigrationInterface {
         hobbies json NULL,
         plan enum('free','gold','platinum') NOT NULL DEFAULT 'free',
         status enum('active','suspended','banned','pending_verification') NOT NULL DEFAULT 'active',
-        role enum('user','admin','super_admin','marketing','finance','sales','support') NOT NULL DEFAULT 'user',
+        role enum('user','admin','super_admin','marketing','data_entry','finance','sales','support') NOT NULL DEFAULT 'user',
         isVerified tinyint NOT NULL DEFAULT 0,
         onboardingCompleted tinyint NOT NULL DEFAULT 0,
         isOnline tinyint NOT NULL DEFAULT 0,

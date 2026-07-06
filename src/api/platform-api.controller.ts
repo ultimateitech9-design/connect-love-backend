@@ -386,7 +386,7 @@ export class PlatformApiController {
 
     const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
     const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
-    const role = ['user', 'admin', 'super_admin', 'marketing', 'finance', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
+    const role = ['user', 'admin', 'super_admin', 'marketing', 'data_entry', 'finance', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
 
     Object.assign(user, {
       ...(body.name !== undefined ? { name: body.name } : {}),

@@ -33,6 +33,9 @@ export class Message {
   @Column('mediumtext')
   content: string;
 
+  @Column({ type: 'text', nullable: true })
+  reactions: string | null;
+
   @Column({ default: false })
   isRead: boolean;
 

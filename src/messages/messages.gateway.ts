@@ -53,6 +53,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  private isUserOnline(userId: string): boolean {
+    return !!this.connectedUsers.get(userId)?.size;
+  }
+
   async handleConnection(client: Socket) {
     const token = (client.handshake.auth?.token || client.handshake.query.token) as string | undefined;
     let userId: string | undefined;
@@ -134,23 +138,96 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: error?.message || 'Could not send message' };
     }
 
+    const messageForSender = {
+      ...savedMessage,
+      deliveryStatus: this.isUserOnline(data.receiverId) ? 'delivered' : 'sent',
+    };
+
     // Emit to recipient if online
     this.emitToUser(data.receiverId, 'receiveMessage', savedMessage);
     
     // Emit back to sender (optional, can be optimistic on client)
-    this.server.to(client.id).emit('receiveMessage', savedMessage);
+    this.server.to(client.id).emit('receiveMessage', messageForSender);
 
-    return { event: 'messageSent', data: savedMessage };
+    return { event: 'messageSent', data: messageForSender };
+  }
+
+  @SubscribeMessage('toggleReaction')
+  async handleToggleReaction(
+    @MessageBody() data: { messageId: string; conversationId: string; receiverId: string; emoji: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const updatedReactions = await this.messagesService.toggleReaction(data.messageId, userId, data.emoji);
+      const payload = { messageId: data.messageId, conversationId: data.conversationId, reactions: updatedReactions };
+
+      // Emit messageReactionChanged to both receiver and sender
+      this.emitToUser(data.receiverId, 'messageReactionChanged', payload);
+      this.server.to(client.id).emit('messageReactionChanged', payload);
+
+      return { event: 'reactionToggled', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not toggle reaction' };
+    }
   }
 
   @SubscribeMessage('typing')
   handleTyping(
-    @MessageBody() data: { receiverId: string; isTyping: boolean },
+    @MessageBody() data: { conversationId?: string; receiverId: string; isTyping: boolean },
     @ConnectedSocket() client: Socket,
   ) {
     const senderId = this.getUserIdForSocket(client);
-    
-    this.emitToUser(data.receiverId, 'typingStatus', { userId: senderId, isTyping: data.isTyping });
+    if (!senderId) return { error: 'Not authenticated' };
+
+    this.emitToUser(data.receiverId, 'typingStatus', {
+      conversationId: data.conversationId,
+      userId: senderId,
+      isTyping: data.isTyping,
+    });
+  }
+
+  @SubscribeMessage('recording')
+  handleRecording(
+    @MessageBody() data: { conversationId?: string; receiverId: string; isRecording: boolean },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const senderId = this.getUserIdForSocket(client);
+    if (!senderId) return { error: 'Not authenticated' };
+
+    this.emitToUser(data.receiverId, 'recordingStatus', {
+      conversationId: data.conversationId,
+      userId: senderId,
+      isRecording: data.isRecording,
+    });
+  }
+
+  @SubscribeMessage('markMessagesRead')
+  async handleMarkMessagesRead(
+    @MessageBody() data: { conversationId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const readerId = this.getUserIdForSocket(client);
+    if (!readerId) return { error: 'Not authenticated' };
+
+    try {
+      const readMessages = await this.messagesService.markAsRead(data.conversationId, readerId);
+      const payload = {
+        conversationId: data.conversationId,
+        readerId,
+        messageIds: readMessages.map((message) => message.id),
+      };
+
+      const senderIds = new Set(readMessages.map((message) => message.senderId));
+      senderIds.forEach((senderId) => this.emitToUser(senderId, 'messagesRead', payload));
+      this.server.to(client.id).emit('messagesRead', payload);
+
+      return { event: 'messagesRead', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not mark messages as read' };
+    }
   }
 
   @SubscribeMessage('startVideoCall')

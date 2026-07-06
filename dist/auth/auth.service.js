@@ -315,6 +315,10 @@ let AuthService = class AuthService {
                 'marketing',
                 'super_admin'
             ],
+            'data-entry': [
+                'data_entry',
+                'super_admin'
+            ],
             finance: [
                 'finance',
                 'super_admin'

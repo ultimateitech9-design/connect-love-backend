@@ -44,6 +44,9 @@ let MessagesGateway = class MessagesGateway {
             this.server.to(socketId).emit(event, payload);
         }
     }
+    isUserOnline(userId) {
+        return !!this.connectedUsers.get(userId)?.size;
+    }
     async handleConnection(client) {
         const token = client.handshake.auth?.token || client.handshake.query.token;
         let userId;
@@ -122,21 +125,90 @@ let MessagesGateway = class MessagesGateway {
                 error: error?.message || 'Could not send message'
             };
         }
+        const messageForSender = {
+            ...savedMessage,
+            deliveryStatus: this.isUserOnline(data.receiverId) ? 'delivered' : 'sent'
+        };
         // Emit to recipient if online
         this.emitToUser(data.receiverId, 'receiveMessage', savedMessage);
         // Emit back to sender (optional, can be optimistic on client)
-        this.server.to(client.id).emit('receiveMessage', savedMessage);
+        this.server.to(client.id).emit('receiveMessage', messageForSender);
         return {
             event: 'messageSent',
-            data: savedMessage
+            data: messageForSender
         };
+    }
+    async handleToggleReaction(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const updatedReactions = await this.messagesService.toggleReaction(data.messageId, userId, data.emoji);
+            const payload = {
+                messageId: data.messageId,
+                conversationId: data.conversationId,
+                reactions: updatedReactions
+            };
+            // Emit messageReactionChanged to both receiver and sender
+            this.emitToUser(data.receiverId, 'messageReactionChanged', payload);
+            this.server.to(client.id).emit('messageReactionChanged', payload);
+            return {
+                event: 'reactionToggled',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not toggle reaction'
+            };
+        }
     }
     handleTyping(data, client) {
         const senderId = this.getUserIdForSocket(client);
+        if (!senderId) return {
+            error: 'Not authenticated'
+        };
         this.emitToUser(data.receiverId, 'typingStatus', {
+            conversationId: data.conversationId,
             userId: senderId,
             isTyping: data.isTyping
         });
+    }
+    handleRecording(data, client) {
+        const senderId = this.getUserIdForSocket(client);
+        if (!senderId) return {
+            error: 'Not authenticated'
+        };
+        this.emitToUser(data.receiverId, 'recordingStatus', {
+            conversationId: data.conversationId,
+            userId: senderId,
+            isRecording: data.isRecording
+        });
+    }
+    async handleMarkMessagesRead(data, client) {
+        const readerId = this.getUserIdForSocket(client);
+        if (!readerId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const readMessages = await this.messagesService.markAsRead(data.conversationId, readerId);
+            const payload = {
+                conversationId: data.conversationId,
+                readerId,
+                messageIds: readMessages.map((message)=>message.id)
+            };
+            const senderIds = new Set(readMessages.map((message)=>message.senderId));
+            senderIds.forEach((senderId)=>this.emitToUser(senderId, 'messagesRead', payload));
+            this.server.to(client.id).emit('messagesRead', payload);
+            return {
+                event: 'messagesRead',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not mark messages as read'
+            };
+        }
     }
     async handleStartVideoCall(data, client) {
         const callerId = this.getUserIdForSocket(client);
@@ -247,6 +319,17 @@ _ts_decorate([
     _ts_metadata("design:returntype", Promise)
 ], MessagesGateway.prototype, "handleSendMessage", null);
 _ts_decorate([
+    (0, _websockets.SubscribeMessage)('toggleReaction'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleToggleReaction", null);
+_ts_decorate([
     (0, _websockets.SubscribeMessage)('typing'),
     _ts_param(0, (0, _websockets.MessageBody)()),
     _ts_param(1, (0, _websockets.ConnectedSocket)()),
@@ -257,6 +340,28 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], MessagesGateway.prototype, "handleTyping", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('recording'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], MessagesGateway.prototype, "handleRecording", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('markMessagesRead'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleMarkMessagesRead", null);
 _ts_decorate([
     (0, _websockets.SubscribeMessage)('startVideoCall'),
     _ts_param(0, (0, _websockets.MessageBody)()),

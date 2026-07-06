@@ -50,11 +50,51 @@ export class MessagesService {
     }
   }
 
-  async markAsRead(conversationId: string, userId: string): Promise<void> {
+  async markAsRead(conversationId: string, userId: string): Promise<Message[]> {
     await this.assertConversationAccess(conversationId, userId);
+    const unreadMessages = await this.msgRepo.find({
+      where: { conversationId, receiverId: userId, isRead: false },
+    });
+
+    if (unreadMessages.length === 0) return [];
+
     await this.msgRepo.update(
       { conversationId, receiverId: userId, isRead: false },
       { isRead: true }
     );
+
+    return unreadMessages.map((message) => ({ ...message, isRead: true }));
+  }
+
+  async toggleReaction(messageId: string, userId: string, emoji: string): Promise<Record<string, string[]>> {
+    const msg = await this.msgRepo.findOne({ where: { id: messageId } });
+    if (!msg) throw new NotFoundException('Message not found.');
+
+    let reactionsMap: Record<string, string[]> = {};
+    if (msg.reactions) {
+      try {
+        reactionsMap = JSON.parse(msg.reactions);
+      } catch (e) {
+        reactionsMap = {};
+      }
+    }
+
+    if (!reactionsMap[emoji]) {
+      reactionsMap[emoji] = [];
+    }
+
+    const index = reactionsMap[emoji].indexOf(userId);
+    if (index > -1) {
+      reactionsMap[emoji].splice(index, 1);
+      if (reactionsMap[emoji].length === 0) {
+        delete reactionsMap[emoji];
+      }
+    } else {
+      reactionsMap[emoji].push(userId);
+    }
+
+    msg.reactions = JSON.stringify(reactionsMap);
+    await this.msgRepo.save(msg);
+    return reactionsMap;
   }
 }

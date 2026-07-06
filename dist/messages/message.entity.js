@@ -61,6 +61,13 @@ _ts_decorate([
 ], Message.prototype, "content", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "reactions", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         default: false
     }),
     _ts_metadata("design:type", Boolean)
