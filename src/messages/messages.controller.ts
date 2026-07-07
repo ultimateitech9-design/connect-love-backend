@@ -7,6 +7,17 @@ import { AuthGuard } from '@nestjs/passport';
 export class MessagesController {
   constructor(private readonly messagesService: MessagesService) {}
 
+  @Post('batch-delete')
+  async batchDelete(@Request() req, @Body('messageIds') messageIds: string[]) {
+    await this.messagesService.removeMany(messageIds, req.user.userId);
+    return { success: true };
+  }
+
+  @Get(':id/info')
+  async messageInfo(@Request() req, @Param('id') id: string) {
+    return this.messagesService.getInfo(id, req.user.userId);
+  }
+
   @Get(':conversationId')
   async getConversationMessages(@Request() req, @Param('conversationId') conversationId: string) {
     return this.messagesService.findAll(conversationId, req.user.userId);
@@ -18,13 +29,36 @@ export class MessagesController {
     @Param('conversationId') conversationId: string,
     @Body('receiverId') receiverId: string,
     @Body('text') text: string,
+    @Body('content') content: string,
+    @Body('replyToMessageId') replyToMessageId?: string,
   ) {
-    return this.messagesService.create(conversationId, req.user.userId, receiverId, text);
+    return this.messagesService.create(conversationId, req.user.userId, receiverId, content || text, replyToMessageId);
   }
 
   @Delete(':id')
-  async deleteMessage(@Request() req, @Param('id') id: string) {
-    return this.messagesService.remove(id, req.user.userId);
+  async deleteMessage(@Request() req, @Param('id') id: string, @Body('scope') scope?: 'me' | 'everyone') {
+    return this.messagesService.remove(id, req.user.userId, scope || 'everyone');
+  }
+
+  @Delete('conversation/:conversationId')
+  async clearConversation(@Request() req, @Param('conversationId') conversationId: string) {
+    await this.messagesService.clearConversation(conversationId, req.user.userId);
+    return { success: true };
+  }
+
+  @Patch(':id')
+  async editMessage(@Request() req, @Param('id') id: string, @Body('content') content: string) {
+    return this.messagesService.update(id, req.user.userId, content);
+  }
+
+  @Patch(':id/pin')
+  async togglePin(@Request() req, @Param('id') id: string) {
+    return this.messagesService.togglePin(id, req.user.userId);
+  }
+
+  @Patch(':id/star')
+  async toggleStar(@Request() req, @Param('id') id: string) {
+    return this.messagesService.toggleStar(id, req.user.userId);
   }
 
   @Patch(':conversationId/read')

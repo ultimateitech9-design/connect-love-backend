@@ -119,7 +119,7 @@ let MessagesGateway = class MessagesGateway {
         };
         let savedMessage;
         try {
-            savedMessage = await this.messagesService.create(data.conversationId, senderId, data.receiverId, data.content);
+            savedMessage = await this.messagesService.create(data.conversationId, senderId, data.receiverId, data.content, data.replyToMessageId);
         } catch (error) {
             return {
                 error: error?.message || 'Could not send message'
@@ -137,6 +137,85 @@ let MessagesGateway = class MessagesGateway {
             event: 'messageSent',
             data: messageForSender
         };
+    }
+    async handleEditMessage(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const message = await this.messagesService.update(data.messageId, userId, data.content);
+            this.emitToUser(data.receiverId, 'messageUpdated', message);
+            this.server.to(client.id).emit('messageUpdated', message);
+            return {
+                event: 'messageUpdated',
+                data: message
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not edit message'
+            };
+        }
+    }
+    async handleDeleteMessage(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const message = await this.messagesService.remove(data.messageId, userId, data.scope || 'everyone');
+            const payload = {
+                message,
+                scope: data.scope || 'everyone',
+                userId
+            };
+            if (data.scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
+            this.server.to(client.id).emit('messageDeleted', payload);
+            return {
+                event: 'messageDeleted',
+                data: payload
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not delete message'
+            };
+        }
+    }
+    async handleTogglePin(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const message = await this.messagesService.togglePin(data.messageId, userId);
+            this.server.to(client.id).emit('messageMetaChanged', message);
+            return {
+                event: 'messageMetaChanged',
+                data: message
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not pin message'
+            };
+        }
+    }
+    async handleToggleStar(data, client) {
+        const userId = this.getUserIdForSocket(client);
+        if (!userId) return {
+            error: 'Not authenticated'
+        };
+        try {
+            const message = await this.messagesService.toggleStar(data.messageId, userId);
+            this.server.to(client.id).emit('messageMetaChanged', message);
+            return {
+                event: 'messageMetaChanged',
+                data: message
+            };
+        } catch (error) {
+            return {
+                error: error?.message || 'Could not star message'
+            };
+        }
     }
     async handleToggleReaction(data, client) {
         const userId = this.getUserIdForSocket(client);
@@ -318,6 +397,50 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MessagesGateway.prototype, "handleSendMessage", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('editMessage'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleEditMessage", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('deleteMessage'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleDeleteMessage", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('togglePin'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleTogglePin", null);
+_ts_decorate([
+    (0, _websockets.SubscribeMessage)('toggleStar'),
+    _ts_param(0, (0, _websockets.MessageBody)()),
+    _ts_param(1, (0, _websockets.ConnectedSocket)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        typeof _socketio.Socket === "undefined" ? Object : _socketio.Socket
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesGateway.prototype, "handleToggleStar", null);
 _ts_decorate([
     (0, _websockets.SubscribeMessage)('toggleReaction'),
     _ts_param(0, (0, _websockets.MessageBody)()),

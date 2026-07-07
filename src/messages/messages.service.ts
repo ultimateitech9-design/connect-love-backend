@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, In } from 'typeorm';
 import { Message } from './message.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 
@@ -25,29 +25,66 @@ export class MessagesService {
     return match;
   }
 
+  private parseUserList(value: string | null): string[] {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.map(String) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private async assertMessageAccess(messageId: string, userId: string): Promise<Message> {
+    const msg = await this.msgRepo.findOne({ where: { id: messageId } });
+    if (!msg) throw new NotFoundException('Message not found.');
+    await this.assertConversationAccess(msg.conversationId, userId);
+    if (msg.senderId !== userId && msg.receiverId !== userId) {
+      throw new ForbiddenException('You are not part of this message.');
+    }
+    return msg;
+  }
+
   async findAll(conversationId: string, userId: string): Promise<Message[]> {
     await this.assertConversationAccess(conversationId, userId);
-    return this.msgRepo.find({
+    const messages = await this.msgRepo.find({
       where: { conversationId },
       order: { createdAt: 'ASC' }
     });
+    return messages.filter((message) => !this.parseUserList(message.deletedForUserIds).includes(userId));
   }
 
-  async create(conversationId: string, senderId: string, receiverId: string, content: string): Promise<Message> {
+  async create(conversationId: string, senderId: string, receiverId: string, content: string, replyToMessageId?: string): Promise<Message> {
     const match = await this.assertConversationAccess(conversationId, senderId);
     const validReceiver = receiverId === match.senderId || receiverId === match.receiverId;
     if (!validReceiver || receiverId === senderId) {
       throw new ForbiddenException('Invalid receiver for this conversation.');
     }
-    const msg = this.msgRepo.create({ conversationId, senderId, receiverId, content });
+    if (replyToMessageId) {
+      const replyMessage = await this.assertMessageAccess(replyToMessageId, senderId);
+      if (replyMessage.conversationId !== conversationId) {
+        throw new ForbiddenException('Reply message is not in this conversation.');
+      }
+    }
+    const msg = this.msgRepo.create({ conversationId, senderId, receiverId, content, replyToMessageId: replyToMessageId || null });
     return this.msgRepo.save(msg);
   }
 
-  async remove(id: string, userId: string): Promise<void> {
-    const msg = await this.msgRepo.findOne({ where: { id } });
-    if (msg && (msg.senderId === userId || msg.receiverId === userId)) {
-      await this.msgRepo.remove(msg);
+  async remove(id: string, userId: string, scope: 'me' | 'everyone' = 'everyone'): Promise<Message> {
+    const msg = await this.assertMessageAccess(id, userId);
+    if (scope === 'everyone') {
+      if (msg.senderId !== userId) {
+        throw new ForbiddenException('Only the sender can delete this message for everyone.');
+      }
+      msg.deletedForEveryone = true;
+      msg.content = 'This message was deleted';
+      msg.reactions = null;
+    } else {
+      const deletedFor = new Set(this.parseUserList(msg.deletedForUserIds));
+      deletedFor.add(userId);
+      msg.deletedForUserIds = JSON.stringify([...deletedFor]);
     }
+    return this.msgRepo.save(msg);
   }
 
   async markAsRead(conversationId: string, userId: string): Promise<Message[]> {
@@ -67,8 +104,8 @@ export class MessagesService {
   }
 
   async toggleReaction(messageId: string, userId: string, emoji: string): Promise<Record<string, string[]>> {
-    const msg = await this.msgRepo.findOne({ where: { id: messageId } });
-    if (!msg) throw new NotFoundException('Message not found.');
+    const msg = await this.assertMessageAccess(messageId, userId);
+    if (msg.deletedForEveryone) throw new ForbiddenException('Cannot react to a deleted message.');
 
     let reactionsMap: Record<string, string[]> = {};
     if (msg.reactions) {
@@ -96,5 +133,66 @@ export class MessagesService {
     msg.reactions = JSON.stringify(reactionsMap);
     await this.msgRepo.save(msg);
     return reactionsMap;
+  }
+
+  async clearConversation(conversationId: string, userId: string): Promise<void> {
+    await this.assertConversationAccess(conversationId, userId);
+    const messages = await this.msgRepo.find({ where: { conversationId } });
+    await Promise.all(messages.map((message) => {
+      const deletedFor = new Set(this.parseUserList(message.deletedForUserIds));
+      deletedFor.add(userId);
+      message.deletedForUserIds = JSON.stringify([...deletedFor]);
+      return this.msgRepo.save(message);
+    }));
+  }
+
+  async removeMany(ids: string[], userId: string): Promise<void> {
+    const messages = await this.msgRepo.find({
+      where: [
+        { id: In(ids), senderId: userId },
+        { id: In(ids), receiverId: userId }
+      ]
+    });
+    if (messages.length > 0) {
+      await Promise.all(messages.map((message) => {
+        const deletedFor = new Set(this.parseUserList(message.deletedForUserIds));
+        deletedFor.add(userId);
+        message.deletedForUserIds = JSON.stringify([...deletedFor]);
+        return this.msgRepo.save(message);
+      }));
+    }
+  }
+
+  async update(id: string, userId: string, newContent: string): Promise<Message> {
+    const msg = await this.assertMessageAccess(id, userId);
+    if (msg.senderId !== userId) {
+      throw new ForbiddenException('You can only edit your own messages.');
+    }
+    if (msg.deletedForEveryone) throw new ForbiddenException('Cannot edit a deleted message.');
+    msg.content = newContent;
+    msg.editedAt = new Date();
+    return this.msgRepo.save(msg);
+  }
+
+  async togglePin(id: string, userId: string): Promise<Message> {
+    const msg = await this.assertMessageAccess(id, userId);
+    const pinnedBy = new Set(this.parseUserList(msg.pinnedByUserIds));
+    if (pinnedBy.has(userId)) pinnedBy.delete(userId);
+    else pinnedBy.add(userId);
+    msg.pinnedByUserIds = JSON.stringify([...pinnedBy]);
+    return this.msgRepo.save(msg);
+  }
+
+  async toggleStar(id: string, userId: string): Promise<Message> {
+    const msg = await this.assertMessageAccess(id, userId);
+    const starredBy = new Set(this.parseUserList(msg.starredByUserIds));
+    if (starredBy.has(userId)) starredBy.delete(userId);
+    else starredBy.add(userId);
+    msg.starredByUserIds = JSON.stringify([...starredBy]);
+    return this.msgRepo.save(msg);
+  }
+
+  async getInfo(id: string, userId: string): Promise<Message> {
+    return this.assertMessageAccess(id, userId);
   }
 }

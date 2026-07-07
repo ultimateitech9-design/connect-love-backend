@@ -68,10 +68,52 @@ _ts_decorate([
 ], Message.prototype, "reactions", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "deletedForUserIds", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        default: false
+    }),
+    _ts_metadata("design:type", Boolean)
+], Message.prototype, "deletedForEveryone", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "pinnedByUserIds", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "starredByUserIds", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 36,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "replyToMessageId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         default: false
     }),
     _ts_metadata("design:type", Boolean)
 ], Message.prototype, "isRead", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'datetime',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Message.prototype, "editedAt", void 0);
 _ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)

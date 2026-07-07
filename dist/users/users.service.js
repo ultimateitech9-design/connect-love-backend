@@ -85,7 +85,9 @@ let UsersService = class UsersService {
             kycMatched: user.kycMatched,
             kycMatchScore: user.kycMatchScore,
             photosVisibleToNonMatches: true,
-            isVerified: user.isVerified
+            isVerified: user.isVerified,
+            locationLatitude: user.locationLatitude,
+            locationLongitude: user.locationLongitude
         };
     }
     async findAll() {

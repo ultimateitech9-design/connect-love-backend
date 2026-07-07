@@ -67,6 +67,8 @@ export class UsersService {
       kycMatchScore: user.kycMatchScore,
       photosVisibleToNonMatches: true,
       isVerified: user.isVerified,
+      locationLatitude: user.locationLatitude,
+      locationLongitude: user.locationLongitude,
     };
   }
 

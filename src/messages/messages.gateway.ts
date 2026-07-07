@@ -125,7 +125,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
-    @MessageBody() data: { conversationId: string; receiverId: string; content: string },
+    @MessageBody() data: { conversationId: string; receiverId: string; content: string; replyToMessageId?: string },
     @ConnectedSocket() client: Socket,
   ) {
     const senderId = this.getUserIdForSocket(client);
@@ -133,7 +133,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     let savedMessage;
     try {
-      savedMessage = await this.messagesService.create(data.conversationId, senderId, data.receiverId, data.content);
+      savedMessage = await this.messagesService.create(data.conversationId, senderId, data.receiverId, data.content, data.replyToMessageId);
     } catch (error: any) {
       return { error: error?.message || 'Could not send message' };
     }
@@ -150,6 +150,77 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.to(client.id).emit('receiveMessage', messageForSender);
 
     return { event: 'messageSent', data: messageForSender };
+  }
+
+  @SubscribeMessage('editMessage')
+  async handleEditMessage(
+    @MessageBody() data: { messageId: string; receiverId: string; content: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const message = await this.messagesService.update(data.messageId, userId, data.content);
+      this.emitToUser(data.receiverId, 'messageUpdated', message);
+      this.server.to(client.id).emit('messageUpdated', message);
+      return { event: 'messageUpdated', data: message };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not edit message' };
+    }
+  }
+
+  @SubscribeMessage('deleteMessage')
+  async handleDeleteMessage(
+    @MessageBody() data: { messageId: string; receiverId: string; scope?: 'me' | 'everyone' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const message = await this.messagesService.remove(data.messageId, userId, data.scope || 'everyone');
+      const payload = { message, scope: data.scope || 'everyone', userId };
+      if (data.scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
+      this.server.to(client.id).emit('messageDeleted', payload);
+      return { event: 'messageDeleted', data: payload };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not delete message' };
+    }
+  }
+
+  @SubscribeMessage('togglePin')
+  async handleTogglePin(
+    @MessageBody() data: { messageId: string; receiverId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const message = await this.messagesService.togglePin(data.messageId, userId);
+      this.server.to(client.id).emit('messageMetaChanged', message);
+      return { event: 'messageMetaChanged', data: message };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not pin message' };
+    }
+  }
+
+  @SubscribeMessage('toggleStar')
+  async handleToggleStar(
+    @MessageBody() data: { messageId: string; receiverId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = this.getUserIdForSocket(client);
+    if (!userId) return { error: 'Not authenticated' };
+
+    try {
+      const message = await this.messagesService.toggleStar(data.messageId, userId);
+      this.server.to(client.id).emit('messageMetaChanged', message);
+      return { event: 'messageMetaChanged', data: message };
+    } catch (error: any) {
+      return { error: error?.message || 'Could not star message' };
+    }
   }
 
   @SubscribeMessage('toggleReaction')
