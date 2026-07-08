@@ -37,6 +37,7 @@ let UsersService = class UsersService {
     serializeUser(user) {
         return {
             ...user,
+            religion: user.religion,
             age: user.age,
             avatarUrl: user.avatarUrl,
             photos: user.photos || [],
@@ -73,6 +74,7 @@ let UsersService = class UsersService {
             age: user.age,
             birthDate: user.birthDate,
             gender: user.gender,
+            religion: user.religion,
             profession: user.profession,
             height: user.height,
             city: user.city,

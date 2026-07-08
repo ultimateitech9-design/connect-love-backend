@@ -235,6 +235,11 @@ _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "religion", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
 ], UpdatePlatformUserDto.prototype, "bio", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
@@ -537,6 +542,7 @@ let PlatformApiController = class PlatformApiController {
                 age: user.age,
                 birthDate: user.birthDate,
                 gender: user.gender,
+                religion: user.religion,
                 profession: user.profession,
                 height: user.height,
                 city: user.city,
@@ -606,6 +612,9 @@ let PlatformApiController = class PlatformApiController {
             } : {},
             ...body.gender !== undefined ? {
                 gender: body.gender
+            } : {},
+            ...body.religion !== undefined ? {
+                religion: body.religion
             } : {},
             ...body.profession !== undefined ? {
                 profession: body.profession

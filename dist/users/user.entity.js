@@ -76,6 +76,13 @@ _ts_decorate([
 _ts_decorate([
     (0, _typeorm.Column)({
         nullable: true,
+        length: 100
+    }),
+    _ts_metadata("design:type", String)
+], User.prototype, "religion", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
         length: 150
     }),
     _ts_metadata("design:type", String)

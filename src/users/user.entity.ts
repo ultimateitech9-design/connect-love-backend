@@ -41,6 +41,9 @@ export class User {
 
   // ─── Extended profile fields ──────────────────────────────────────────────
 
+  @Column({ nullable: true, length: 100 })
+  religion: string;
+
   @Column({ nullable: true, length: 150 })
   profession: string;
 

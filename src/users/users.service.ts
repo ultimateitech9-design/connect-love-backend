@@ -23,6 +23,7 @@ export class UsersService {
   serializeUser(user: User): any {
     return {
       ...user,
+      religion: user.religion,
       age: user.age,
       avatarUrl: user.avatarUrl,
       photos: user.photos || [],
@@ -54,6 +55,7 @@ export class UsersService {
       age: user.age,
       birthDate: user.birthDate,
       gender: user.gender,
+      religion: user.religion,
       profession: user.profession,
       height: user.height,
       city: user.city,

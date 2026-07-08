@@ -40,6 +40,12 @@ _ts_decorate([
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(100),
+    _ts_metadata("design:type", String)
+], UpdateProfileDto.prototype, "religion", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
     (0, _classvalidator.MaxLength)(150),
     _ts_metadata("design:type", String)
 ], UpdateProfileDto.prototype, "profession", void 0);

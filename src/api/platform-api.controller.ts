@@ -119,6 +119,10 @@ export class UpdatePlatformUserDto {
 
   @IsOptional()
   @IsString()
+  religion?: string;
+
+  @IsOptional()
+  @IsString()
   bio?: string;
 
   @IsOptional()
@@ -355,6 +359,7 @@ export class PlatformApiController {
         age: user.age,
         birthDate: user.birthDate,
         gender: user.gender,
+        religion: user.religion,
         profession: user.profession,
         height: user.height,
         city: user.city,
@@ -393,6 +398,7 @@ export class PlatformApiController {
       ...(body.email !== undefined ? { email: body.email } : {}),
       ...(body.birthDate !== undefined ? { birthDate: body.birthDate ? new Date(body.birthDate) : null } : {}),
       ...(body.gender !== undefined ? { gender: body.gender } : {}),
+      ...(body.religion !== undefined ? { religion: body.religion } : {}),
       ...(body.profession !== undefined ? { profession: body.profession } : {}),
       ...(body.height !== undefined ? { height: body.height } : {}),
       ...(body.city !== undefined ? { city: body.city } : {}),

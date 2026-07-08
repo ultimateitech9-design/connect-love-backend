@@ -28,6 +28,11 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
+  religion?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(150)
   profession?: string;
 
