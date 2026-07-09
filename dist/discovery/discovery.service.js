@@ -80,15 +80,18 @@ let DiscoveryService = class DiscoveryService {
                 verified: true
             });
         }
-        const users = await query.orderBy('user.createdAt', 'DESC').limit(50).getMany();
+        const users = await query.orderBy('user.createdAt', 'DESC').limit(12).getMany();
         return users.map((user)=>{
             const { password, ...rest } = user;
+            const primaryPhoto = user.avatarUrl;
             return {
                 ...rest,
                 age: user.age,
-                avatarUrl: user.avatarUrl,
-                photo: user.avatarUrl,
-                photos: user.photos || [],
+                avatarUrl: primaryPhoto,
+                photo: primaryPhoto,
+                photos: primaryPhoto ? [
+                    primaryPhoto
+                ] : [],
                 photosVisibleToNonMatches: true,
                 verified: user.isVerified,
                 personality: user.personalityWords || [],
