@@ -13,6 +13,7 @@ import { MatchesModule } from './matches/matches.module';
 import { DiscoveryModule } from './discovery/discovery.module';
 import { ProfilePhotosModule } from './profile-photos/profile-photos.module';
 import { ApiModule } from './api/api.module';
+import { KycModule } from './kyc/kyc.module';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ dotenv.config();
     DiscoveryModule,
     ProfilePhotosModule,
     ApiModule,
+    KycModule,
   ],
   controllers: [HealthController],
 })

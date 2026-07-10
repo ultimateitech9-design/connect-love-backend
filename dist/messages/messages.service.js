@@ -104,6 +104,10 @@ let MessagesService = class MessagesService {
             if (msg.senderId !== userId) {
                 throw new _common.ForbiddenException('Only the sender can delete this message for everyone.');
             }
+            const deleteForEveryoneWindowMs = 10 * 60 * 1000;
+            if (Date.now() - new Date(msg.createdAt).getTime() > deleteForEveryoneWindowMs) {
+                throw new _common.ForbiddenException('Delete for everyone is only available for 10 minutes.');
+            }
             msg.deletedForEveryone = true;
             msg.content = 'This message was deleted';
             msg.reactions = null;

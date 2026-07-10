@@ -32,7 +32,6 @@ const normalizeTags = (tags)=>{
         ...new Set(tags.map((t)=>t.trim().toLowerCase().replace(/\b\w/g, (l)=>l.toUpperCase())).filter(Boolean))
     ];
 };
-const KYC_MATCH_THRESHOLD = 60;
 let UsersService = class UsersService {
     serializeUser(user) {
         return {
@@ -116,7 +115,17 @@ let UsersService = class UsersService {
             if (uniquePhotos.length > 5) {
                 throw new _common.BadRequestException('Maximum 5 photos allowed.');
             }
+            const photosChanged = JSON.stringify(existingUser.photos || []) !== JSON.stringify(uniquePhotos);
             sanitizedData.photos = uniquePhotos;
+            if (photosChanged) {
+                // A verified face must never remain attached to a different photo set.
+                sanitizedData.kycLivePhoto = null;
+                sanitizedData.kycMatched = false;
+                sanitizedData.kycMatchScore = null;
+                sanitizedData.kycVerifiedAt = null;
+                sanitizedData.isVerified = false;
+                sanitizedData.onboardingCompleted = false;
+            }
         }
         if (sanitizedData.interests) {
             sanitizedData.interests = normalizeTags(sanitizedData.interests);
@@ -127,24 +136,12 @@ let UsersService = class UsersService {
         if (sanitizedData.hobbies) {
             sanitizedData.hobbies = normalizeTags(sanitizedData.hobbies);
         }
-        if (sanitizedData.kycMatched) {
-            if (!sanitizedData.kycLivePhoto && !existingUser.kycLivePhoto) {
-                throw new _common.BadRequestException('Video KYC frame is required.');
-            }
-            const kycMatchScore = sanitizedData.kycMatchScore ?? existingUser.kycMatchScore ?? 0;
-            if (kycMatchScore < KYC_MATCH_THRESHOLD) {
-                throw new _common.BadRequestException(`Video KYC match score must be at least ${KYC_MATCH_THRESHOLD}%.`);
-            }
-            sanitizedData.kycVerifiedAt = existingUser.kycVerifiedAt || new Date();
-            sanitizedData.isVerified = true;
-        }
         if (sanitizedData.onboardingCompleted) {
             const photos = sanitizedData.photos ?? existingUser.photos ?? [];
-            const kycMatched = sanitizedData.kycMatched ?? existingUser.kycMatched;
             if (!photos.length) {
                 throw new _common.BadRequestException('Add at least one profile photo before completing onboarding.');
             }
-            if (!kycMatched) {
+            if (!existingUser.kycMatched || (existingUser.kycMatchScore ?? 0) < 60) {
                 throw new _common.BadRequestException('Complete video KYC match before completing onboarding.');
             }
         }

@@ -21,6 +21,7 @@ const _matchesmodule = require("./matches/matches.module");
 const _discoverymodule = require("./discovery/discovery.module");
 const _profilephotosmodule = require("./profile-photos/profile-photos.module");
 const _apimodule = require("./api/api.module");
+const _kycmodule = require("./kyc/kyc.module");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -99,7 +100,8 @@ AppModule = _ts_decorate([
             _matchesmodule.MatchesModule,
             _discoverymodule.DiscoveryModule,
             _profilephotosmodule.ProfilePhotosModule,
-            _apimodule.ApiModule
+            _apimodule.ApiModule,
+            _kycmodule.KycModule
         ],
         controllers: [
             _healthcontroller.HealthController

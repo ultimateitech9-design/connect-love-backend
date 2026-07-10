@@ -1,9 +1,14 @@
 -  TSC  Initializing type checker...
 √  TSC  Initializing type checker...
-Successfully compiled: 68 files with swc (432.47ms)
-(node:15964) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+Successfully compiled: 68 files with swc (371.9ms)
+(node:4704) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[31m[Nest] 132  - [39m07/09/2026, 12:18:59 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +7ms[39m
+-  TSC  Initializing type checker...
+√  TSC  Initializing type checker...
+Successfully compiled: 68 files with swc (808.63ms)
+(node:9892) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[31m[Nest] 11416  - [39m07/09/2026, 12:37:13 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +5ms[39m
 node:net:2008
     const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
                ^
@@ -27,10 +32,10 @@ Error: listen EADDRINUSE: address already in use :::5002
 Node.js v24.15.0
 -  TSC  Initializing type checker...
 √  TSC  Initializing type checker...
-Successfully compiled: 68 files with swc (812.87ms)
-(node:11192) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+Successfully compiled: 68 files with swc (677.08ms)
+(node:3264) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[31m[Nest] 3016  - [39m07/09/2026, 12:37:13 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +4ms[39m
+[31m[Nest] 9176  - [39m07/09/2026, 12:47:55 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +5ms[39m
 node:net:2008
     const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
                ^
@@ -54,10 +59,10 @@ Error: listen EADDRINUSE: address already in use :::5002
 Node.js v24.15.0
 -  TSC  Initializing type checker...
 √  TSC  Initializing type checker...
-Successfully compiled: 68 files with swc (268.48ms)
-(node:14348) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+Successfully compiled: 68 files with swc (640.64ms)
+(node:12548) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[31m[Nest] 4304  - [39m07/09/2026, 12:47:55 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +4ms[39m
+[31m[Nest] 15128  - [39m07/09/2026, 12:50:43 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +7ms[39m
 node:net:2008
     const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
                ^
@@ -81,37 +86,10 @@ Error: listen EADDRINUSE: address already in use :::5002
 Node.js v24.15.0
 -  TSC  Initializing type checker...
 √  TSC  Initializing type checker...
-Successfully compiled: 68 files with swc (658.69ms)
-(node:14388) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+Successfully compiled: 68 files with swc (853.05ms)
+(node:8560) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[31m[Nest] 10608  - [39m07/09/2026, 12:50:43 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +5ms[39m
-node:net:2008
-    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
-               ^
-
-Error: listen EADDRINUSE: address already in use :::5002
-    at Server.setupListenHandle [as _listen2] (node:net:2008:16)
-    at listenInCluster (node:net:2065:12)
-    at Server.listen (node:net:2170:7)
-    at ExpressAdapter.listen (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\@nestjs\platform-express\adapters\express-adapter.js:95:32)
-    at C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\@nestjs\core\nest-application.js:183:30
-    at new Promise (<anonymous>)
-    at NestApplication.listen (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\@nestjs\core\nest-application.js:173:16)
-    at async bootstrap (C:\Users\User\Desktop\Dating App\connect-love-backend\src\main.ts:37:3) {
-  code: 'EADDRINUSE',
-  errno: -4091,
-  syscall: 'listen',
-  address: '::',
-  port: 5002
-}
-
-Node.js v24.15.0
--  TSC  Initializing type checker...
-√  TSC  Initializing type checker...
-Successfully compiled: 68 files with swc (809.57ms)
-(node:8176) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
-(Use `node --trace-deprecation ...` to show where the warning was created)
-[31m[Nest] 7160  - [39m07/09/2026, 5:12:54 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +5ms[39m
+[31m[Nest] 4064  - [39m07/09/2026, 5:12:54 PM [31m  ERROR[39m [38;5;3m[NestApplication] [39m[31mError: listen EADDRINUSE: address already in use :::5002[39m[38;5;3m +7ms[39m
 node:net:2008
     const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
                ^
