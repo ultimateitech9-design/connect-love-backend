@@ -8,8 +8,18 @@ import * as express from 'express';
 
 dotenv.config();
 
+function parseAllowedOrigins(): string[] {
+  const configured = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3002';
+  return configured
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks();
+  app.setGlobalPrefix(process.env.API_PREFIX || '', { exclude: ['/health'] });
 
   // Increase JSON body limit to 10 MB (needed for base64 profile photos)
   app.use(express.json({ limit: '10mb' }));
@@ -18,9 +28,9 @@ async function bootstrap() {
   // Security: Secure HTTP headers
   app.use(helmet());
 
-  // Enable CORS for the Next.js frontend
+  // Enable CORS for independently deployed frontend origins.
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3002',
+    origin: parseAllowedOrigins(),
     credentials: true,
   });
 

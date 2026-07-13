@@ -163,13 +163,14 @@ let MessagesGateway = class MessagesGateway {
             error: 'Not authenticated'
         };
         try {
-            const message = await this.messagesService.remove(data.messageId, userId, data.scope || 'everyone');
+            const scope = data.scope || 'me';
+            const message = await this.messagesService.remove(data.messageId, userId, scope);
             const payload = {
                 message,
-                scope: data.scope || 'everyone',
+                scope,
                 userId
             };
-            if (data.scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
+            if (scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
             this.server.to(client.id).emit('messageDeleted', payload);
             return {
                 event: 'messageDeleted',

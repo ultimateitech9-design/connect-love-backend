@@ -56,8 +56,18 @@ function _interop_require_wildcard(obj, nodeInterop) {
     return newObj;
 }
 _dotenv.config();
+function parseAllowedOrigins() {
+    const configured = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3002';
+    return configured.split(',').map((origin)=>origin.trim()).filter(Boolean);
+}
 async function bootstrap() {
     const app = await _core.NestFactory.create(_appmodule.AppModule);
+    app.enableShutdownHooks();
+    app.setGlobalPrefix(process.env.API_PREFIX || '', {
+        exclude: [
+            '/health'
+        ]
+    });
     // Increase JSON body limit to 10 MB (needed for base64 profile photos)
     app.use(_express.json({
         limit: '10mb'
@@ -68,9 +78,9 @@ async function bootstrap() {
     }));
     // Security: Secure HTTP headers
     app.use((0, _helmet.default)());
-    // Enable CORS for the Next.js frontend
+    // Enable CORS for independently deployed frontend origins.
     app.enableCors({
-        origin: process.env.FRONTEND_URL || 'http://localhost:3002',
+        origin: parseAllowedOrigins(),
         credentials: true
     });
     // Global validation with class-validator

@@ -42,7 +42,7 @@ let MessagesController = class MessagesController {
         return this.messagesService.create(conversationId, req.user.userId, receiverId, content || text, replyToMessageId);
     }
     async deleteMessage(req, id, scope) {
-        return this.messagesService.remove(id, req.user.userId, scope || 'everyone');
+        return this.messagesService.remove(id, req.user.userId, scope || 'me');
     }
     async clearConversation(req, conversationId) {
         await this.messagesService.clearConversation(conversationId, req.user.userId);

@@ -4,7 +4,10 @@
   "description": "SoulMatch NestJS API",
   "private": true,
   "scripts": {
-    "dev": "nodemon --watch src -e ts,json --exec \"nest start\"",
+    "dev": "concurrently --kill-others-on-fail -n api,kyc -c magenta,yellow \"npm run dev:api\" \"npm run dev:kyc\"",
+    "dev:api": "echo Backend API server: http://localhost:5002 && nodemon --watch src -e ts,json --exec \"nest start\"",
+    "dev:kyc": "python -m uvicorn app:app --app-dir face-service --host 127.0.0.1 --port 8001",
+    "install:kyc": "python -m pip install -r face-service/requirements.txt",
     "build": "nest build",
     "start": "nest start",
     "start:prod": "node dist/main",
@@ -51,6 +54,7 @@
     "@types/node": "22.16.5",
     "@types/passport-jwt": "4.0.1",
     "nodemon": "^3.1.14",
+    "concurrently": "^9.2.1",
     "typescript": "5.8.3"
   }
 }

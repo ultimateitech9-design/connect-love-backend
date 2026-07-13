@@ -44,8 +44,8 @@ export class UsersController {
 
   @UseGuards(AuthGuard('jwt'))
   @Get(':id/details')
-  async getProfileDetails(@Param('id') id: string) {
-    return this.usersService.findProfileDetails(id);
+  async getProfileDetails(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.findProfileDetails(id, req.user.userId);
   }
 
   @UseGuards(AuthGuard('jwt'))

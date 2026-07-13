@@ -22,6 +22,8 @@ const _discoverymodule = require("./discovery/discovery.module");
 const _profilephotosmodule = require("./profile-photos/profile-photos.module");
 const _apimodule = require("./api/api.module");
 const _kycmodule = require("./kyc/kyc.module");
+const _searchmodule = require("./search/search.module");
+const _boostsmodule = require("./boosts/boosts.module");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -90,7 +92,12 @@ AppModule = _ts_decorate([
                 ],
                 migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
                 synchronize: false,
-                logging: false
+                logging: false,
+                extra: {
+                    connectionLimit: parseInt(process.env.DB_POOL_MAX || '30', 10),
+                    waitForConnections: true,
+                    queueLimit: parseInt(process.env.DB_POOL_QUEUE_LIMIT || '0', 10)
+                }
             }),
             _authmodule.AuthModule,
             _usersmodule.UsersModule,
@@ -101,7 +108,9 @@ AppModule = _ts_decorate([
             _discoverymodule.DiscoveryModule,
             _profilephotosmodule.ProfilePhotosModule,
             _apimodule.ApiModule,
-            _kycmodule.KycModule
+            _kycmodule.KycModule,
+            _searchmodule.SearchModule,
+            _boostsmodule.BoostsModule
         ],
         controllers: [
             _healthcontroller.HealthController

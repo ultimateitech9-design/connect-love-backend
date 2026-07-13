@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _userentity = require("./user.entity");
+const _distance = require("../location/distance");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -60,13 +61,26 @@ let UsersService = class UsersService {
         if (!user) throw new _common.NotFoundException('User not found.');
         return this.serializeUser(user);
     }
-    async findProfileDetails(id) {
-        const user = await this.userRepo.findOne({
-            where: {
-                id
-            }
-        });
+    async findProfileDetails(id, viewerId) {
+        const [user, viewer] = await Promise.all([
+            this.userRepo.findOne({
+                where: {
+                    id
+                }
+            }),
+            this.userRepo.findOne({
+                where: {
+                    id: viewerId
+                },
+                select: [
+                    'id',
+                    'locationLatitude',
+                    'locationLongitude'
+                ]
+            })
+        ]);
         if (!user) throw new _common.NotFoundException('User not found.');
+        const distanceKm = user.showDistance && viewer ? (0, _distance.distanceBetweenKm)(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude) : null;
         return {
             id: user.id,
             name: user.name,
@@ -87,8 +101,8 @@ let UsersService = class UsersService {
             kycMatchScore: user.kycMatchScore,
             photosVisibleToNonMatches: true,
             isVerified: user.isVerified,
-            locationLatitude: user.locationLatitude,
-            locationLongitude: user.locationLongitude
+            showDistance: user.showDistance,
+            distanceKm
         };
     }
     async findAll() {

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -59,16 +59,6 @@ export class CreateRoleDto {
   @IsOptional()
   @IsString()
   status?: string;
-}
-
-export class CreateInvoiceDto {
-  @IsOptional()
-  @IsString()
-  plan?: string;
-
-  @IsOptional()
-  @IsNumber()
-  amount?: number;
 }
 
 export class SavePlanDto {
@@ -290,25 +280,36 @@ export class PlatformApiController {
   }
 
   @Get('users')
-  async users() {
-    const users = await this.userRepo.find({
-      select: [
-        'id',
-        'name',
-        'email',
-        'role',
-        'plan',
-        'city',
-        'lastSeen',
-        'updatedAt',
-        'createdAt',
-        'isVerified',
-        'status',
-      ],
-      order: { createdAt: 'DESC' },
-      take: 100,
-    });
+  async users(
+    @Query('search') search?: string,
+    @Query('page') pageValue?: string,
+    @Query('limit') limitValue?: string,
+  ) {
+    const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
+    const query = this.userRepo.createQueryBuilder('user')
+      .select([
+        'user.id', 'user.name', 'user.email', 'user.role', 'user.plan',
+        'user.city', 'user.lastSeen', 'user.updatedAt', 'user.createdAt',
+        'user.isVerified', 'user.status',
+      ])
+      .orderBy('user.createdAt', 'DESC');
+
+    const term = search?.trim().toLowerCase();
+    if (term) {
+      query.andWhere(`(
+        LOWER(user.id) LIKE :term OR
+        LOWER(user.name) LIKE :term OR
+        LOWER(user.email) LIKE :term
+      )`, { term: `%${term}%` });
+    }
+
+    const [users, total] = await query.skip((page - 1) * limit).take(limit).getManyAndCount();
     return {
+      total,
+      page,
+      limit,
+      hasMore: page * limit < total,
       users: users.map((user) => ({
         id: user.id,
         name: user.name,
@@ -391,7 +392,7 @@ export class PlatformApiController {
 
     const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
     const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
-    const role = ['user', 'admin', 'super_admin', 'marketing', 'data_entry', 'finance', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
+    const role = ['user', 'admin', 'super_admin', 'marketing', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
 
     Object.assign(user, {
       ...(body.name !== undefined ? { name: body.name } : {}),
@@ -589,7 +590,7 @@ export class PlatformApiController {
       status: body.status === 'inactive' ? 'inactive' : 'active',
       sortOrder: await this.planRepo.count() + 1,
     }));
-    await this.audit('Finance', 'Plan created', `Created subscription plan ${plan.displayName}`);
+    await this.audit('Admin', 'Plan created', `Created subscription plan ${plan.displayName}`);
     return plan;
   }
 
@@ -602,7 +603,7 @@ export class PlatformApiController {
     plan.features = body.features || plan.features;
     plan.status = body.status === 'inactive' ? 'inactive' : 'active';
     await this.planRepo.save(plan);
-    await this.audit('Finance', 'Plan updated', `Updated subscription plan ${plan.displayName}`);
+    await this.audit('Admin', 'Plan updated', `Updated subscription plan ${plan.displayName}`);
     return plan;
   }
 
@@ -678,7 +679,10 @@ export class PlatformApiController {
   @Get('roles')
   async roles() {
     const users = await this.userRepo.find({ select: ['role'] });
-    const roles = await this.roleRepo.find({ order: { role: 'ASC' } });
+    const roles = (await this.roleRepo.find({ order: { role: 'ASC' } })).filter((role) => {
+      const key = role.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      return key !== 'data_entry' && key !== 'finance';
+    });
     const counts = users.reduce<Record<string, number>>((acc, user) => {
       acc[user.role] = (acc[user.role] || 0) + 1;
       return acc;
@@ -699,6 +703,10 @@ export class PlatformApiController {
 
   @Post('roles')
   async createRole(@Body() body: CreateRoleDto) {
+    const roleKey = body.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    if (roleKey === 'data_entry' || roleKey === 'finance') {
+      throw new BadRequestException('This role is no longer available.');
+    }
     const role = await this.roleRepo.save(this.roleRepo.create({
       role: body.role,
       permissions: body.permissions ?? 1,
@@ -954,81 +962,13 @@ export class PlatformApiController {
     };
   }
 
-  @Get('finance/refunds')
-  async financeRefunds() {
-    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
-    return {
-      refunds: payments.map((p) => ({
-        id: p.id,
-        user: p.user?.name || 'Deleted user',
-        plan: p.planName,
-        amount: Number(p.amount),
-        status: p.status === 'refunded' ? 'Approved' : p.status === 'failed' ? 'Rejected' : 'Requests',
-        date: p.createdAt.toISOString().slice(0, 10),
-      })),
-    };
-  }
-
-  @Get('finance/notifications')
-  async financeNotifications() {
-    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' }, take: 20 });
-    return {
-      notifications: payments.map((payment) => ({
-        id: payment.id,
-        title: payment.status === 'failed' ? 'Payment Failed' : payment.status === 'refunded' ? 'Refund Processed' : payment.status === 'successful' ? 'Payment Received' : 'Payment Pending',
-        message: `${payment.user?.name || payment.user?.email || 'Unassigned user'} - ${payment.planName} - ${payment.currency} ${Number(payment.amount).toFixed(2)}`,
-        time: payment.createdAt,
-        type: payment.status === 'failed' ? 'error' : payment.status === 'successful' ? 'success' : 'info',
-      })),
-    };
-  }
-
-  @Patch('finance/payments/:id/refund')
+  @Patch('payments/:id/refund')
   async refundPayment(@Param('id') id: string) {
     const payment = await this.paymentRepo.findOne({ where: { id }, relations: ['user'] });
-    if (!payment) return { message: 'Payment not found.' };
+    if (!payment) throw new NotFoundException('Payment not found.');
     payment.status = 'refunded';
     await this.paymentRepo.save(payment);
-    await this.audit('Finance', 'Refund', `Refunded payment ${id}`);
-    return payment;
-  }
-
-  @Patch('finance/payments/:id/reject-refund')
-  async rejectRefund(@Param('id') id: string) {
-    const payment = await this.paymentRepo.findOne({ where: { id } });
-    if (!payment) throw new NotFoundException('Payment not found.');
-    payment.status = 'failed';
-    await this.paymentRepo.save(payment);
-    await this.audit('Finance', 'Refund rejected', `Rejected refund request for payment ${id}`);
-    return payment;
-  }
-
-  @Get('finance/invoices')
-  async invoices() {
-    const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'DESC' } });
-    return {
-      invoices: payments.map((p, index) => ({
-        id: `INV-${String(index + 1).padStart(4, '0')}`,
-        customer: p.user?.name || 'Deleted user',
-        email: p.user?.email || '',
-        plan: p.planName,
-        amount: Number(p.amount),
-        status: p.status === 'successful' ? 'Paid' : p.status === 'failed' ? 'Overdue' : 'Unpaid',
-        due: p.createdAt.toISOString().slice(0, 10),
-        paymentId: p.id,
-      })),
-    };
-  }
-
-  @Post('finance/invoices')
-  async createInvoice(@Body() body: CreateInvoiceDto) {
-    const payment = await this.paymentRepo.save(this.paymentRepo.create({
-      planName: body.plan || 'Invoice',
-      amount: Number(body.amount || 0).toFixed(2),
-      currency: 'USD',
-      status: 'pending',
-    }));
-    await this.audit('Finance', 'Invoice', `Created invoice payment ${payment.id}`);
+    await this.audit('Admin', 'Refund', `Refunded payment ${id}`);
     return payment;
   }
 

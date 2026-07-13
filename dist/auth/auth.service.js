@@ -279,29 +279,6 @@ let AuthService = class AuthService {
             }
         };
     }
-    async financeLogin(dto, context = {}) {
-        const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
-        const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
-            email: dto.email
-        }).getOne();
-        if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
-        if (user.role !== 'finance' && user.role !== 'super_admin') {
-            throw new _common.UnauthorizedException('Access denied. Finance privileges required.');
-        }
-        const match = await _bcryptjs.compare(decryptedPassword, user.password);
-        if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
-        const session = await this.startSession(user, context);
-        const token = this.signUserToken(user, session.sessionId);
-        return {
-            access_token: token,
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
-                role: user.role
-            }
-        };
-    }
     async managementLogin(dto, context = {}) {
         const roleMap = {
             admin: [
@@ -313,14 +290,6 @@ let AuthService = class AuthService {
             ],
             marketing: [
                 'marketing',
-                'super_admin'
-            ],
-            'data-entry': [
-                'data_entry',
-                'super_admin'
-            ],
-            finance: [
-                'finance',
                 'super_admin'
             ],
             sales: [

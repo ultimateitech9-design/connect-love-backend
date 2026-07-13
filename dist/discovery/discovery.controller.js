@@ -26,11 +26,14 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DiscoveryController = class DiscoveryController {
-    async getSuggestions(req, search, ageMin, ageMax) {
+    async getSuggestions(req, search, ageMin, ageMax, goals, page, limit) {
         return this.discoveryService.getSuggestions(req.user.userId, {
             search,
             ageMin: ageMin ? Number(ageMin) : undefined,
-            ageMax: ageMax ? Number(ageMax) : undefined
+            ageMax: ageMax ? Number(ageMax) : undefined,
+            goals: goals ? goals.split(',').map((goal)=>goal.trim()).filter(Boolean) : undefined,
+            page: page ? Number(page) : undefined,
+            limit: limit ? Number(limit) : undefined
         });
     }
     async getTags() {
@@ -46,9 +49,15 @@ _ts_decorate([
     _ts_param(1, (0, _common.Query)('search')),
     _ts_param(2, (0, _common.Query)('ageMin')),
     _ts_param(3, (0, _common.Query)('ageMax')),
+    _ts_param(4, (0, _common.Query)('goals')),
+    _ts_param(5, (0, _common.Query)('page')),
+    _ts_param(6, (0, _common.Query)('limit')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
+        String,
+        String,
         String,
         String,
         String

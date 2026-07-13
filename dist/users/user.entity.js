@@ -104,6 +104,20 @@ _ts_decorate([
 _ts_decorate([
     (0, _typeorm.Column)({
         nullable: true,
+        length: 30
+    }),
+    _ts_metadata("design:type", String)
+], User.prototype, "relationshipGoal", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
+        length: 20
+    }),
+    _ts_metadata("design:type", String)
+], User.prototype, "zodiac", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        nullable: true,
         type: 'double'
     }),
     _ts_metadata("design:type", Number)
@@ -210,8 +224,6 @@ _ts_decorate([
             'admin',
             'super_admin',
             'marketing',
-            'data_entry',
-            'finance',
             'sales',
             'support'
         ],

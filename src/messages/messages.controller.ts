@@ -37,7 +37,7 @@ export class MessagesController {
 
   @Delete(':id')
   async deleteMessage(@Request() req, @Param('id') id: string, @Body('scope') scope?: 'me' | 'everyone') {
-    return this.messagesService.remove(id, req.user.userId, scope || 'everyone');
+    return this.messagesService.remove(id, req.user.userId, scope || 'me');
   }
 
   @Delete('conversation/:conversationId')

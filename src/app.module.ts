@@ -14,6 +14,8 @@ import { DiscoveryModule } from './discovery/discovery.module';
 import { ProfilePhotosModule } from './profile-photos/profile-photos.module';
 import { ApiModule } from './api/api.module';
 import { KycModule } from './kyc/kyc.module';
+import { SearchModule } from './search/search.module';
+import { BoostsModule } from './boosts/boosts.module';
 
 dotenv.config();
 
@@ -31,6 +33,11 @@ dotenv.config();
       migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
       synchronize: false,
       logging: false,
+      extra: {
+        connectionLimit: parseInt(process.env.DB_POOL_MAX || '30', 10),
+        waitForConnections: true,
+        queueLimit: parseInt(process.env.DB_POOL_QUEUE_LIMIT || '0', 10),
+      },
     }),
     AuthModule,
     UsersModule,
@@ -42,6 +49,8 @@ dotenv.config();
     ProfilePhotosModule,
     ApiModule,
     KycModule,
+    SearchModule,
+    BoostsModule,
   ],
   controllers: [HealthController],
 })

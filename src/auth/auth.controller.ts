@@ -112,26 +112,6 @@ export class AuthController {
     return { message: 'Marketing login successful', user: result.user };
   }
 
-  @Post('finance/login')
-  @HttpCode(HttpStatus.OK)
-  async financeLogin(
-    @Body() dto: LoginDto,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const result = await this.authService.financeLogin(dto, this.loginContext(request));
-    
-    response.cookie('admin_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
-    });
-
-    return { message: 'Finance login successful', user: result.user };
-  }
-
   @Post('management/login')
   @HttpCode(HttpStatus.OK)
   async managementLogin(

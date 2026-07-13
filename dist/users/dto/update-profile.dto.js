@@ -63,6 +63,36 @@ _ts_decorate([
 ], UpdateProfileDto.prototype, "city", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsIn)([
+        'Long-term',
+        'Casual',
+        'Friendships',
+        'Not sure yet'
+    ]),
+    _ts_metadata("design:type", String)
+], UpdateProfileDto.prototype, "relationshipGoal", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsIn)([
+        'Aries',
+        'Taurus',
+        'Gemini',
+        'Cancer',
+        'Leo',
+        'Virgo',
+        'Libra',
+        'Scorpio',
+        'Sagittarius',
+        'Capricorn',
+        'Aquarius',
+        'Pisces'
+    ]),
+    _ts_metadata("design:type", String)
+], UpdateProfileDto.prototype, "zodiac", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsArray)(),
     (0, _classvalidator.IsString)({
         each: true

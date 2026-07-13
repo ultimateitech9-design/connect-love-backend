@@ -179,9 +179,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!userId) return { error: 'Not authenticated' };
 
     try {
-      const message = await this.messagesService.remove(data.messageId, userId, data.scope || 'everyone');
-      const payload = { message, scope: data.scope || 'everyone', userId };
-      if (data.scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
+      const scope = data.scope || 'me';
+      const message = await this.messagesService.remove(data.messageId, userId, scope);
+      const payload = { message, scope, userId };
+      if (scope === 'everyone') this.emitToUser(data.receiverId, 'messageDeleted', payload);
       this.server.to(client.id).emit('messageDeleted', payload);
       return { event: 'messageDeleted', data: payload };
     } catch (error: any) {

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { distanceBetweenKm } from '../location/distance';
 
 const normalizeTags = (tags: string[]) => {
   if (!tags || !Array.isArray(tags)) return tags;
@@ -43,9 +44,15 @@ export class UsersService {
     return this.serializeUser(user);
   }
 
-  async findProfileDetails(id: string): Promise<any> {
-    const user = await this.userRepo.findOne({ where: { id } });
+  async findProfileDetails(id: string, viewerId: string): Promise<any> {
+    const [user, viewer] = await Promise.all([
+      this.userRepo.findOne({ where: { id } }),
+      this.userRepo.findOne({ where: { id: viewerId }, select: ['id', 'locationLatitude', 'locationLongitude'] }),
+    ]);
     if (!user) throw new NotFoundException('User not found.');
+    const distanceKm = user.showDistance && viewer
+      ? distanceBetweenKm(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude)
+      : null;
 
     return {
       id: user.id,
@@ -67,8 +74,8 @@ export class UsersService {
       kycMatchScore: user.kycMatchScore,
       photosVisibleToNonMatches: true,
       isVerified: user.isVerified,
-      locationLatitude: user.locationLatitude,
-      locationLongitude: user.locationLongitude,
+      showDistance: user.showDistance,
+      distanceKm,
     };
   }
 

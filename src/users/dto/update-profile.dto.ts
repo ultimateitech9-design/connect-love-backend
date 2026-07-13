@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsArray,
   IsDateString,
+  IsIn,
 } from 'class-validator';
 
 export class UpdateProfileDto {
@@ -42,6 +43,16 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(150)
   city?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['Long-term', 'Casual', 'Friendships', 'Not sure yet'])
+  relationshipGoal?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'])
+  zodiac?: string;
 
   @IsOptional()
   @IsArray()

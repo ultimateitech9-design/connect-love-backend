@@ -13,11 +13,17 @@ export class DiscoveryController {
     @Query('search') search?: string,
     @Query('ageMin') ageMin?: string,
     @Query('ageMax') ageMax?: string,
+    @Query('goals') goals?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     return this.discoveryService.getSuggestions(req.user.userId, {
       search,
       ageMin: ageMin ? Number(ageMin) : undefined,
       ageMax: ageMax ? Number(ageMax) : undefined,
+      goals: goals ? goals.split(',').map((goal) => goal.trim()).filter(Boolean) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
     });
   }
 

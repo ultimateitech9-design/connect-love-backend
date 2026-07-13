@@ -42,8 +42,8 @@ let UsersController = class UsersController {
     /** DELETE /users/me — permanently delete the currently authenticated user's account and all associated data */ async deleteMe(req) {
         return this.usersService.removeMe(req.user.userId);
     }
-    async getProfileDetails(id) {
-        return this.usersService.findProfileDetails(id);
+    async getProfileDetails(id, req) {
+        return this.usersService.findProfileDetails(id, req.user.userId);
     }
     async getUser(id) {
         return this.usersService.findById(id);
@@ -114,9 +114,11 @@ _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Get)(':id/details'),
     _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Request)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        String
+        String,
+        Object
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UsersController.prototype, "getProfileDetails", null);

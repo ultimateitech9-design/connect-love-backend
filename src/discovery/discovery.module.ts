@@ -4,9 +4,10 @@ import { DiscoveryService } from './discovery.service';
 import { DiscoveryController } from './discovery.controller';
 import { User } from '../users/user.entity';
 import { MatchRelation } from '../matches/match.entity';
+import { SearchModule } from '../search/search.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, MatchRelation])],
+  imports: [TypeOrmModule.forFeature([User, MatchRelation]), SearchModule],
   providers: [DiscoveryService],
   controllers: [DiscoveryController],
 })
