@@ -198,4 +198,18 @@ export class MatchesService {
     return { deleted: true };
   }
 
+  async deletePendingRequest(id: string, senderId: string): Promise<{ deleted: boolean }> {
+    const match = await this.matchesRepository.findOne({ where: { id } });
+    if (!match) throw new NotFoundException('Pending request not found.');
+    if (match.senderId !== senderId) {
+      throw new ForbiddenException('Only the sender can delete this request.');
+    }
+    if (match.status !== MatchStatus.PENDING) {
+      throw new BadRequestException('Only pending requests can be deleted.');
+    }
+
+    await this.matchesRepository.remove(match);
+    return { deleted: true };
+  }
+
 }

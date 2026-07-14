@@ -147,6 +147,9 @@ export class User {
   @Column({ default: true })
   notifyPush: boolean;
 
+  @Column({ type: 'int', unsigned: true, default: 0 })
+  coinBalance: number;
+
   @Column({ default: false })
   darkMode: boolean;
 

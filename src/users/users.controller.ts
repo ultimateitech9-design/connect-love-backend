@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -19,6 +19,18 @@ export class UsersController {
   @Patch('me')
   updateMe(@Request() req: any, @Body() dto: UpdateProfileDto) {
     return this.usersService.update(req.user.userId, dto);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/coins/recharge')
+  rechargeCoins(@Request() req: any, @Body('amount') amount: number) {
+    return this.usersService.rechargeCoins(req.user.userId, amount);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/coins/spend')
+  spendCoins(@Request() req: any, @Body('amount') amount: number) {
+    return this.usersService.spendCoins(req.user.userId, amount);
   }
 
   /** GET /users/me/export - returns a portable copy of the authenticated user's data */

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { MatchStatus } from './match.entity';
 import { AuthGuard } from '@nestjs/passport';
@@ -36,6 +36,11 @@ export class MatchesController {
   async unblockUser(@Request() req, @Param('id') id: string) {
     // Delete the blocked relation so they return to discovery
     return this.matchesService.delete(id, req.user.userId);
+  }
+
+  @Delete('pending/:id')
+  async deletePendingRequest(@Request() req, @Param('id') id: string) {
+    return this.matchesService.deletePendingRequest(id, req.user.userId);
   }
 
   @Patch('block/:id')
