@@ -5,10 +5,10 @@ import { ProfileBoost, type BoostPlanKey } from './boost.entity';
 import { User } from '../users/user.entity';
 
 export const BOOST_PLANS: Record<BoostPlanKey, { name: string; durationMinutes: number; price: number }> = {
-  '30_minutes': { name: '30 Minutes Boost', durationMinutes: 30, price: 49 },
-  '1_hour': { name: '1 Hour Boost', durationMinutes: 60, price: 99 },
-  '3_hours': { name: '3 Hours Boost', durationMinutes: 180, price: 199 },
-  '24_hours': { name: '24 Hours Boost', durationMinutes: 1440, price: 499 },
+  '30_minutes': { name: '30 Minutes Boost', durationMinutes: 30, price: 29 },
+  '1_hour': { name: '1 Hour Boost', durationMinutes: 60, price: 49 },
+  '3_hours': { name: '3 Hours Boost', durationMinutes: 180, price: 99 },
+  '24_hours': { name: '24 Hours Boost', durationMinutes: 1440, price: 249 },
 };
 
 @Injectable()

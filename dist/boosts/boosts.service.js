@@ -39,22 +39,22 @@ const BOOST_PLANS = {
     '30_minutes': {
         name: '30 Minutes Boost',
         durationMinutes: 30,
-        price: 49
+        price: 29
     },
     '1_hour': {
         name: '1 Hour Boost',
         durationMinutes: 60,
-        price: 99
+        price: 49
     },
     '3_hours': {
         name: '3 Hours Boost',
         durationMinutes: 180,
-        price: 199
+        price: 99
     },
     '24_hours': {
         name: '24 Hours Boost',
         durationMinutes: 1440,
-        price: 499
+        price: 249
     }
 };
 let BoostsService = class BoostsService {
