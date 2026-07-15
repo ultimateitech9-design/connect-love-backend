@@ -248,6 +248,24 @@ let MatchesService = class MatchesService {
             deleted: true
         };
     }
+    async deletePendingRequest(id, senderId) {
+        const match = await this.matchesRepository.findOne({
+            where: {
+                id
+            }
+        });
+        if (!match) throw new _common.NotFoundException('Pending request not found.');
+        if (match.senderId !== senderId) {
+            throw new _common.ForbiddenException('Only the sender can delete this request.');
+        }
+        if (match.status !== _matchentity.MatchStatus.PENDING) {
+            throw new _common.BadRequestException('Only pending requests can be deleted.');
+        }
+        await this.matchesRepository.remove(match);
+        return {
+            deleted: true
+        };
+    }
     constructor(matchesRepository, msgRepo, userRepo){
         this.matchesRepository = matchesRepository;
         this.msgRepo = msgRepo;

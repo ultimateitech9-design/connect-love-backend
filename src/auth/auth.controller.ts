@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -49,6 +50,12 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto, @Req() request: Request) {
     return this.authService.login(dto, this.loginContext(request));
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  googleLogin(@Body() dto: GoogleAuthDto, @Req() request: Request) {
+    return this.authService.googleLogin(dto.credential, this.loginContext(request));
   }
 
   @Post('admin/login')

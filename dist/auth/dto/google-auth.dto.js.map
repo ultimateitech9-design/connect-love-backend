@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../src/auth/dto/google-auth.dto.ts"],"sourcesContent":["import { IsString, MinLength } from 'class-validator';\n\nexport class GoogleAuthDto {\n  @IsString()\n  @MinLength(20)\n  credential: string;\n}\n"],"names":["GoogleAuthDto"],"mappings":";;;;+BAEaA;;;eAAAA;;;gCAFuB;;;;;;;;;;AAE7B,IAAA,AAAMA,gBAAN,MAAMA;AAIb"}

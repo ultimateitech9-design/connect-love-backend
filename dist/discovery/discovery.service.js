@@ -31,6 +31,11 @@ function _ts_param(paramIndex, decorator) {
 }
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 90;
+const DISCOVERABLE_GENDERS = new Set([
+    'female',
+    'male',
+    'non-binary'
+]);
 function clampAge(value, fallback) {
     return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
 }
@@ -69,6 +74,11 @@ let DiscoveryService = class DiscoveryService {
             minBirthDate: toDateOnly(minBirthDate),
             maxBirthDate
         });
+        if (filters.interestedIn && filters.interestedIn !== 'everyone' && DISCOVERABLE_GENDERS.has(filters.interestedIn)) {
+            query.andWhere('LOWER(user.gender) = :interestedIn', {
+                interestedIn: filters.interestedIn
+            });
+        }
         if (filters.search && filters.search.trim()) {
             const term = filters.search.trim();
             const searchIds = await this.searchService.searchUserIds(term, {
@@ -130,9 +140,13 @@ let DiscoveryService = class DiscoveryService {
         const users = await query.take(limit).getMany();
         return users.map((user)=>{
             const primaryPhoto = user.avatarUrl;
+            const visiblePhotos = user.photosVisibleToNonMatches ? (user.photos || []).filter(Boolean) : primaryPhoto ? [
+                primaryPhoto
+            ] : [];
             return {
                 id: user.id,
                 name: user.name,
+                gender: user.gender,
                 birthDate: user.birthDate,
                 age: user.age,
                 profession: user.profession,
@@ -148,9 +162,7 @@ let DiscoveryService = class DiscoveryService {
                 lastSeen: user.showOnlineStatus ? user.lastSeen : null,
                 avatarUrl: primaryPhoto,
                 photo: primaryPhoto,
-                photos: primaryPhoto ? [
-                    primaryPhoto
-                ] : [],
+                photos: visiblePhotos,
                 photosVisibleToNonMatches: user.photosVisibleToNonMatches,
                 verified: user.isVerified,
                 personality: user.personalityWords || [],

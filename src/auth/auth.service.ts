@@ -10,6 +10,8 @@ import { User } from '../users/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { AuditLog } from '../platform/audit-log.entity';
+import { OAuth2Client } from 'google-auth-library';
+import { randomUUID } from 'crypto';
 
 export interface LoginContext {
   ipAddress?: string;
@@ -18,6 +20,7 @@ export interface LoginContext {
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient = new OAuth2Client();
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -144,6 +147,66 @@ export class AuthService {
 
     return {
       access_token: token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        plan: user.plan,
+        role: user.role,
+        onboardingCompleted: user.onboardingCompleted,
+      },
+    };
+  }
+
+  async googleLogin(credential: string, context: LoginContext = {}) {
+    const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+    if (!clientId) {
+      throw new UnauthorizedException('Google sign-in is not configured on the server.');
+    }
+
+    let payload;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({ idToken: credential, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Google sign-in could not be verified. Please try again.');
+    }
+
+    const email = payload?.email?.trim().toLowerCase();
+    if (!email || !payload?.email_verified) {
+      throw new UnauthorizedException('A verified Google email is required.');
+    }
+
+    let user = await this.userRepo.findOne({ where: { email } });
+    let isNewUser = false;
+
+    if (user) {
+      if (user.role !== 'user') {
+        throw new UnauthorizedException('Please use the management login for this account.');
+      }
+      if (user.status !== 'active') {
+        throw new UnauthorizedException('This account is not active. Please contact support.');
+      }
+    } else {
+      const password = await bcrypt.hash(randomUUID(), 12);
+      user = await this.userRepo.save(this.userRepo.create({
+        name: payload.name?.trim() || email.split('@')[0],
+        email,
+        password,
+        avatarUrl: payload.picture || undefined,
+        role: 'user',
+        status: 'active',
+        onboardingCompleted: false,
+      }));
+      isNewUser = true;
+    }
+
+    const session = await this.startSession(user, context);
+    const token = this.signUserToken(user, session.sessionId);
+
+    return {
+      access_token: token,
+      isNewUser,
       user: {
         id: user.id,
         name: user.name,

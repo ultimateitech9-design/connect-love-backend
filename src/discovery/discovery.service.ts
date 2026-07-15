@@ -7,6 +7,7 @@ import { SearchService } from '../search/search.service';
 import { distanceBetweenKm } from '../location/distance';
 
 interface DiscoveryFilters {
+  interestedIn?: string;
   search?: string;
   ageMin?: number;
   ageMax?: number;
@@ -17,6 +18,7 @@ interface DiscoveryFilters {
 
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 90;
+const DISCOVERABLE_GENDERS = new Set(['female', 'male', 'non-binary']);
 
 function clampAge(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value!), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
@@ -64,6 +66,10 @@ export class DiscoveryService {
         minBirthDate: toDateOnly(minBirthDate),
         maxBirthDate,
       });
+
+    if (filters.interestedIn && filters.interestedIn !== 'everyone' && DISCOVERABLE_GENDERS.has(filters.interestedIn)) {
+      query.andWhere('LOWER(user.gender) = :interestedIn', { interestedIn: filters.interestedIn });
+    }
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
@@ -143,9 +149,13 @@ export class DiscoveryService {
 
     return users.map(user => {
       const primaryPhoto = user.avatarUrl;
+      const visiblePhotos = user.photosVisibleToNonMatches
+        ? (user.photos || []).filter(Boolean)
+        : (primaryPhoto ? [primaryPhoto] : []);
       return {
         id: user.id,
         name: user.name,
+        gender: user.gender,
         birthDate: user.birthDate,
         age: user.age, // Serialize the virtual getter
         profession: user.profession,
@@ -161,7 +171,7 @@ export class DiscoveryService {
         lastSeen: user.showOnlineStatus ? user.lastSeen : null,
         avatarUrl: primaryPhoto,
         photo: primaryPhoto,
-        photos: primaryPhoto ? [primaryPhoto] : [],
+        photos: visiblePhotos,
         photosVisibleToNonMatches: user.photosVisibleToNonMatches,
         verified: user.isVerified,
         personality: user.personalityWords || [],

@@ -14,6 +14,7 @@ const _authservice = require("./auth.service");
 const _tokenblacklistservice = require("./token-blacklist.service");
 const _logindto = require("./dto/login.dto");
 const _registerdto = require("./dto/register.dto");
+const _googleauthdto = require("./dto/google-auth.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -47,6 +48,9 @@ let AuthController = class AuthController {
     }
     login(dto, request) {
         return this.authService.login(dto, this.loginContext(request));
+    }
+    googleLogin(dto, request) {
+        return this.authService.googleLogin(dto.credential, this.loginContext(request));
     }
     async adminLogin(dto, request, response) {
         const result = await this.authService.adminLogin(dto, this.loginContext(request));
@@ -154,6 +158,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AuthController.prototype, "login", null);
+_ts_decorate([
+    (0, _common.Post)('google'),
+    (0, _common.HttpCode)(_common.HttpStatus.OK),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _googleauthdto.GoogleAuthDto === "undefined" ? Object : _googleauthdto.GoogleAuthDto,
+        typeof _express.Request === "undefined" ? Object : _express.Request
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], AuthController.prototype, "googleLogin", null);
 _ts_decorate([
     (0, _common.Post)('admin/login'),
     (0, _common.HttpCode)(_common.HttpStatus.OK),

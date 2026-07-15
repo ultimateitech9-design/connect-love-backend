@@ -211,6 +211,51 @@ let UsersService = class UsersService {
         }
         await this.userRepo.update(userId, updateData);
     }
+    async rechargeCoins(userId, amount) {
+        const coins = Number(amount);
+        if (!Number.isInteger(coins) || coins < 1 || coins > 100000) {
+            throw new _common.BadRequestException('Enter a valid recharge amount between 1 and 100000 coins.');
+        }
+        const user = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User not found.');
+        await this.userRepo.increment({
+            id: userId
+        }, 'coinBalance', coins);
+        const updated = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        return {
+            coinBalance: updated?.coinBalance || 0
+        };
+    }
+    async spendCoins(userId, amount) {
+        const coins = Number(amount);
+        if (!Number.isInteger(coins) || coins < 1) {
+            throw new _common.BadRequestException('Invalid coin amount.');
+        }
+        const result = await this.userRepo.createQueryBuilder().update(_userentity.User).set({
+            coinBalance: ()=>`coinBalance - ${coins}`
+        }).where('id = :userId', {
+            userId
+        }).andWhere('coinBalance >= :coins', {
+            coins
+        }).execute();
+        if (!result.affected) throw new _common.BadRequestException('Not enough coins. Please recharge your wallet.');
+        const updated = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        return {
+            coinBalance: updated?.coinBalance || 0
+        };
+    }
     constructor(userRepo){
         this.userRepo = userRepo;
     }

@@ -300,6 +300,14 @@ _ts_decorate([
 ], User.prototype, "notifyPush", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'int',
+        unsigned: true,
+        default: 0
+    }),
+    _ts_metadata("design:type", Number)
+], User.prototype, "coinBalance", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         default: false
     }),
     _ts_metadata("design:type", Boolean)

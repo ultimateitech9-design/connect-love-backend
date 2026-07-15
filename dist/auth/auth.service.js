@@ -16,6 +16,8 @@ const _bcryptjs = /*#__PURE__*/ _interop_require_wildcard(require("bcryptjs"));
 const _cryptojs = /*#__PURE__*/ _interop_require_wildcard(require("crypto-js"));
 const _userentity = require("../users/user.entity");
 const _auditlogentity = require("../platform/audit-log.entity");
+const _googleauthlibrary = require("google-auth-library");
+const _crypto = require("crypto");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -207,6 +209,66 @@ let AuthService = class AuthService {
             }
         };
     }
+    async googleLogin(credential, context = {}) {
+        const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+        if (!clientId) {
+            throw new _common.UnauthorizedException('Google sign-in is not configured on the server.');
+        }
+        let payload;
+        try {
+            const ticket = await this.googleClient.verifyIdToken({
+                idToken: credential,
+                audience: clientId
+            });
+            payload = ticket.getPayload();
+        } catch  {
+            throw new _common.UnauthorizedException('Google sign-in could not be verified. Please try again.');
+        }
+        const email = payload?.email?.trim().toLowerCase();
+        if (!email || !payload?.email_verified) {
+            throw new _common.UnauthorizedException('A verified Google email is required.');
+        }
+        let user = await this.userRepo.findOne({
+            where: {
+                email
+            }
+        });
+        let isNewUser = false;
+        if (user) {
+            if (user.role !== 'user') {
+                throw new _common.UnauthorizedException('Please use the management login for this account.');
+            }
+            if (user.status !== 'active') {
+                throw new _common.UnauthorizedException('This account is not active. Please contact support.');
+            }
+        } else {
+            const password = await _bcryptjs.hash((0, _crypto.randomUUID)(), 12);
+            user = await this.userRepo.save(this.userRepo.create({
+                name: payload.name?.trim() || email.split('@')[0],
+                email,
+                password,
+                avatarUrl: payload.picture || undefined,
+                role: 'user',
+                status: 'active',
+                onboardingCompleted: false
+            }));
+            isNewUser = true;
+        }
+        const session = await this.startSession(user, context);
+        const token = this.signUserToken(user, session.sessionId);
+        return {
+            access_token: token,
+            isNewUser,
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                plan: user.plan,
+                role: user.role,
+                onboardingCompleted: user.onboardingCompleted
+            }
+        };
+    }
     async adminLogin(dto, context = {}) {
         const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
         // 2. Find user
@@ -332,6 +394,7 @@ let AuthService = class AuthService {
         this.userRepo = userRepo;
         this.auditRepo = auditRepo;
         this.jwtService = jwtService;
+        this.googleClient = new _googleauthlibrary.OAuth2Client();
     }
 };
 AuthService = _ts_decorate([

@@ -33,6 +33,12 @@ let UsersController = class UsersController {
     /** PATCH /users/me — update the currently authenticated user's profile */ updateMe(req, dto) {
         return this.usersService.update(req.user.userId, dto);
     }
+    rechargeCoins(req, amount) {
+        return this.usersService.rechargeCoins(req.user.userId, amount);
+    }
+    spendCoins(req, amount) {
+        return this.usersService.spendCoins(req.user.userId, amount);
+    }
     /** GET /users/me/export - returns a portable copy of the authenticated user's data */ exportMe(req) {
         return this.usersService.exportMe(req.user.userId);
     }
@@ -80,6 +86,30 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UsersController.prototype, "updateMe", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Post)('me/coins/recharge'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Body)('amount')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        Number
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "rechargeCoins", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Post)('me/coins/spend'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Body)('amount')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        Number
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "spendCoins", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Get)('me/export'),

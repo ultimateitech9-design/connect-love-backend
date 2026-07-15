@@ -4,6 +4,7 @@ import {
   IsLatitude,
   IsLongitude,
   IsOptional,
+  IsIn,
   IsString,
   MaxLength,
   MinLength,
@@ -27,6 +28,7 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @IsIn(['male', 'female', 'non-binary', 'prefer-not'])
   gender?: string;
 
   @IsOptional()

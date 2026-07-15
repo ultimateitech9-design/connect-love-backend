@@ -42,6 +42,12 @@ _ts_decorate([
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
+    (0, _classvalidator.IsIn)([
+        'male',
+        'female',
+        'non-binary',
+        'prefer-not'
+    ]),
     _ts_metadata("design:type", String)
 ], RegisterDto.prototype, "gender", void 0);
 _ts_decorate([
