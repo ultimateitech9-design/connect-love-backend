@@ -171,7 +171,10 @@ export class DiscoveryService {
         lastSeen: user.showOnlineStatus ? user.lastSeen : null,
         avatarUrl: primaryPhoto,
         photo: primaryPhoto,
-        photos: visiblePhotos,
+        // Keep the discovery feed lightweight: the primary photo is enough for
+        // the first paint. ProfileCard fetches the full photo set on demand.
+        photos: visiblePhotos.slice(0, 1),
+        photoCount: visiblePhotos.length,
         photosVisibleToNonMatches: user.photosVisibleToNonMatches,
         verified: user.isVerified,
         personality: user.personalityWords || [],

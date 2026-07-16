@@ -16,6 +16,19 @@ function parseAllowedOrigins(): string[] {
     .filter(Boolean);
 }
 
+function isAllowedOrigin(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (parseAllowedOrigins().includes(origin)) return true;
+
+  // In local development the frontend is commonly opened from another device
+  // through Next.js' Network URL (for example http://192.168.1.7:3002).
+  if (process.env.NODE_ENV !== 'production') {
+    return /^http:\/\/(localhost|127\.0\.0\.1|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2}):3002$/.test(origin);
+  }
+
+  return false;
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.enableShutdownHooks();
@@ -30,7 +43,7 @@ async function bootstrap() {
 
   // Enable CORS for independently deployed frontend origins.
   app.enableCors({
-    origin: parseAllowedOrigins(),
+    origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
     credentials: true,
   });
 
@@ -44,7 +57,7 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 3001;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   console.log(`🚀 SoulMatch API running on http://localhost:${port}`);
 }
 
