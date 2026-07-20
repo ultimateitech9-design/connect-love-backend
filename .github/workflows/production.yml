@@ -1,0 +1,78 @@
+name: Build and Production Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Production build check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  production:
+    name: Verify VPS deployment
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: https://connectlove.in/deploy-status/
+    steps:
+      - name: Wait for VPS auto-deployment
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+          REPOSITORY_NAME: ${{ github.event.repository.name }}
+        run: |
+          if [[ "$REPOSITORY_NAME" == "connect-love-fronted" ]]; then
+            COMPONENT=frontend
+          else
+            COMPONENT=backend
+          fi
+          for attempt in {1..120}; do
+            JSON=$(curl --fail --silent --show-error --max-time 15 "https://connectlove.in/deploy-status/status.json?t=$RANDOM" || true)
+            if [[ -z "$JSON" ]]; then
+              echo "Attempt $attempt: deployment status endpoint not ready"
+              sleep 10
+              continue
+            fi
+            DEPLOYED=$(jq -r --arg c "$COMPONENT" '.components[$c].deployed_sha // ""' <<<"$JSON" 2>/dev/null || true)
+            ATTEMPTED=$(jq -r --arg c "$COMPONENT" '.components[$c].attempted_sha // ""' <<<"$JSON" 2>/dev/null || true)
+            STATUS=$(jq -r --arg c "$COMPONENT" '.components[$c].status // "unknown"' <<<"$JSON" 2>/dev/null || true)
+            MESSAGE=$(jq -r --arg c "$COMPONENT" '.components[$c].message // ""' <<<"$JSON" 2>/dev/null || true)
+            echo "Attempt $attempt: component=$COMPONENT status=$STATUS deployed=${DEPLOYED:0:7} expected=${EXPECTED_SHA:0:7}"
+            if [[ "$DEPLOYED" == "$EXPECTED_SHA" && "$STATUS" == "live" ]]; then
+              echo "### ✅ Production deployment successful" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Component: **$COMPONENT**" >> "$GITHUB_STEP_SUMMARY"
+              echo "- Commit: $EXPECTED_SHA" >> "$GITHUB_STEP_SUMMARY"
+              echo "- [Open deployment dashboard](https://connectlove.in/deploy-status/)" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [[ "$STATUS" == "failed" && "$ATTEMPTED" == "$EXPECTED_SHA" ]]; then
+              echo "Deployment failed: $MESSAGE" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for production deployment" >&2
+          exit 1
+
