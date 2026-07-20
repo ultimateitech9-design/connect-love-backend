@@ -7,14 +7,14 @@ import {
   Req,
   Res,
   Headers,
-  UnauthorizedException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
+import { RequestRegistrationOtpDto } from './dto/request-registration-otp.dto';
+import { VerifyRegistrationDto } from './dto/verify-registration.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -41,8 +41,14 @@ export class AuthController {
     return body?.token;
   }
 
+  @Post('register/request-otp')
+  @HttpCode(HttpStatus.OK)
+  requestRegistrationOtp(@Body() dto: RequestRegistrationOtpDto) {
+    return this.authService.requestRegistrationOtp(dto.email);
+  }
+
   @Post('register')
-  register(@Body() dto: RegisterDto) {
+  register(@Body() dto: VerifyRegistrationDto) {
     return this.authService.register(dto);
   }
 

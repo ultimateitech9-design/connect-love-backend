@@ -115,6 +115,9 @@ export class User {
   @Column({ default: false })
   isVerified: boolean;
 
+  @Column({ nullable: true, type: 'timestamp' })
+  emailVerifiedAt: Date;
+
   @Column({ default: false })
   onboardingCompleted: boolean;
 

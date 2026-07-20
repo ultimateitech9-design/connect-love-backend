@@ -13,6 +13,7 @@ import { AuditLog } from './platform/audit-log.entity';
 import { PlatformSetting } from './platform/platform-setting.entity';
 import { PlatformRole } from './platform/role.entity';
 import { VideoCall } from './messages/video-call.entity';
+import { EmailRegistrationOtp } from './auth/email-registration-otp.entity';
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ export default new DataSource({
     PlatformSetting,
     PlatformRole,
     VideoCall,
+    EmailRegistrationOtp,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

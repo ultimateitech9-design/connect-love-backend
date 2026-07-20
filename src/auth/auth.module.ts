@@ -9,12 +9,14 @@ import { JwtStrategy } from './jwt.strategy';
 import { TokenBlacklistService } from './token-blacklist.service';
 import { User } from '../users/user.entity';
 import { AuditLog } from '../platform/audit-log.entity';
+import { EmailRegistrationOtp } from './email-registration-otp.entity';
+import { RegistrationOtpService } from './registration-otp.service';
 
 dotenv.config();
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, AuditLog]),
+    TypeOrmModule.forFeature([User, AuditLog, EmailRegistrationOtp]),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
@@ -22,7 +24,7 @@ dotenv.config();
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, TokenBlacklistService],
+  providers: [AuthService, JwtStrategy, TokenBlacklistService, RegistrationOtpService],
   exports: [JwtModule, TokenBlacklistService],
 })
 export class AuthModule {}

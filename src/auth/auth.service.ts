@@ -8,10 +8,11 @@ import * as bcrypt from 'bcryptjs';
 import * as CryptoJS from 'crypto-js';
 import { User } from '../users/user.entity';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { AuditLog } from '../platform/audit-log.entity';
 import { OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'crypto';
+import { RegistrationOtpService } from './registration-otp.service';
+import { VerifyRegistrationDto } from './dto/verify-registration.dto';
 
 export interface LoginContext {
   ipAddress?: string;
@@ -27,6 +28,7 @@ export class AuthService {
     @InjectRepository(AuditLog)
     private readonly auditRepo: Repository<AuditLog>,
     private readonly jwtService: JwtService,
+    private readonly registrationOtpService: RegistrationOtpService,
   ) {}
 
   private decryptOrUsePlainPassword(password: string): string {
@@ -102,22 +104,30 @@ export class AuthService {
     }
   }
 
-  async register(dto: RegisterDto) {
-    const existing = await this.userRepo.findOne({ where: { email: dto.email } });
+  requestRegistrationOtp(email: string) {
+    return this.registrationOtpService.request(email);
+  }
+
+  async register(dto: VerifyRegistrationDto) {
+    const email = dto.email.trim().toLowerCase();
+    const existing = await this.userRepo.findOne({ where: { email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
     }
 
+    await this.registrationOtpService.verify(email, dto.otp);
+
     const hashed = await bcrypt.hash(dto.password, 12);
     const user = this.userRepo.create({
       name: dto.name,
-      email: dto.email,
+      email,
       password: hashed,
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
       gender: dto.gender,
       city: dto.city,
       locationLatitude: dto.locationLatitude,
       locationLongitude: dto.locationLongitude,
+      emailVerifiedAt: new Date(),
     });
     const saved = await this.userRepo.save(user);
     const { password: _, ...safe } = saved as any;
@@ -187,6 +197,10 @@ export class AuthService {
       if (user.status !== 'active') {
         throw new UnauthorizedException('This account is not active. Please contact support.');
       }
+      if (!user.emailVerifiedAt) {
+        user.emailVerifiedAt = new Date();
+        user = await this.userRepo.save(user);
+      }
     } else {
       const password = await bcrypt.hash(randomUUID(), 12);
       user = await this.userRepo.save(this.userRepo.create({
@@ -197,6 +211,7 @@ export class AuthService {
         role: 'user',
         status: 'active',
         onboardingCompleted: false,
+        emailVerifiedAt: new Date(),
       }));
       isNewUser = true;
     }
