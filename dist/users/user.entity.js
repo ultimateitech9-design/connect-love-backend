@@ -239,6 +239,13 @@ _ts_decorate([
 ], User.prototype, "isVerified", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        nullable: true,
+        type: 'timestamp'
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], User.prototype, "emailVerifiedAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         default: false
     }),
     _ts_metadata("design:type", Boolean)

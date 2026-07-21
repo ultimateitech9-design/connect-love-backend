@@ -155,9 +155,8 @@ let UsersService = class UsersService {
             if (!photos.length) {
                 throw new _common.BadRequestException('Add at least one profile photo before completing onboarding.');
             }
-            if (!existingUser.kycMatched || (existingUser.kycMatchScore ?? 0) < 60) {
-                throw new _common.BadRequestException('Complete video KYC match before completing onboarding.');
-            }
+        // Video KYC is optional during onboarding. Successful KYC separately sets
+        // kycMatched/isVerified, which controls the verified badge.
         }
         sanitizedData.photosVisibleToNonMatches = true;
         // Only update fields that are part of the DTO (safe update)

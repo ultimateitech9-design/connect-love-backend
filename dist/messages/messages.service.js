@@ -11,6 +11,7 @@ Object.defineProperty(exports, "MessagesService", {
 const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
+const _crypto = require("crypto");
 const _messageentity = require("./message.entity");
 const _matchentity = require("../matches/match.entity");
 function _ts_decorate(decorators, target, key, desc) {
@@ -28,6 +29,23 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let MessagesService = class MessagesService {
+    isOptionalMessageSchemaMismatch(error) {
+        const code = error?.driverError?.code || error?.code;
+        return code === 'ER_BAD_FIELD_ERROR' || code === 'ER_NO_DEFAULT_FOR_FIELD';
+    }
+    normalizeCoreMessage(row) {
+        return {
+            ...row,
+            isRead: Boolean(row.isRead),
+            reactions: null,
+            deletedForUserIds: null,
+            deletedForEveryone: false,
+            pinnedByUserIds: null,
+            starredByUserIds: null,
+            replyToMessageId: null,
+            editedAt: null
+        };
+    }
     async assertConversationAccess(conversationId, userId) {
         const match = await this.matchRepo.findOne({
             where: {
@@ -67,15 +85,23 @@ let MessagesService = class MessagesService {
     }
     async findAll(conversationId, userId) {
         await this.assertConversationAccess(conversationId, userId);
-        const messages = await this.msgRepo.find({
-            where: {
+        try {
+            const messages = await this.msgRepo.find({
+                where: {
+                    conversationId
+                },
+                order: {
+                    createdAt: 'ASC'
+                }
+            });
+            return messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId));
+        } catch (error) {
+            if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
+            const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? ORDER BY createdAt ASC', [
                 conversationId
-            },
-            order: {
-                createdAt: 'ASC'
-            }
-        });
-        return messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId));
+            ]);
+            return rows.map((row)=>this.normalizeCoreMessage(row));
+        }
     }
     async create(conversationId, senderId, receiverId, content, replyToMessageId) {
         const match = await this.assertConversationAccess(conversationId, senderId);
@@ -96,7 +122,23 @@ let MessagesService = class MessagesService {
             content,
             replyToMessageId: replyToMessageId || null
         });
-        return this.msgRepo.save(msg);
+        try {
+            return await this.msgRepo.save(msg);
+        } catch (error) {
+            if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
+            const id = (0, _crypto.randomUUID)();
+            await this.msgRepo.query('INSERT INTO messages (id, conversationId, senderId, receiverId, content, isRead, createdAt) VALUES (?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP(6))', [
+                id,
+                conversationId,
+                senderId,
+                receiverId,
+                content
+            ]);
+            const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE id = ? LIMIT 1', [
+                id
+            ]);
+            return this.normalizeCoreMessage(rows[0]);
+        }
     }
     async remove(id, userId, scope = 'everyone') {
         const msg = await this.assertMessageAccess(id, userId);
@@ -122,13 +164,23 @@ let MessagesService = class MessagesService {
     }
     async markAsRead(conversationId, userId) {
         await this.assertConversationAccess(conversationId, userId);
-        const unreadMessages = await this.msgRepo.find({
-            where: {
+        let unreadMessages;
+        try {
+            unreadMessages = await this.msgRepo.find({
+                where: {
+                    conversationId,
+                    receiverId: userId,
+                    isRead: false
+                }
+            });
+        } catch (error) {
+            if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
+            const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? AND receiverId = ? AND isRead = 0', [
                 conversationId,
-                receiverId: userId,
-                isRead: false
-            }
-        });
+                userId
+            ]);
+            unreadMessages = rows.map((row)=>this.normalizeCoreMessage(row));
+        }
         if (unreadMessages.length === 0) return [];
         await this.msgRepo.update({
             conversationId,

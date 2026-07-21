@@ -13,8 +13,9 @@ const _express = require("express");
 const _authservice = require("./auth.service");
 const _tokenblacklistservice = require("./token-blacklist.service");
 const _logindto = require("./dto/login.dto");
-const _registerdto = require("./dto/register.dto");
 const _googleauthdto = require("./dto/google-auth.dto");
+const _requestregistrationotpdto = require("./dto/request-registration-otp.dto");
+const _verifyregistrationdto = require("./dto/verify-registration.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -42,6 +43,9 @@ let AuthController = class AuthController {
     tokenFrom(authHeader, body) {
         if (authHeader?.startsWith('Bearer ')) return authHeader.slice(7).trim();
         return body?.token;
+    }
+    requestRegistrationOtp(dto) {
+        return this.authService.requestRegistrationOtp(dto.email);
     }
     register(dto) {
         return this.authService.register(dto);
@@ -138,11 +142,21 @@ let AuthController = class AuthController {
     }
 };
 _ts_decorate([
+    (0, _common.Post)('register/request-otp'),
+    (0, _common.HttpCode)(_common.HttpStatus.OK),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _requestregistrationotpdto.RequestRegistrationOtpDto === "undefined" ? Object : _requestregistrationotpdto.RequestRegistrationOtpDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], AuthController.prototype, "requestRegistrationOtp", null);
+_ts_decorate([
     (0, _common.Post)('register'),
     _ts_param(0, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _registerdto.RegisterDto === "undefined" ? Object : _registerdto.RegisterDto
+        typeof _verifyregistrationdto.VerifyRegistrationDto === "undefined" ? Object : _verifyregistrationdto.VerifyRegistrationDto
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AuthController.prototype, "register", null);

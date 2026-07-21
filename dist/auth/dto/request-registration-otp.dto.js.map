@@ -1,0 +1,1 @@
+{"version":3,"sources":["../../../src/auth/dto/request-registration-otp.dto.ts"],"sourcesContent":["import { IsEmail } from 'class-validator';\r\n\r\nexport class RequestRegistrationOtpDto {\r\n  @IsEmail()\r\n  email: string;\r\n}\r\n"],"names":["RequestRegistrationOtpDto"],"mappings":";;;;+BAEaA;;;eAAAA;;;gCAFW;;;;;;;;;;AAEjB,IAAA,AAAMA,4BAAN,MAAMA;AAGb"}

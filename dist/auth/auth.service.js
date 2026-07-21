@@ -18,6 +18,7 @@ const _userentity = require("../users/user.entity");
 const _auditlogentity = require("../platform/audit-log.entity");
 const _googleauthlibrary = require("google-auth-library");
 const _crypto = require("crypto");
+const _registrationotpservice = require("./registration-otp.service");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -155,25 +156,31 @@ let AuthService = class AuthService {
             return null;
         }
     }
+    requestRegistrationOtp(email) {
+        return this.registrationOtpService.request(email);
+    }
     async register(dto) {
+        const email = dto.email.trim().toLowerCase();
         const existing = await this.userRepo.findOne({
             where: {
-                email: dto.email
+                email
             }
         });
         if (existing) {
             throw new _common.ConflictException('An account with this email already exists.');
         }
+        await this.registrationOtpService.verify(email, dto.otp);
         const hashed = await _bcryptjs.hash(dto.password, 12);
         const user = this.userRepo.create({
             name: dto.name,
-            email: dto.email,
+            email,
             password: hashed,
             birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
             gender: dto.gender,
             city: dto.city,
             locationLatitude: dto.locationLatitude,
-            locationLongitude: dto.locationLongitude
+            locationLongitude: dto.locationLongitude,
+            emailVerifiedAt: new Date()
         });
         const saved = await this.userRepo.save(user);
         const { password: _, ...safe } = saved;
@@ -241,6 +248,10 @@ let AuthService = class AuthService {
             if (user.status !== 'active') {
                 throw new _common.UnauthorizedException('This account is not active. Please contact support.');
             }
+            if (!user.emailVerifiedAt) {
+                user.emailVerifiedAt = new Date();
+                user = await this.userRepo.save(user);
+            }
         } else {
             const password = await _bcryptjs.hash((0, _crypto.randomUUID)(), 12);
             user = await this.userRepo.save(this.userRepo.create({
@@ -250,7 +261,8 @@ let AuthService = class AuthService {
                 avatarUrl: payload.picture || undefined,
                 role: 'user',
                 status: 'active',
-                onboardingCompleted: false
+                onboardingCompleted: false,
+                emailVerifiedAt: new Date()
             }));
             isNewUser = true;
         }
@@ -390,10 +402,11 @@ let AuthService = class AuthService {
             }
         };
     }
-    constructor(userRepo, auditRepo, jwtService){
+    constructor(userRepo, auditRepo, jwtService, registrationOtpService){
         this.userRepo = userRepo;
         this.auditRepo = auditRepo;
         this.jwtService = jwtService;
+        this.registrationOtpService = registrationOtpService;
         this.googleClient = new _googleauthlibrary.OAuth2Client();
     }
 };
@@ -405,7 +418,8 @@ AuthService = _ts_decorate([
     _ts_metadata("design:paramtypes", [
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService
+        typeof _jwt.JwtService === "undefined" ? Object : _jwt.JwtService,
+        typeof _registrationotpservice.RegistrationOtpService === "undefined" ? Object : _registrationotpservice.RegistrationOtpService
     ])
 ], AuthService);
 

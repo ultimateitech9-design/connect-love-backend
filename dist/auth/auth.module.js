@@ -19,6 +19,8 @@ const _jwtstrategy = require("./jwt.strategy");
 const _tokenblacklistservice = require("./token-blacklist.service");
 const _userentity = require("../users/user.entity");
 const _auditlogentity = require("../platform/audit-log.entity");
+const _emailregistrationotpentity = require("./email-registration-otp.entity");
+const _registrationotpservice = require("./registration-otp.service");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -74,7 +76,8 @@ AuthModule = _ts_decorate([
         imports: [
             _typeorm.TypeOrmModule.forFeature([
                 _userentity.User,
-                _auditlogentity.AuditLog
+                _auditlogentity.AuditLog,
+                _emailregistrationotpentity.EmailRegistrationOtp
             ]),
             _passport.PassportModule,
             _jwt.JwtModule.register({
@@ -90,7 +93,8 @@ AuthModule = _ts_decorate([
         providers: [
             _authservice.AuthService,
             _jwtstrategy.JwtStrategy,
-            _tokenblacklistservice.TokenBlacklistService
+            _tokenblacklistservice.TokenBlacklistService,
+            _registrationotpservice.RegistrationOtpService
         ],
         exports: [
             _jwt.JwtModule,
