@@ -120,9 +120,8 @@ export class UsersService {
       if (!photos.length) {
         throw new BadRequestException('Add at least one profile photo before completing onboarding.');
       }
-      if (!existingUser.kycMatched || (existingUser.kycMatchScore ?? 0) < 60) {
-        throw new BadRequestException('Complete video KYC match before completing onboarding.');
-      }
+      // Video KYC is optional during onboarding. Successful KYC separately sets
+      // kycMatched/isVerified, which controls the verified badge.
     }
     sanitizedData.photosVisibleToNonMatches = true;
 
