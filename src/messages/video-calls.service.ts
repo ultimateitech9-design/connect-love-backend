@@ -1,8 +1,8 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThan, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
-import { VideoCall, VideoCallStatus } from './video-call.entity';
+import { VideoCall, VideoCallStatus, VideoCallType } from './video-call.entity';
 
 @Injectable()
 export class VideoCallsService {
@@ -25,7 +25,7 @@ export class VideoCallsService {
     return match;
   }
 
-  async start(conversationId: string, callerId: string, receiverId: string): Promise<VideoCall> {
+  async start(conversationId: string, callerId: string, receiverId: string, callType: VideoCallType = 'video'): Promise<VideoCall> {
     const match = await this.assertMatchedConversation(conversationId, callerId);
     const validReceiver = receiverId === match.senderId || receiverId === match.receiverId;
     if (!validReceiver || receiverId === callerId) {
@@ -36,8 +36,17 @@ export class VideoCallsService {
       conversationId,
       callerId,
       receiverId,
+      callType,
       status: 'ringing',
     }));
+  }
+
+  async findIncoming(userId: string): Promise<VideoCall | null> {
+    const recentThreshold = new Date(Date.now() - 2 * 60 * 1000);
+    return this.callRepo.findOne({
+      where: { receiverId: userId, status: 'ringing', createdAt: MoreThan(recentThreshold) },
+      order: { createdAt: 'DESC' },
+    });
   }
 
   async accept(callId: string, userId: string): Promise<VideoCall> {

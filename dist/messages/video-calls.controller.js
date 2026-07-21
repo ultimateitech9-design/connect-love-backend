@@ -26,8 +26,11 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let VideoCallsController = class VideoCallsController {
-    startCall(req, conversationId, receiverId) {
-        return this.videoCallsService.start(conversationId, req.user.userId, receiverId);
+    incomingCall(req) {
+        return this.videoCallsService.findIncoming(req.user.userId);
+    }
+    startCall(req, conversationId, receiverId, callType) {
+        return this.videoCallsService.start(conversationId, req.user.userId, receiverId, callType);
     }
     acceptCall(req, id) {
         return this.videoCallsService.accept(id, req.user.userId);
@@ -43,13 +46,24 @@ let VideoCallsController = class VideoCallsController {
     }
 };
 _ts_decorate([
+    (0, _common.Get)('incoming'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        void 0
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], VideoCallsController.prototype, "incomingCall", null);
+_ts_decorate([
     (0, _common.Post)(),
     _ts_param(0, (0, _common.Request)()),
     _ts_param(1, (0, _common.Body)('conversationId')),
     _ts_param(2, (0, _common.Body)('receiverId')),
+    _ts_param(3, (0, _common.Body)('callType')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         void 0,
+        String,
         String,
         String
     ]),

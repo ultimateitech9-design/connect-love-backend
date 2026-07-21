@@ -11,6 +11,7 @@ import { User } from '../users/user.entity';
 import { MatchRelation } from '../matches/match.entity';
 
 export type VideoCallStatus = 'ringing' | 'active' | 'ended' | 'rejected' | 'missed';
+export type VideoCallType = 'audio' | 'video';
 
 @Entity('video_calls')
 export class VideoCall {
@@ -40,6 +41,9 @@ export class VideoCall {
 
   @Column({ type: 'enum', enum: ['ringing', 'active', 'ended', 'rejected', 'missed'], default: 'ringing' })
   status: VideoCallStatus;
+
+  @Column({ type: 'enum', enum: ['audio', 'video'], default: 'video' })
+  callType: VideoCallType;
 
   @Column({ nullable: true, type: 'timestamp' })
   startedAt: Date | null;

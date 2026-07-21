@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { VideoCallsService } from './video-calls.service';
 
@@ -7,13 +7,19 @@ import { VideoCallsService } from './video-calls.service';
 export class VideoCallsController {
   constructor(private readonly videoCallsService: VideoCallsService) {}
 
+  @Get('incoming')
+  incomingCall(@Request() req) {
+    return this.videoCallsService.findIncoming(req.user.userId);
+  }
+
   @Post()
   startCall(
     @Request() req,
     @Body('conversationId') conversationId: string,
     @Body('receiverId') receiverId: string,
+    @Body('callType') callType?: 'audio' | 'video',
   ) {
-    return this.videoCallsService.start(conversationId, req.user.userId, receiverId);
+    return this.videoCallsService.start(conversationId, req.user.userId, receiverId, callType);
   }
 
   @Patch(':id/accept')

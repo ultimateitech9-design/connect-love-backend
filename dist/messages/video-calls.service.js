@@ -43,7 +43,7 @@ let VideoCallsService = class VideoCallsService {
         }
         return match;
     }
-    async start(conversationId, callerId, receiverId) {
+    async start(conversationId, callerId, receiverId, callType = 'video') {
         const match = await this.assertMatchedConversation(conversationId, callerId);
         const validReceiver = receiverId === match.senderId || receiverId === match.receiverId;
         if (!validReceiver || receiverId === callerId) {
@@ -53,8 +53,22 @@ let VideoCallsService = class VideoCallsService {
             conversationId,
             callerId,
             receiverId,
+            callType,
             status: 'ringing'
         }));
+    }
+    async findIncoming(userId) {
+        const recentThreshold = new Date(Date.now() - 2 * 60 * 1000);
+        return this.callRepo.findOne({
+            where: {
+                receiverId: userId,
+                status: 'ringing',
+                createdAt: (0, _typeorm1.MoreThan)(recentThreshold)
+            },
+            order: {
+                createdAt: 'DESC'
+            }
+        });
     }
     async accept(callId, userId) {
         const call = await this.callRepo.findOne({

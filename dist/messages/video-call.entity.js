@@ -81,6 +81,17 @@ _ts_decorate([
 ], VideoCall.prototype, "status", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'enum',
+        enum: [
+            'audio',
+            'video'
+        ],
+        default: 'video'
+    }),
+    _ts_metadata("design:type", typeof VideoCallType === "undefined" ? Object : VideoCallType)
+], VideoCall.prototype, "callType", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         nullable: true,
         type: 'timestamp'
     }),

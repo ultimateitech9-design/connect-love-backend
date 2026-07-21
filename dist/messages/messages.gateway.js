@@ -38,11 +38,7 @@ let MessagesGateway = class MessagesGateway {
         return undefined;
     }
     emitToUser(userId, event, payload) {
-        const sockets = this.connectedUsers.get(userId);
-        if (!sockets) return;
-        for (const socketId of sockets){
-            this.server.to(socketId).emit(event, payload);
-        }
+        this.server.to(`user:${userId}`).emit(event, payload);
     }
     isUserOnline(userId) {
         return !!this.connectedUsers.get(userId)?.size;
@@ -61,6 +57,7 @@ let MessagesGateway = class MessagesGateway {
             return;
         }
         if (userId) {
+            await client.join(`user:${userId}`);
             const userSockets = this.connectedUsers.get(userId);
             if (!userSockets || userSockets.size === 0) {
                 this.connectedUsers.set(userId, new Set([
@@ -296,12 +293,13 @@ let MessagesGateway = class MessagesGateway {
             error: 'Not authenticated'
         };
         try {
-            const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId);
+            const callType = data.callType === 'audio' ? 'audio' : 'video';
+            const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId, callType);
             const payload = {
                 call,
                 callerId,
                 conversationId: data.conversationId,
-                callType: data.callType || 'video'
+                callType
             };
             this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
             this.server.to(client.id).emit('videoCallStarted', payload);
