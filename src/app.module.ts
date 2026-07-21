@@ -30,11 +30,7 @@ dotenv.config();
       database: process.env.DB_NAME || 'dating_web_app',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       migrations: [__dirname + '/migrations/*{.ts,.js}'],
-      // Keep deployed schemas in sync with entity changes. Set
-      // TYPEORM_MIGRATIONS_RUN=false only for environments that run migrations separately.
-      migrationsRun:
-        process.env.TYPEORM_MIGRATIONS_RUN === 'true' ||
-        (process.env.NODE_ENV === 'production' && process.env.TYPEORM_MIGRATIONS_RUN !== 'false'),
+      migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
       synchronize: false,
       logging: false,
       extra: {

@@ -30,12 +30,29 @@ export class MatchesService {
     };
   }
 
+  private matchesWithProfilesQuery() {
+    // Match cards use a stable subset so unrelated, newly-added user columns
+    // cannot break this endpoint before a production schema migration runs.
+    return this.matchesRepository
+      .createQueryBuilder('match')
+      .leftJoin('match.sender', 'sender')
+      .leftJoin('match.receiver', 'receiver')
+      .addSelect([
+        'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos',
+        'sender.isOnline', 'sender.showOnlineStatus', 'sender.city', 'sender.profession',
+        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos',
+        'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.city', 'receiver.profession',
+      ]);
+  }
+
   private async enrichMatches(matches: MatchRelation[], userId: string): Promise<any[]> {
     const enriched = await Promise.all(matches.map(async (match) => {
-      const lastMessage = await this.msgRepo.findOne({
-        where: { conversationId: match.id },
-        order: { createdAt: 'DESC' },
-      });
+      const lastMessage = await this.msgRepo
+        .createQueryBuilder('message')
+        .select(['message.content', 'message.createdAt'])
+        .where('message.conversationId = :conversationId', { conversationId: match.id })
+        .orderBy('message.createdAt', 'DESC')
+        .getOne();
       const unreadCount = await this.msgRepo.count({
         where: { conversationId: match.id, receiverId: userId, isRead: false },
       });
@@ -66,27 +83,20 @@ export class MatchesService {
   }
 
   async findAllByStatus(userId: string, status: MatchStatus): Promise<any[]> {
-    const matches = await this.matchesRepository.find({ 
-      where: [
-        { senderId: userId, status },
-        { receiverId: userId, status }
-      ], 
-      order: { createdAt: 'DESC' },
-      relations: ['sender', 'receiver']
-    });
+    const matches = await this.matchesWithProfilesQuery()
+      .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
+      .andWhere('match.status = :status', { status })
+      .orderBy('match.createdAt', 'DESC')
+      .getMany();
 
     return this.enrichMatches(matches, userId);
   }
 
   async findAll(userId: string): Promise<any[]> {
-    const matches = await this.matchesRepository.find({ 
-      where: [
-        { senderId: userId },
-        { receiverId: userId }
-      ],
-      order: { createdAt: 'DESC' },
-      relations: ['sender', 'receiver']
-    });
+    const matches = await this.matchesWithProfilesQuery()
+      .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
+      .orderBy('match.createdAt', 'DESC')
+      .getMany();
 
     return this.enrichMatches(matches, userId);
   }
