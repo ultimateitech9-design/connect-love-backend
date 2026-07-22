@@ -24,6 +24,7 @@ const _apimodule = require("./api/api.module");
 const _kycmodule = require("./kyc/kyc.module");
 const _searchmodule = require("./search/search.module");
 const _boostsmodule = require("./boosts/boosts.module");
+const _chatbotmodule = require("./chatbot/chatbot.module");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -110,7 +111,8 @@ AppModule = _ts_decorate([
             _apimodule.ApiModule,
             _kycmodule.KycModule,
             _searchmodule.SearchModule,
-            _boostsmodule.BoostsModule
+            _boostsmodule.BoostsModule,
+            _chatbotmodule.ChatbotModule
         ],
         controllers: [
             _healthcontroller.HealthController

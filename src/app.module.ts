@@ -16,6 +16,7 @@ import { ApiModule } from './api/api.module';
 import { KycModule } from './kyc/kyc.module';
 import { SearchModule } from './search/search.module';
 import { BoostsModule } from './boosts/boosts.module';
+import { ChatbotModule } from './chatbot/chatbot.module';
 
 dotenv.config();
 
@@ -51,6 +52,7 @@ dotenv.config();
     KycModule,
     SearchModule,
     BoostsModule,
+    ChatbotModule,
   ],
   controllers: [HealthController],
 })
