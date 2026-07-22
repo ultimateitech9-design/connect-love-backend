@@ -17,6 +17,7 @@ import { KycModule } from './kyc/kyc.module';
 import { SearchModule } from './search/search.module';
 import { BoostsModule } from './boosts/boosts.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
+import { DivorcedModule } from './divorced/divorced.module';
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ dotenv.config();
     SearchModule,
     BoostsModule,
     ChatbotModule,
+    DivorcedModule,
   ],
   controllers: [HealthController],
 })
