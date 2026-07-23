@@ -18,6 +18,7 @@ import { SearchModule } from './search/search.module';
 import { BoostsModule } from './boosts/boosts.module';
 import { ChatbotModule } from './chatbot/chatbot.module';
 import { DivorcedModule } from './divorced/divorced.module';
+import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 
 dotenv.config();
 
@@ -55,6 +56,7 @@ dotenv.config();
     BoostsModule,
     ChatbotModule,
     DivorcedModule,
+    PushNotificationsModule,
   ],
   controllers: [HealthController],
 })

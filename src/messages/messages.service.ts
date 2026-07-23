@@ -1,18 +1,50 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Message } from './message.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
+import { User } from '../users/user.entity';
+import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
+
   constructor(
     @InjectRepository(Message)
     private msgRepo: Repository<Message>,
     @InjectRepository(MatchRelation)
     private matchRepo: Repository<MatchRelation>,
+    @InjectRepository(User)
+    private userRepo: Repository<User>,
+    private readonly pushNotifications: PushNotificationsService,
   ) {}
+
+  private queueMessagePush(message: Message): void {
+    void (async () => {
+      const [sender, receiver] = await Promise.all([
+        this.userRepo.findOne({ where: { id: message.senderId }, select: ['id', 'name'] }),
+        this.userRepo.findOne({ where: { id: message.receiverId }, select: ['id', 'notifyMessages'] }),
+      ]);
+      if (!receiver?.notifyMessages) return;
+
+      const cleanContent = String(message.content || '').replace(/\s+/g, ' ').trim();
+      const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}…` : cleanContent;
+      await this.pushNotifications.sendToUser(message.receiverId, {
+        title: sender?.name ? `New message from ${sender.name}` : 'New message',
+        body: preview || 'You received a new message.',
+        data: {
+          type: 'message',
+          messageId: message.id,
+          conversationId: message.conversationId,
+          senderId: message.senderId,
+        },
+      });
+    })().catch((error) => {
+      this.logger.warn(`Could not queue message push: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    });
+  }
 
   private isOptionalMessageSchemaMismatch(error: any): boolean {
     const code = error?.driverError?.code || error?.code;
@@ -97,7 +129,9 @@ export class MessagesService {
     }
     const msg = this.msgRepo.create({ conversationId, senderId, receiverId, content, replyToMessageId: replyToMessageId || null });
     try {
-      return await this.msgRepo.save(msg);
+      const savedMessage = await this.msgRepo.save(msg);
+      this.queueMessagePush(savedMessage);
+      return savedMessage;
     } catch (error) {
       if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
       const id = randomUUID();
@@ -109,7 +143,9 @@ export class MessagesService {
         'SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE id = ? LIMIT 1',
         [id],
       );
-      return this.normalizeCoreMessage(rows[0]);
+      const savedMessage = this.normalizeCoreMessage(rows[0]);
+      this.queueMessagePush(savedMessage);
+      return savedMessage;
     }
   }
 
