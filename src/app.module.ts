@@ -33,7 +33,11 @@ dotenv.config();
       database: process.env.DB_NAME || 'dating_web_app',
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       migrations: [__dirname + '/migrations/*{.ts,.js}'],
-      migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
+      // Production releases must apply pending schema changes before accepting traffic.
+      // TYPEORM_MIGRATIONS_RUN remains available for explicitly enabling this locally.
+      migrationsRun:
+        process.env.NODE_ENV === 'production'
+        || process.env.TYPEORM_MIGRATIONS_RUN === 'true',
       synchronize: false,
       logging: false,
       extra: {
