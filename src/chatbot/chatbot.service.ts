@@ -4,6 +4,11 @@ export type ChatbotLanguage = 'en' | 'hi';
 
 @Injectable()
 export class ChatbotService {
+  shouldSuggestSupport(messageInput: string) {
+    const message = messageInput.trim().toLowerCase();
+    return /support|human|agent|ticket|refund|charged|payment failed|not working|bug|error|hacked|scam|harass|threat|सपोर्ट|मदद|एजेंट|टिकट|रिफंड|पेमेंट|काम नहीं|हैक|धोखा|परेशान/.test(message);
+  }
+
   reply(messageInput: string, language: ChatbotLanguage) {
     const message = messageInput.trim().toLowerCase();
     const hindi = language === 'hi';

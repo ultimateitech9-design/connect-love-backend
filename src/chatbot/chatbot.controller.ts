@@ -18,6 +18,9 @@ export class ChatbotController {
 
   @Post('message')
   message(@Body() body: ChatbotMessageDto) {
-    return { reply: this.chatbotService.reply(body.message, body.language) };
+    return {
+      reply: this.chatbotService.reply(body.message, body.language),
+      supportSuggested: this.chatbotService.shouldSuggestSupport(body.message),
+    };
   }
 }

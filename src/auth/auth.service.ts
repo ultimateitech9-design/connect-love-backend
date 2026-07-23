@@ -290,38 +290,10 @@ export class AuthService {
     };
   }
 
-  async marketingLogin(dto: LoginDto, context: LoginContext = {}) {
-    const decryptedPassword = this.decryptOrUsePlainPassword(dto.password);
-
-    const user = await this.userRepo
-      .createQueryBuilder('u')
-      .addSelect('u.password')
-      .where('u.email = :email', { email: dto.email })
-      .getOne();
-
-    if (!user) throw new UnauthorizedException('Invalid email or password.');
-
-    if (user.role !== 'marketing' && user.role !== 'super_admin') {
-      throw new UnauthorizedException('Access denied. Marketing privileges required.');
-    }
-
-    const match = await bcrypt.compare(decryptedPassword, user.password);
-    if (!match) throw new UnauthorizedException('Invalid email or password.');
-
-    const session = await this.startSession(user, context);
-    const token = this.signUserToken(user, session.sessionId);
-
-    return {
-      access_token: token,
-      user: { id: user.id, name: user.name, email: user.email, role: user.role },
-    };
-  }
-
   async managementLogin(dto: LoginDto & { role: string }, context: LoginContext = {}) {
     const roleMap: Record<string, string[]> = {
       admin: ['admin', 'super_admin'],
       'super-admin': ['super_admin'],
-      marketing: ['marketing', 'super_admin'],
       sales: ['sales', 'super_admin'],
       support: ['support', 'admin', 'super_admin'],
     };

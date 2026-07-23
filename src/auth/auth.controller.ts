@@ -105,26 +105,6 @@ export class AuthController {
     return { message: 'Super Admin login successful', user: result.user };
   }
 
-  @Post('marketing/login')
-  @HttpCode(HttpStatus.OK)
-  async marketingLogin(
-    @Body() dto: LoginDto,
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    const result = await this.authService.marketingLogin(dto, this.loginContext(request));
-    
-    response.cookie('admin_token', result.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path: '/',
-      maxAge: 1000 * 60 * 60 * 24, // 1 day
-    });
-
-    return { message: 'Marketing login successful', user: result.user };
-  }
-
   @Post('management/login')
   @HttpCode(HttpStatus.OK)
   async managementLogin(

@@ -1,7 +1,8 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
+import { AuthGuard } from '@nestjs/passport';
 import { User } from '../users/user.entity';
 import { Contact } from '../support/contact.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
@@ -12,7 +13,8 @@ import { NotificationStatus, PlatformNotification } from '../platform/platform-n
 import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
-import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray, IsBoolean } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray, IsBoolean, IsDateString, IsInt, Max, MaxLength, Min, Matches } from 'class-validator';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -46,6 +48,87 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsString()
   status?: string;
+
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  description: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  discountPercent?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  ctaLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Matches(/^(\/|https?:\/\/)/, { message: 'ctaUrl must be a site path or an http(s) URL.' })
+  ctaUrl?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
+
+export class UpdateNotificationDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(160)
+  campaign?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  audience?: string;
+
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  description?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  discountPercent?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  ctaLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Matches(/^(\/|https?:\/\/)/, { message: 'ctaUrl must be a site path or an http(s) URL.' })
+  ctaUrl?: string;
+
+  @IsOptional()
+  @IsDateString()
+  startsAt?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endsAt?: string;
+}
+
+export class RejectNotificationDto {
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  reason: string;
 }
 
 export class CreateRoleDto {
@@ -153,6 +236,8 @@ export class UpdatePlatformUserDto {
 }
 
 @Controller('api')
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles('admin', 'super_admin')
 export class PlatformApiController {
   constructor(
     @InjectRepository(User)
@@ -181,8 +266,93 @@ export class PlatformApiController {
     return date.toLocaleString('en-US', { weekday: 'short' });
   }
 
+  private periodDelta(current: number, previous: number) {
+    if (previous === 0) return current === 0 ? '0%' : '+100%';
+    const value = ((current - previous) / previous) * 100;
+    return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+  }
+
   private normalizeRole(value?: string) {
     return String(value || 'user').toLowerCase().replace(/[- ]/g, '_');
+  }
+
+  private requestUser(request: any): { userId: string; role: string } {
+    return {
+      userId: String(request?.user?.userId || ''),
+      role: this.normalizeRole(request?.user?.role),
+    };
+  }
+
+  private statusLabel(status: string) {
+    return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' ? 'Suspended' : 'Under Review';
+  }
+
+  private campaignResponse(campaign: PlatformNotification) {
+    const ctr = campaign.impressions > 0 ? Number(((campaign.clicks / campaign.impressions) * 100).toFixed(2)) : 0;
+    return {
+      id: campaign.id,
+      campaign: campaign.campaign,
+      description: campaign.description,
+      type: campaign.type,
+      audience: campaign.audience,
+      discountPercent: campaign.discountPercent,
+      ctaLabel: campaign.ctaLabel,
+      ctaUrl: campaign.ctaUrl,
+      placement: campaign.placement,
+      status: campaign.status,
+      createdByUserId: campaign.createdByUserId,
+      createdByRole: campaign.createdByRole,
+      approvedByUserId: campaign.approvedByUserId,
+      submittedAt: campaign.submittedAt,
+      approvedAt: campaign.approvedAt,
+      rejectedAt: campaign.rejectedAt,
+      rejectionReason: campaign.rejectionReason,
+      startsAt: campaign.startsAt,
+      endsAt: campaign.endsAt,
+      impressions: campaign.impressions,
+      clicks: campaign.clicks,
+      dismissals: campaign.dismissals,
+      ctr,
+      createdAt: campaign.createdAt,
+      updatedAt: campaign.updatedAt,
+    };
+  }
+
+  private validateCampaignDates(startsAt?: Date | null, endsAt?: Date | null) {
+    if (startsAt && endsAt && endsAt <= startsAt) {
+      throw new BadRequestException('Campaign end date must be after its start date.');
+    }
+  }
+
+  private canAccessCampaign(campaign: PlatformNotification, actor: { userId: string; role: string }) {
+    return actor.role === 'admin'
+      || actor.role === 'super_admin'
+      || (actor.role === 'sales' && campaign.createdByUserId === actor.userId);
+  }
+
+  private audienceMatches(audience: string, user: User) {
+    const value = String(audience || 'All users').trim().toLowerCase();
+    if (value === 'all' || value === 'all users' || value === 'everyone') return true;
+    if (value.includes('premium')) return user.plan === 'gold' || user.plan === 'platinum';
+    if (value.includes('free')) return user.plan === 'free';
+    if (value.includes('gold')) return user.plan === 'gold';
+    if (value.includes('platinum') || value.includes('elite')) return user.plan === 'platinum';
+    if (value.startsWith('city:')) return String(user.city || '').toLowerCase() === value.slice(5).trim();
+    return false;
+  }
+
+  private async visibleCampaignForUser(id: string, request: any) {
+    const user = await this.userRepo.findOne({ where: { id: this.requestUser(request).userId } });
+    const campaign = await this.notificationRepo.findOne({ where: { id, status: 'active' } });
+    const now = new Date();
+    if (!user
+      || !campaign
+      || (campaign.startsAt && campaign.startsAt > now)
+      || (campaign.endsAt && campaign.endsAt < now)
+      || !this.audienceMatches(campaign.audience, user)) {
+      throw new NotFoundException('Campaign not found.');
+    }
+    return campaign;
   }
 
   private initials(name: string) {
@@ -199,27 +369,7 @@ export class PlatformApiController {
   }
 
   private normalizeSubscriptionPlan(plan: SubscriptionPlan) {
-    const canonical: Record<string, { displayName: string; price: number; currency: string; features: string[] }> = {
-      free: {
-        displayName: 'Basic Plan',
-        price: 0,
-        currency: 'INR',
-        features: ['20 Likes per day', 'Basic Matching', 'Chat after Match', 'View Basic Profile'],
-      },
-      gold: {
-        displayName: 'Premium Plan',
-        price: 199,
-        currency: 'INR',
-        features: ['Unlimited Likes', 'See Who Liked You', '5 Super Likes per day', 'Profile Boost (1 per week)', 'No Ads', 'Priority Matching'],
-      },
-      platinum: {
-        displayName: 'Elite Plan',
-        price: 399,
-        currency: 'INR',
-        features: ['Unlimited Likes', 'See Who Liked You', 'Unlimited Super Likes', 'Unlimited Profile Boost', 'Priority Matching', 'Advanced Filters', 'Top Search Ranking', 'Premium Badge', 'No Ads'],
-      },
-    };
-    return canonical[plan.name] || {
+    return {
       displayName: plan.displayName,
       price: Number(plan.price),
       currency: plan.currency,
@@ -250,8 +400,18 @@ export class PlatformApiController {
       .where('payment.status = :status', { status: 'successful' })
       .getRawOne();
     const totalRevenue = Number(revenue?.total || 0);
-    const users = await this.userRepo.find({ select: ['createdAt'] });
+    const users = await this.userRepo.find({ select: ['createdAt', 'plan', 'status'] });
     const matches = await this.matchRepo.find({ select: ['createdAt'] });
+    const payments = await this.paymentRepo.find({ where: { status: 'successful' }, select: ['amount', 'createdAt'] });
+    const reports = await this.contactRepo.find({ select: ['createdAt', 'status'] });
+    const now = Date.now();
+    const currentStart = now - 30 * 86400000;
+    const previousStart = now - 60 * 86400000;
+    const countPeriod = <T extends { createdAt: Date }>(rows: T[], start: number, end: number) =>
+      rows.filter((row) => new Date(row.createdAt).getTime() >= start && new Date(row.createdAt).getTime() < end).length;
+    const sumPeriod = (rows: Payment[], start: number, end: number) =>
+      rows.filter((row) => new Date(row.createdAt).getTime() >= start && new Date(row.createdAt).getTime() < end)
+        .reduce((sum, row) => sum + Number(row.amount), 0);
     const monthly: Record<string, { m: string; users: number; matches: number }> = {};
     const ensureMonth = (date: Date) => {
       const key = date.toLocaleString('en-US', { month: 'short' });
@@ -268,19 +428,21 @@ export class PlatformApiController {
 
     return {
       stats: [
-        { label: 'Total Users', value: String(totalUsers), delta: '+4.2%' },
-        { label: 'Active Users', value: String(activeUsers), delta: '+2.8%' },
-        { label: 'Matches Done', value: String(matchesDone), delta: '+6.1%' },
-        { label: 'Total Revenue', value: `$${totalRevenue.toLocaleString()}`, delta: '+11.6%' },
-        { label: 'Pending Reports', value: String(pendingReports), delta: '-1.3%' },
-        { label: 'Premium Users', value: String(premiumUsers), delta: '+2.1%' },
+        { label: 'Total Users', value: String(totalUsers), delta: this.periodDelta(countPeriod(users, currentStart, now), countPeriod(users, previousStart, currentStart)) },
+        { label: 'Active Users', value: String(activeUsers), delta: 'Live DB' },
+        { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
+        { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
+        { label: 'Pending Reports', value: String(pendingReports), delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart)) },
+        { label: 'Premium Users', value: String(premiumUsers), delta: this.periodDelta(countPeriod(users.filter((user) => user.plan !== 'free'), currentStart, now), countPeriod(users.filter((user) => user.plan !== 'free'), previousStart, currentStart)) },
       ],
       growth,
     };
   }
 
   @Get('users')
+  @Roles('admin', 'super_admin', 'sales', 'support')
   async users(
+    @Req() request: any,
     @Query('search') search?: string,
     @Query('page') pageValue?: string,
     @Query('limit') limitValue?: string,
@@ -305,6 +467,7 @@ export class PlatformApiController {
     }
 
     const [users, total] = await query.skip((page - 1) * limit).take(limit).getManyAndCount();
+    const actor = this.requestUser(request);
     return {
       total,
       page,
@@ -314,7 +477,7 @@ export class PlatformApiController {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
         plan: user.plan,
         account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
         city: user.city || 'Unknown',
@@ -327,6 +490,7 @@ export class PlatformApiController {
   }
 
   @Post('users')
+  @Roles('super_admin')
   async createUser(@Body() body: CreatePlatformUserDto) {
     const existing = await this.userRepo.findOne({ where: { email: body.email } });
     if (existing) return { message: 'A user with this email already exists.', user: existing };
@@ -349,14 +513,27 @@ export class PlatformApiController {
   }
 
   @Get('users/:id')
-  async getUserDetails(@Param('id') id: string) {
+  @Roles('admin', 'super_admin', 'sales', 'support')
+  async getUserDetails(@Param('id') id: string, @Req() request: any) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
+    const actor = this.requestUser(request);
+    const necessary = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      city: user.city,
+      isVerified: user.isVerified,
+      plan: user.plan,
+      account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
+      ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
+      status: this.statusLabel(user.status),
+      joined: user.createdAt,
+      lastActive: user.lastSeen || user.updatedAt,
+    };
     return {
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
+      user: actor.role === 'super_admin' ? {
+        ...necessary,
         age: user.age,
         birthDate: user.birthDate,
         gender: user.gender,
@@ -370,17 +547,12 @@ export class PlatformApiController {
         hobbies: user.hobbies || [],
         avatarUrl: user.avatarUrl,
         photos: user.photos || [],
-        isVerified: user.isVerified,
-        plan: user.plan,
-        role: user.role,
-        status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review',
-        joined: user.createdAt,
-        lastActive: user.lastSeen || user.updatedAt,
-      }
+      } : necessary,
     };
   }
 
   @Patch('users/:id')
+  @Roles('super_admin')
   async updateUser(@Param('id') id: string, @Body() body: UpdatePlatformUserDto) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
@@ -392,7 +564,7 @@ export class PlatformApiController {
 
     const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
     const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
-    const role = ['user', 'admin', 'super_admin', 'marketing', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
+    const role = ['user', 'admin', 'super_admin', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
 
     Object.assign(user, {
       ...(body.name !== undefined ? { name: body.name } : {}),
@@ -421,16 +593,29 @@ export class PlatformApiController {
   }
 
   @Patch('users/:id/status')
+  @Roles('admin', 'super_admin')
   async updateUserStatus(@Param('id') id: string, @Body('status') status: 'active' | 'suspended' | 'banned' | 'pending_verification') {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
     user.status = status;
     await this.userRepo.save(user);
     await this.audit('Users', 'Update Status', `Updated user ${user.email} status to ${status}`);
-    return { success: true, user };
+    return {
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        plan: user.plan,
+        status: user.status,
+        isVerified: user.isVerified,
+      },
+    };
   }
 
   @Delete('users/:id')
+  @Roles('super_admin')
   async deleteUser(@Param('id') id: string) {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
@@ -441,7 +626,8 @@ export class PlatformApiController {
 
 
   @Get('verification')
-  async verification() {
+  async verification(@Req() request: any) {
+    const includePrivateMedia = this.requestUser(request).role === 'super_admin';
     const pending = await this.verificationRepo.find({
       relations: ['user'],
       order: { createdAt: 'DESC' },
@@ -472,9 +658,11 @@ export class PlatformApiController {
           priority: request.priority === 'high' ? 'High' : request.priority === 'low' ? 'Low' : 'Normal',
           status: request.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
           date: request.createdAt,
-          documents: request.documents || [],
-          photo: request.user?.avatarUrl || null,
-          birthDate: request.user?.birthDate || null,
+          ...(includePrivateMedia ? {
+            documents: request.documents || [],
+            photo: request.user?.avatarUrl || null,
+            birthDate: request.user?.birthDate || null,
+          } : {}),
         })),
         ...kycUsers
           .filter((user) => !requestedUserIds.has(user.id) && !user.isVerified)
@@ -486,10 +674,12 @@ export class PlatformApiController {
             priority: user.kycMatched ? 'Normal' : 'High',
             status: user.isVerified ? 'Approved' : user.kycMatched ? 'Pending' : 'Under Review',
             date: user.kycVerifiedAt || user.updatedAt || user.createdAt,
-            documents: [user.kycLivePhoto].filter(Boolean),
-            photo: user.avatarUrl || user.photos?.[0] || null,
-            birthDate: user.birthDate || null,
-            matchScore: user.kycMatchScore,
+            ...(includePrivateMedia ? {
+              documents: [user.kycLivePhoto].filter(Boolean),
+              photo: user.avatarUrl || user.photos?.[0] || null,
+              birthDate: user.birthDate || null,
+              matchScore: user.kycMatchScore,
+            } : {}),
           })),
         ...reviewUsers
           .filter((user) => !requestedUserIds.has(user.id) && !kycUserIds.has(user.id))
@@ -501,9 +691,11 @@ export class PlatformApiController {
             priority: user.status === 'pending_verification' ? 'High' : 'Low',
             status: user.status === 'pending_verification' ? 'Pending' : 'Unverified',
             date: user.updatedAt || user.createdAt,
-            documents: user.photos || [],
-            photo: user.avatarUrl || user.photos?.[0] || null,
-            birthDate: user.birthDate || null,
+            ...(includePrivateMedia ? {
+              documents: user.photos || [],
+              photo: user.avatarUrl || user.photos?.[0] || null,
+              birthDate: user.birthDate || null,
+            } : {}),
           })),
       ],
     };
@@ -566,16 +758,15 @@ export class PlatformApiController {
   }
 
   @Get('notifications')
-  async notifications() {
-    const notifications = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
+  @Roles('admin', 'super_admin', 'sales')
+  async notifications(@Req() request: any) {
+    const actor = this.requestUser(request);
+    const notifications = await this.notificationRepo.find({
+      ...(actor.role === 'sales' ? { where: { createdByUserId: actor.userId } } : {}),
+      order: { createdAt: 'DESC' },
+    });
     return {
-      notifications: notifications.map((notification) => ({
-        id: notification.id,
-        campaign: notification.campaign,
-        type: notification.type,
-        audience: notification.audience,
-        status: notification.status.replace(/\b\w/g, (c) => c.toUpperCase()),
-      })),
+      notifications: notifications.map((notification) => this.campaignResponse(notification)),
     };
   }
 
@@ -608,34 +799,203 @@ export class PlatformApiController {
   }
 
   @Post('notifications')
-  async createNotification(@Body() body: CreateNotificationDto) {
+  @Roles('admin', 'super_admin', 'sales')
+  async createNotification(@Body() body: CreateNotificationDto, @Req() request: any) {
+    const actor = this.requestUser(request);
+    const startsAt = body.startsAt ? new Date(body.startsAt) : null;
+    const endsAt = body.endsAt ? new Date(body.endsAt) : null;
+    this.validateCampaignDates(startsAt, endsAt);
+    const activateNow = (actor.role === 'admin' || actor.role === 'super_admin') && body.status === 'active';
+    const now = new Date();
     const notification = await this.notificationRepo.save(this.notificationRepo.create({
       campaign: body.campaign || 'Untitled campaign',
-      type: body.type || 'Push',
+      type: body.type || 'In-app',
       audience: body.audience || 'All users',
-      status: (body.status as NotificationStatus) || 'draft',
+      description: body.description,
+      discountPercent: body.discountPercent ?? null,
+      ctaLabel: body.ctaLabel?.trim() || 'View offer',
+      ctaUrl: body.ctaUrl?.trim() || '/user/premium',
+      placement: 'user_dashboard',
+      status: activateNow ? 'active' : 'draft',
+      createdByUserId: actor.userId,
+      createdByRole: actor.role,
+      approvedByUserId: activateNow ? actor.userId : null,
+      approvedAt: activateNow ? now : null,
+      startsAt,
+      endsAt,
     }));
-    await this.audit('Notifications', 'Create', `Created notification campaign ${notification.campaign}`);
-    return notification;
+    await this.audit('Campaigns', 'Create', `${actor.role} created campaign ${notification.campaign}`);
+    return this.campaignResponse(notification);
+  }
+
+  @Patch('notifications/:id')
+  @Roles('admin', 'super_admin', 'sales')
+  async updateNotification(@Param('id') id: string, @Body() body: UpdateNotificationDto, @Req() request: any) {
+    const actor = this.requestUser(request);
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) throw new NotFoundException('Campaign not found.');
+    if (!this.canAccessCampaign(notification, actor)) throw new ForbiddenException('You cannot edit this campaign.');
+    if (actor.role === 'sales' && !['draft', 'rejected'].includes(notification.status)) {
+      throw new ForbiddenException('Sales can edit only draft or rejected campaigns.');
+    }
+    const startsAt = body.startsAt !== undefined ? (body.startsAt ? new Date(body.startsAt) : null) : notification.startsAt;
+    const endsAt = body.endsAt !== undefined ? (body.endsAt ? new Date(body.endsAt) : null) : notification.endsAt;
+    this.validateCampaignDates(startsAt, endsAt);
+    Object.assign(notification, {
+      ...(body.campaign !== undefined ? { campaign: body.campaign.trim() } : {}),
+      ...(body.audience !== undefined ? { audience: body.audience.trim() } : {}),
+      ...(body.description !== undefined ? { description: body.description.trim() } : {}),
+      ...(body.discountPercent !== undefined ? { discountPercent: body.discountPercent } : {}),
+      ...(body.ctaLabel !== undefined ? { ctaLabel: body.ctaLabel.trim() } : {}),
+      ...(body.ctaUrl !== undefined ? { ctaUrl: body.ctaUrl.trim() } : {}),
+      ...(body.startsAt !== undefined ? { startsAt } : {}),
+      ...(body.endsAt !== undefined ? { endsAt } : {}),
+      ...(notification.status === 'rejected' ? {
+        status: 'draft' as NotificationStatus,
+        rejectedAt: null,
+        rejectionReason: null,
+      } : {}),
+    });
+    const saved = await this.notificationRepo.save(notification);
+    await this.audit('Campaigns', 'Update', `${actor.role} updated campaign ${saved.campaign}`);
+    return this.campaignResponse(saved);
+  }
+
+  @Post('notifications/:id/submit')
+  @Roles('admin', 'super_admin', 'sales')
+  async submitNotification(@Param('id') id: string, @Req() request: any) {
+    const actor = this.requestUser(request);
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) throw new NotFoundException('Campaign not found.');
+    if (!this.canAccessCampaign(notification, actor)) throw new ForbiddenException('You cannot submit this campaign.');
+    if (!['draft', 'rejected'].includes(notification.status)) {
+      throw new BadRequestException('Only draft or rejected campaigns can be submitted.');
+    }
+    notification.status = 'pending_approval';
+    notification.submittedAt = new Date();
+    notification.rejectedAt = null;
+    notification.rejectionReason = null;
+    const saved = await this.notificationRepo.save(notification);
+    await this.audit('Campaigns', 'Submit', `${actor.role} submitted campaign ${saved.campaign} for approval`);
+    return this.campaignResponse(saved);
+  }
+
+  @Post('notifications/:id/approve')
+  @Roles('admin', 'super_admin')
+  async approveNotification(@Param('id') id: string, @Req() request: any) {
+    const actor = this.requestUser(request);
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) throw new NotFoundException('Campaign not found.');
+    if (!['pending_approval', 'draft'].includes(notification.status)) {
+      throw new BadRequestException('Only submitted or admin-created draft campaigns can be approved.');
+    }
+    notification.status = 'active';
+    notification.approvedByUserId = actor.userId;
+    notification.approvedAt = new Date();
+    notification.rejectedAt = null;
+    notification.rejectionReason = null;
+    const saved = await this.notificationRepo.save(notification);
+    await this.audit('Campaigns', 'Approve', `${actor.role} approved campaign ${saved.campaign}`);
+    return this.campaignResponse(saved);
+  }
+
+  @Post('notifications/:id/reject')
+  @Roles('admin', 'super_admin')
+  async rejectNotification(@Param('id') id: string, @Body() body: RejectNotificationDto, @Req() request: any) {
+    const actor = this.requestUser(request);
+    const notification = await this.notificationRepo.findOne({ where: { id } });
+    if (!notification) throw new NotFoundException('Campaign not found.');
+    if (notification.status !== 'pending_approval') throw new BadRequestException('Only submitted campaigns can be rejected.');
+    notification.status = 'rejected';
+    notification.rejectionReason = body.reason.trim();
+    notification.rejectedAt = new Date();
+    notification.approvedByUserId = null;
+    notification.approvedAt = null;
+    const saved = await this.notificationRepo.save(notification);
+    await this.audit('Campaigns', 'Reject', `${actor.role} rejected campaign ${saved.campaign}`);
+    return this.campaignResponse(saved);
   }
 
   @Patch('notifications/:id/status')
+  @Roles('admin', 'super_admin')
   async updateNotificationStatus(@Param('id') id: string, @Body('status') status: NotificationStatus) {
+    const allowed: NotificationStatus[] = ['active', 'paused', 'expired'];
+    if (!allowed.includes(status)) throw new BadRequestException('Unsupported campaign status change.');
     const notification = await this.notificationRepo.findOne({ where: { id } });
-    if (!notification) return { message: 'Notification campaign not found.' };
+    if (!notification) throw new NotFoundException('Campaign not found.');
     notification.status = status;
     await this.notificationRepo.save(notification);
-    await this.audit('Notifications', 'Update', `Changed ${notification.campaign} to ${status}`);
-    return notification;
+    await this.audit('Campaigns', 'Status', `Changed ${notification.campaign} to ${status}`);
+    return this.campaignResponse(notification);
   }
 
   @Delete('notifications/:id')
-  async deleteNotification(@Param('id') id: string) {
+  @Roles('admin', 'super_admin', 'sales')
+  async deleteNotification(@Param('id') id: string, @Req() request: any) {
+    const actor = this.requestUser(request);
     const notification = await this.notificationRepo.findOne({ where: { id } });
     if (!notification) return { deleted: true };
+    if (!this.canAccessCampaign(notification, actor)) throw new ForbiddenException('You cannot delete this campaign.');
+    if (actor.role === 'sales' && !['draft', 'rejected'].includes(notification.status)) {
+      throw new ForbiddenException('Sales can delete only draft or rejected campaigns.');
+    }
     await this.notificationRepo.remove(notification);
-    await this.audit('Notifications', 'Delete', `Deleted notification campaign ${notification.campaign}`);
+    await this.audit('Campaigns', 'Delete', `${actor.role} deleted campaign ${notification.campaign}`);
     return { deleted: true };
+  }
+
+  @Get('campaigns/active')
+  @Roles('user')
+  async activeUserCampaigns(@Req() request: any) {
+    const user = await this.userRepo.findOne({ where: { id: this.requestUser(request).userId } });
+    if (!user) throw new NotFoundException('User not found.');
+    const now = new Date();
+    const campaigns = await this.notificationRepo.find({
+      where: { status: 'active' },
+      order: { approvedAt: 'DESC', createdAt: 'DESC' },
+      take: 100,
+    });
+    return {
+      campaigns: campaigns
+        .filter((campaign) => (!campaign.startsAt || campaign.startsAt <= now)
+          && (!campaign.endsAt || campaign.endsAt >= now)
+          && this.audienceMatches(campaign.audience, user))
+        .slice(0, 10)
+        .map((campaign) => ({
+          id: campaign.id,
+          title: campaign.campaign,
+          description: campaign.description,
+          discountPercent: campaign.discountPercent,
+          ctaLabel: campaign.ctaLabel,
+          ctaUrl: campaign.ctaUrl,
+          startsAt: campaign.startsAt,
+          endsAt: campaign.endsAt,
+        })),
+    };
+  }
+
+  @Post('campaigns/:id/impression')
+  @Roles('user')
+  async recordCampaignImpression(@Param('id') id: string, @Req() request: any) {
+    await this.visibleCampaignForUser(id, request);
+    await this.notificationRepo.increment({ id }, 'impressions', 1);
+    return { recorded: true };
+  }
+
+  @Post('campaigns/:id/click')
+  @Roles('user')
+  async recordCampaignClick(@Param('id') id: string, @Req() request: any) {
+    await this.visibleCampaignForUser(id, request);
+    await this.notificationRepo.increment({ id }, 'clicks', 1);
+    return { recorded: true };
+  }
+
+  @Post('campaigns/:id/dismiss')
+  @Roles('user')
+  async recordCampaignDismiss(@Param('id') id: string, @Req() request: any) {
+    await this.visibleCampaignForUser(id, request);
+    await this.notificationRepo.increment({ id }, 'dismissals', 1);
+    return { recorded: true };
   }
 
   @Get('security')
@@ -656,6 +1016,7 @@ export class PlatformApiController {
   }
 
   @Get('settings')
+  @Roles('super_admin')
   async settings() {
     const setting = await this.settingRepo.findOne({ where: { key: 'platform_flags' } });
     const value = (setting?.value || {}) as Record<string, boolean>;
@@ -670,6 +1031,7 @@ export class PlatformApiController {
   }
 
   @Patch('settings')
+  @Roles('super_admin')
   async updateSettings(@Body() settings: Record<string, boolean>) {
     await this.settingRepo.save(this.settingRepo.create({ key: 'platform_flags', value: settings }));
     await this.audit('Settings', 'Update', 'Updated platform settings');
@@ -677,11 +1039,12 @@ export class PlatformApiController {
   }
 
   @Get('roles')
+  @Roles('super_admin')
   async roles() {
     const users = await this.userRepo.find({ select: ['role'] });
     const roles = (await this.roleRepo.find({ order: { role: 'ASC' } })).filter((role) => {
       const key = role.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-      return key !== 'data_entry' && key !== 'finance';
+      return key !== 'data_entry' && key !== 'finance' && key !== 'marketing';
     });
     const counts = users.reduce<Record<string, number>>((acc, user) => {
       acc[user.role] = (acc[user.role] || 0) + 1;
@@ -702,9 +1065,10 @@ export class PlatformApiController {
   }
 
   @Post('roles')
+  @Roles('super_admin')
   async createRole(@Body() body: CreateRoleDto) {
     const roleKey = body.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    if (roleKey === 'data_entry' || roleKey === 'finance') {
+    if (roleKey === 'data_entry' || roleKey === 'finance' || roleKey === 'marketing') {
       throw new BadRequestException('This role is no longer available.');
     }
     const role = await this.roleRepo.save(this.roleRepo.create({
@@ -717,10 +1081,21 @@ export class PlatformApiController {
   }
 
   @Patch('roles/:id')
+  @Roles('super_admin')
   async updateRole(@Param('id') id: string, @Body() body: Partial<PlatformRole>) {
     const role = await this.roleRepo.findOne({ where: { id } });
     if (!role) return { message: 'Role not found.' };
-    Object.assign(role, body);
+    if (body.role) {
+      const roleKey = body.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+      if (roleKey === 'data_entry' || roleKey === 'finance' || roleKey === 'marketing') {
+        throw new BadRequestException('This role is no longer available.');
+      }
+    }
+    Object.assign(role, {
+      ...(body.role !== undefined ? { role: body.role } : {}),
+      ...(body.permissions !== undefined ? { permissions: body.permissions } : {}),
+      ...(body.status !== undefined ? { status: body.status } : {}),
+    });
     await this.roleRepo.save(role);
     await this.audit('Roles', 'Update', `Updated role ${role.role}`);
     return role;
@@ -769,97 +1144,29 @@ export class PlatformApiController {
     return request;
   }
 
-  @Get('marketing/overview')
-  async marketingOverview() {
-    const users = await this.userRepo.find({ order: { createdAt: 'ASC' } });
-    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
-    const weekly: Record<string, { day: string; spend: number; users: number }> = {};
-    users.forEach((user) => {
-      const day = this.dayKey(user.createdAt);
-      weekly[day] ||= { day, spend: 0, users: 0 };
-      weekly[day].users += 1;
-      weekly[day].spend += 300 + weekly[day].users * 18;
-    });
-    const channelData = [
-      { channel: 'Organic', value: users.filter((u) => u.plan === 'free').length },
-      { channel: 'Premium Referral', value: users.filter((u) => u.plan !== 'free').length },
-      { channel: 'Campaigns', value: campaigns.length },
-      { channel: 'Support Leads', value: await this.contactRepo.count() },
-    ];
-    const totalSpend = Object.values(weekly).reduce((sum, row) => sum + row.spend, 0);
-    const premiumUsers = users.filter((u) => u.plan !== 'free').length;
-    const conversionRate = users.length ? ((premiumUsers / users.length) * 100).toFixed(1) : '0.0';
-    return {
-      kpis: [
-        { label: 'Total Marketing Spend', value: `$${totalSpend.toLocaleString()}`, delta: '+8.4%' },
-        { label: 'New Users Acquired', value: users.length.toLocaleString(), delta: '+4.2%' },
-        { label: 'Active Campaigns', value: String(campaigns.filter((c) => c.status === 'active').length), delta: `${campaigns.length} total` },
-        { label: 'Cost Per Acquisition', value: `$${users.length ? (totalSpend / users.length).toFixed(2) : '0.00'}`, delta: '-2.1%' },
-        { label: 'Conversion Rate', value: `${conversionRate}%`, delta: '+1.1%' },
-      ],
-      spendTrend: Object.values(weekly),
-      channelData,
-    };
-  }
-
-  @Get('marketing/campaigns')
-  async marketingCampaigns() {
-    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
-    return {
-      campaigns: campaigns.map((c, index) => ({
-        id: c.id,
-        name: c.campaign,
-        channel: c.type,
-        status: c.status,
-        audience: c.audience,
-        spend: 1200 + index * 730,
-        conversions: 80 + index * 31,
-        roi: 1.8 + index * 0.2,
-      })),
-    };
-  }
-
-  @Get('marketing/reports')
-  async marketingReports() {
-    const users = await this.userRepo.find({ select: ['createdAt', 'plan'] });
-    const campaigns = await this.notificationRepo.find({ order: { createdAt: 'DESC' } });
-    const contacts = await this.contactRepo.count();
-    const premiumUsers = users.filter((user) => user.plan !== 'free').length;
-
-    return {
-      reports: [
-        {
-          title: 'Daily Report',
-          desc: 'Users, campaigns, and support leads created today.',
-          meta: `${users.filter((user) => user.createdAt.toDateString() === new Date().toDateString()).length} users today`,
-          type: 'daily',
-        },
-        {
-          title: 'Users Report',
-          desc: 'Live user acquisition and premium conversion summary.',
-          meta: `${users.length} users, ${premiumUsers} premium`,
-          type: 'users',
-        },
-        {
-          title: 'Campaigns Report',
-          desc: 'Notification campaigns currently stored in the platform.',
-          meta: `${campaigns.length} campaigns`,
-          type: 'campaigns',
-        },
-        {
-          title: 'Leads Report',
-          desc: 'Support/contact leads submitted from the website.',
-          meta: `${contacts} leads`,
-          type: 'leads',
-        },
-      ],
-    };
-  }
-
   @Get('sales/overview')
+  @Roles('sales', 'admin', 'super_admin')
   async salesOverview() {
     const payments = await this.paymentRepo.find({ relations: ['user'], order: { createdAt: 'ASC' } });
     const users = await this.userRepo.find();
+    const successfulPayments = payments.filter((payment) => payment.status === 'successful');
+    const now = Date.now();
+    const currentStart = now - 30 * 86400000;
+    const previousStart = now - 60 * 86400000;
+    const premiumUsers = users.filter((user) => user.plan !== 'free');
+    const currentPremiumSignups = premiumUsers.filter((user) => new Date(user.createdAt).getTime() >= currentStart).length;
+    const previousPremiumSignups = premiumUsers.filter((user) => {
+      const created = new Date(user.createdAt).getTime();
+      return created >= previousStart && created < currentStart;
+    }).length;
+    const paymentCountByUser = successfulPayments.reduce<Record<string, number>>((acc, payment) => {
+      if (payment.userId) acc[payment.userId] = (acc[payment.userId] || 0) + 1;
+      return acc;
+    }, {});
+    const payingUserIds = Object.keys(paymentCountByUser);
+    const renewedUserIds = payingUserIds.filter((userId) => paymentCountByUser[userId] > 1);
+    const renewalRate = payingUserIds.length ? (renewedUserIds.length / payingUserIds.length) * 100 : null;
+    const conversionRate = users.length ? (premiumUsers.length / users.length) * 100 : 0;
     const revenueData: Record<string, { day: string; revenue: number; signups: number }> = {};
     payments.forEach((payment) => {
       const day = this.dayKey(payment.createdAt);
@@ -877,23 +1184,24 @@ export class PlatformApiController {
     }, {})).map(([name, value]) => ({ name, value }));
     return {
       kpis: [
-        { label: 'Total Subscriptions', value: String(users.filter((u) => u.plan !== 'free').length), delta: 8.4 },
-        { label: 'New Premium Users', value: String(users.filter((u) => u.plan !== 'free').length), delta: 4.1 },
-        { label: 'Renewal Rate', value: '78.6%', delta: 2.3 },
-        { label: 'Conversion Rate', value: `${users.length ? ((users.filter((u) => u.plan !== 'free').length / users.length) * 100).toFixed(1) : '0.0'}%`, delta: -1.1 },
+        { label: 'Total Subscriptions', value: String(premiumUsers.length), delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', '')) },
+        { label: 'New Premium Users', value: String(currentPremiumSignups), delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', '')) },
+        { label: 'Renewal Rate', value: renewalRate === null ? '—' : `${renewalRate.toFixed(1)}%`, delta: 0 },
+        { label: 'Conversion Rate', value: `${conversionRate.toFixed(1)}%`, delta: 0 },
       ],
       revenueData: Object.values(revenueData),
       planSplit,
-      recentUpgrades: payments.slice(-5).reverse().map((p) => ({
+      recentUpgrades: successfulPayments.slice(-5).reverse().map((p) => ({
         name: p.user?.name || 'Deleted user',
         plan: p.planName,
-        amt: `$${Number(p.amount).toFixed(2)}`,
+        amt: `${this.currencySymbol(p.currency)}${Number(p.amount).toFixed(2)}`,
         t: p.createdAt.toLocaleString(),
       })),
     };
   }
 
   @Get('sales/trends')
+  @Roles('sales', 'admin', 'super_admin')
   async salesTrends() {
     const payments = await this.paymentRepo.find({ order: { createdAt: 'ASC' } });
     const successful = payments.filter((payment) => payment.status === 'successful');
@@ -937,6 +1245,7 @@ export class PlatformApiController {
   }
 
   @Get('sales/plans')
+  @Roles('sales', 'admin', 'super_admin')
   async salesPlans() {
     const plans = await this.planRepo.find({ order: { sortOrder: 'ASC' } });
     const users = await this.userRepo.find({ select: ['plan', 'city'] });
@@ -973,6 +1282,7 @@ export class PlatformApiController {
   }
 
   @Get('logs')
+  @Roles('super_admin')
   async logs() {
     const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 250 });
     const now = Date.now();
@@ -998,11 +1308,25 @@ export class PlatformApiController {
   }
 
   @Get('super-admin')
+  @Roles('super_admin')
   async superAdmin() {
     const superAdmin = await this.userRepo.findOne({ where: { role: 'super_admin' } });
     if (!superAdmin) throw new NotFoundException('Super admin account not found. Run npm run db:setup in the backend.');
     const logs = await this.auditRepo.find({ order: { createdAt: 'DESC' }, take: 5 });
     const ipWhitelist = [...new Set(logs.map((log) => log.ipAddress).filter(Boolean))];
+    const modules = [
+      { name: 'Dashboard', icon: 'LayoutDashboard', route: '/super-admin', access: true, actions: [{ label: 'View', allowed: true }] },
+      { name: 'Users', icon: 'Users', route: '/super-admin/users', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'Verification', icon: 'ShieldCheck', route: '/super-admin/verification', access: true, actions: [{ label: 'Review', allowed: true }] },
+      { name: 'Payments', icon: 'CreditCard', route: '/super-admin/payments', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'Reports', icon: 'Flag', route: '/super-admin/reports', access: true, actions: [{ label: 'Moderate', allowed: true }] },
+      { name: 'Campaigns', icon: 'Bell', route: '/super-admin/notifications', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'Security', icon: 'Lock', route: '/super-admin/security', access: true, actions: [{ label: 'Audit', allowed: true }] },
+      { name: 'Settings', icon: 'Settings', route: '/super-admin/settings', access: true, actions: [{ label: 'Configure', allowed: true }] },
+      { name: 'Roles & Permissions', icon: 'KeyRound', route: '/super-admin/roles', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'System Logs', icon: 'ScrollText', route: '/super-admin/logs', access: true, actions: [{ label: 'View', allowed: true }] },
+      { name: 'Super Admin Profile', icon: 'User', route: '/super-admin/super-admin', access: true, actions: [{ label: 'Update', allowed: true }] },
+    ];
 
     return {
       superAdmin: {
@@ -1024,23 +1348,11 @@ export class PlatformApiController {
         },
         accessLevel: {
           level: 'Owner',
-          totalPermissions: 42,
-          modulesAccessible: 10,
+          totalPermissions: modules.reduce((count, module) => count + module.actions.filter((action) => action.allowed).length, 0),
+          modulesAccessible: modules.filter((module) => module.access).length,
           description: 'Full platform access',
         },
-        modules: [
-          { name: 'Dashboard', icon: 'LayoutDashboard', route: '/super-admin', access: true, actions: [{ label: 'View', allowed: true }] },
-          { name: 'Users', icon: 'Users', route: '/super-admin/users', access: true, actions: [{ label: 'Manage', allowed: true }] },
-          { name: 'Verification', icon: 'ShieldCheck', route: '/super-admin/verification', access: true, actions: [{ label: 'Review', allowed: true }] },
-          { name: 'Payments', icon: 'CreditCard', route: '/super-admin/payments', access: true, actions: [{ label: 'Manage', allowed: true }] },
-          { name: 'Reports', icon: 'Flag', route: '/super-admin/reports', access: true, actions: [{ label: 'Moderate', allowed: true }] },
-          { name: 'Notifications', icon: 'Bell', route: '/super-admin/notifications', access: true, actions: [{ label: 'Send', allowed: true }] },
-          { name: 'Security', icon: 'Lock', route: '/super-admin/security', access: true, actions: [{ label: 'Audit', allowed: true }] },
-          { name: 'Settings', icon: 'Settings', route: '/super-admin/settings', access: true, actions: [{ label: 'Configure', allowed: true }] },
-          { name: 'Roles & Permissions', icon: 'KeyRound', route: '/super-admin/roles', access: true, actions: [{ label: 'Manage', allowed: true }] },
-          { name: 'System Logs', icon: 'ScrollText', route: '/super-admin/logs', access: true, actions: [{ label: 'View', allowed: true }] },
-          { name: 'Super Admin Profile', icon: 'User', route: '/super-admin/super-admin', access: true, actions: [{ label: 'Update', allowed: true }] },
-        ],
+        modules,
         activityLog: logs.map((log) => ({
           action: log.activity,
           time: log.createdAt.toLocaleString(),

@@ -11,6 +11,7 @@ import { PlatformNotification } from '../platform/platform-notification.entity';
 import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
+import { RolesGuard } from '../auth/roles.guard';
 
 @Module({
   imports: [
@@ -28,5 +29,6 @@ import { PlatformRole } from '../platform/role.entity';
     ]),
   ],
   controllers: [PlatformApiController],
+  providers: [RolesGuard],
 })
 export class ApiModule {}
