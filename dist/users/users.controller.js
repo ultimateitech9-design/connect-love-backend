@@ -30,6 +30,9 @@ let UsersController = class UsersController {
     /** GET /users/me — returns the currently authenticated user's profile */ getMe(req) {
         return this.usersService.findById(req.user.userId);
     }
+    /** GET /users/me/insights — real profile activity for the signed-in user */ getMyInsights(req) {
+        return this.usersService.getProfileInsights(req.user.userId);
+    }
     /** PATCH /users/me — update the currently authenticated user's profile */ updateMe(req, dto) {
         return this.usersService.update(req.user.userId, dto);
     }
@@ -74,6 +77,16 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UsersController.prototype, "getMe", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Get)('me/insights'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "getMyInsights", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Patch)('me'),

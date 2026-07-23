@@ -1,7 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { MoreThanOrEqual, Repository } from 'typeorm';
 import { User } from './user.entity';
+import { MatchRelation, MatchStatus } from '../matches/match.entity';
+import { ProfileView } from './profile-view.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { distanceBetweenKm } from '../location/distance';
 
@@ -17,6 +19,10 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(MatchRelation)
+    private readonly matchRepo: Repository<MatchRelation>,
+    @InjectRepository(ProfileView)
+    private readonly profileViewRepo: Repository<ProfileView>,
   ) {}
 
   serializeUser(user: User): any {
@@ -50,6 +56,7 @@ export class UsersService {
       this.userRepo.findOne({ where: { id: viewerId }, select: ['id', 'locationLatitude', 'locationLongitude'] }),
     ]);
     if (!user) throw new NotFoundException('User not found.');
+    await this.recordProfileView(id, viewerId);
     const distanceKm = user.showDistance && viewer
       ? distanceBetweenKm(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude)
       : null;
@@ -170,6 +177,93 @@ export class UsersService {
       updateData.lastSeen = new Date();
     }
     await this.userRepo.update(userId, updateData);
+  }
+
+  private async recordProfileView(profileUserId: string, viewerUserId: string): Promise<void> {
+    if (!viewerUserId || profileUserId === viewerUserId) return;
+
+    // Store at most one view per viewer/profile pair per day. This keeps reloads
+    // from inflating the insight while retaining a useful visit history.
+    const since = new Date();
+    since.setHours(0, 0, 0, 0);
+    const alreadyRecorded = await this.profileViewRepo.findOne({
+      where: { profileUserId, viewerUserId, createdAt: MoreThanOrEqual(since) },
+      select: ['id'],
+    });
+    if (!alreadyRecorded) {
+      await this.profileViewRepo.save(this.profileViewRepo.create({ profileUserId, viewerUserId }));
+    }
+  }
+
+  private compatibilityScore(owner: User, other: User): number {
+    const normalize = (values?: string[]) => new Set(
+      (values || []).map((value) => value.trim().toLowerCase()).filter(Boolean),
+    );
+    const overlap = (left?: string[], right?: string[]) => {
+      const a = normalize(left);
+      const b = normalize(right);
+      if (!a.size && !b.size) return null;
+      const shared = [...a].filter((value) => b.has(value)).length;
+      const total = new Set([...a, ...b]).size;
+      return total ? shared / total : 0;
+    };
+
+    const tagScores = [
+      overlap(owner.interests, other.interests),
+      overlap(owner.personalityWords, other.personalityWords),
+      overlap(owner.hobbies, other.hobbies),
+    ].filter((value): value is number => value !== null);
+    const tagAverage = tagScores.length
+      ? tagScores.reduce((sum, value) => sum + value, 0) / tagScores.length
+      : 0;
+    const sameGoal = owner.relationshipGoal && other.relationshipGoal
+      && owner.relationshipGoal.toLowerCase() === other.relationshipGoal.toLowerCase() ? 1 : 0;
+    const sameCity = owner.city && other.city
+      && owner.city.toLowerCase() === other.city.toLowerCase() ? 1 : 0;
+    const sameReligion = owner.religion && other.religion
+      && owner.religion.toLowerCase() === other.religion.toLowerCase() ? 1 : 0;
+
+    return Math.round((tagAverage * 0.7 + sameGoal * 0.15 + sameCity * 0.1 + sameReligion * 0.05) * 100);
+  }
+
+  async getProfileInsights(userId: string): Promise<{
+    profileViews7d: number;
+    likesReceived: number;
+    compatibilityAverage: number | null;
+  }> {
+    const owner = await this.userRepo.findOne({ where: { id: userId } });
+    if (!owner) throw new NotFoundException('User not found.');
+
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const viewsResult = await this.profileViewRepo
+      .createQueryBuilder('view')
+      .select('COUNT(DISTINCT view.viewerUserId)', 'count')
+      .where('view.profileUserId = :userId', { userId })
+      .andWhere('view.createdAt >= :sevenDaysAgo', { sevenDaysAgo })
+      .getRawOne();
+
+    const receivedLikes = await this.matchRepo.find({
+      where: [
+        { receiverId: userId, status: MatchStatus.PENDING },
+        { receiverId: userId, status: MatchStatus.MATCHED },
+      ],
+      select: ['senderId'],
+    });
+    const likerIds = [...new Set(receivedLikes.map((like) => like.senderId))];
+    const likers = likerIds.length
+      ? await this.userRepo.createQueryBuilder('user')
+        .where('user.id IN (:...likerIds)', { likerIds })
+        .getMany()
+      : [];
+    const scores = likers.map((liker) => this.compatibilityScore(owner, liker));
+
+    return {
+      profileViews7d: Number(viewsResult?.count || 0),
+      likesReceived: likerIds.length,
+      compatibilityAverage: scores.length
+        ? Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)
+        : null,
+    };
   }
 
   async rechargeCoins(userId: string, amount: number): Promise<{ coinBalance: number }> {

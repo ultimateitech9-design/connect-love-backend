@@ -14,6 +14,13 @@ export class UsersController {
     return this.usersService.findById(req.user.userId);
   }
 
+  /** GET /users/me/insights — real profile activity for the signed-in user */
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/insights')
+  getMyInsights(@Request() req: any) {
+    return this.usersService.getProfileInsights(req.user.userId);
+  }
+
   /** PATCH /users/me — update the currently authenticated user's profile */
   @UseGuards(AuthGuard('jwt'))
   @Patch('me')

@@ -15,6 +15,7 @@ import { PlatformRole } from './platform/role.entity';
 import { VideoCall } from './messages/video-call.entity';
 import { EmailRegistrationOtp } from './auth/email-registration-otp.entity';
 import { DivorcedLead } from './divorced/divorced-lead.entity';
+import { ProfileView } from './users/profile-view.entity';
 
 dotenv.config();
 
@@ -40,6 +41,7 @@ export default new DataSource({
     VideoCall,
     EmailRegistrationOtp,
     DivorcedLead,
+    ProfileView,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

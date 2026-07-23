@@ -12,6 +12,8 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _userentity = require("./user.entity");
+const _matchentity = require("../matches/match.entity");
+const _profileviewentity = require("./profile-view.entity");
 const _distance = require("../location/distance");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
@@ -80,6 +82,7 @@ let UsersService = class UsersService {
             })
         ]);
         if (!user) throw new _common.NotFoundException('User not found.');
+        await this.recordProfileView(id, viewerId);
         const distanceKm = user.showDistance && viewer ? (0, _distance.distanceBetweenKm)(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude) : null;
         return {
             id: user.id,
@@ -210,6 +213,96 @@ let UsersService = class UsersService {
         }
         await this.userRepo.update(userId, updateData);
     }
+    async recordProfileView(profileUserId, viewerUserId) {
+        if (!viewerUserId || profileUserId === viewerUserId) return;
+        // Store at most one view per viewer/profile pair per day. This keeps reloads
+        // from inflating the insight while retaining a useful visit history.
+        const since = new Date();
+        since.setHours(0, 0, 0, 0);
+        const alreadyRecorded = await this.profileViewRepo.findOne({
+            where: {
+                profileUserId,
+                viewerUserId,
+                createdAt: (0, _typeorm1.MoreThanOrEqual)(since)
+            },
+            select: [
+                'id'
+            ]
+        });
+        if (!alreadyRecorded) {
+            await this.profileViewRepo.save(this.profileViewRepo.create({
+                profileUserId,
+                viewerUserId
+            }));
+        }
+    }
+    compatibilityScore(owner, other) {
+        const normalize = (values)=>new Set((values || []).map((value)=>value.trim().toLowerCase()).filter(Boolean));
+        const overlap = (left, right)=>{
+            const a = normalize(left);
+            const b = normalize(right);
+            if (!a.size && !b.size) return null;
+            const shared = [
+                ...a
+            ].filter((value)=>b.has(value)).length;
+            const total = new Set([
+                ...a,
+                ...b
+            ]).size;
+            return total ? shared / total : 0;
+        };
+        const tagScores = [
+            overlap(owner.interests, other.interests),
+            overlap(owner.personalityWords, other.personalityWords),
+            overlap(owner.hobbies, other.hobbies)
+        ].filter((value)=>value !== null);
+        const tagAverage = tagScores.length ? tagScores.reduce((sum, value)=>sum + value, 0) / tagScores.length : 0;
+        const sameGoal = owner.relationshipGoal && other.relationshipGoal && owner.relationshipGoal.toLowerCase() === other.relationshipGoal.toLowerCase() ? 1 : 0;
+        const sameCity = owner.city && other.city && owner.city.toLowerCase() === other.city.toLowerCase() ? 1 : 0;
+        const sameReligion = owner.religion && other.religion && owner.religion.toLowerCase() === other.religion.toLowerCase() ? 1 : 0;
+        return Math.round((tagAverage * 0.7 + sameGoal * 0.15 + sameCity * 0.1 + sameReligion * 0.05) * 100);
+    }
+    async getProfileInsights(userId) {
+        const owner = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        if (!owner) throw new _common.NotFoundException('User not found.');
+        const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+        const viewsResult = await this.profileViewRepo.createQueryBuilder('view').select('COUNT(DISTINCT view.viewerUserId)', 'count').where('view.profileUserId = :userId', {
+            userId
+        }).andWhere('view.createdAt >= :sevenDaysAgo', {
+            sevenDaysAgo
+        }).getRawOne();
+        const receivedLikes = await this.matchRepo.find({
+            where: [
+                {
+                    receiverId: userId,
+                    status: _matchentity.MatchStatus.PENDING
+                },
+                {
+                    receiverId: userId,
+                    status: _matchentity.MatchStatus.MATCHED
+                }
+            ],
+            select: [
+                'senderId'
+            ]
+        });
+        const likerIds = [
+            ...new Set(receivedLikes.map((like)=>like.senderId))
+        ];
+        const likers = likerIds.length ? await this.userRepo.createQueryBuilder('user').where('user.id IN (:...likerIds)', {
+            likerIds
+        }).getMany() : [];
+        const scores = likers.map((liker)=>this.compatibilityScore(owner, liker));
+        return {
+            profileViews7d: Number(viewsResult?.count || 0),
+            likesReceived: likerIds.length,
+            compatibilityAverage: scores.length ? Math.round(scores.reduce((sum, score)=>sum + score, 0) / scores.length) : null
+        };
+    }
     async rechargeCoins(userId, amount) {
         const coins = Number(amount);
         if (!Number.isInteger(coins) || coins < 1 || coins > 100000) {
@@ -255,15 +348,21 @@ let UsersService = class UsersService {
             coinBalance: updated?.coinBalance || 0
         };
     }
-    constructor(userRepo){
+    constructor(userRepo, matchRepo, profileViewRepo){
         this.userRepo = userRepo;
+        this.matchRepo = matchRepo;
+        this.profileViewRepo = profileViewRepo;
     }
 };
 UsersService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(1, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_profileviewentity.ProfileView)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
     ])
 ], UsersService);

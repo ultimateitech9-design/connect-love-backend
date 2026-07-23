@@ -13,6 +13,8 @@ const _typeorm = require("@nestjs/typeorm");
 const _userscontroller = require("./users.controller");
 const _usersservice = require("./users.service");
 const _userentity = require("./user.entity");
+const _matchentity = require("../matches/match.entity");
+const _profileviewentity = require("./profile-view.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -25,7 +27,9 @@ UsersModule = _ts_decorate([
     (0, _common.Module)({
         imports: [
             _typeorm.TypeOrmModule.forFeature([
-                _userentity.User
+                _userentity.User,
+                _matchentity.MatchRelation,
+                _profileviewentity.ProfileView
             ])
         ],
         controllers: [
