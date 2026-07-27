@@ -9,7 +9,9 @@ import * as express from 'express';
 dotenv.config();
 
 function parseAllowedOrigins(): string[] {
-  const configured = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3002';
+  const configured = process.env.FRONTEND_ORIGINS
+    || process.env.FRONTEND_URL
+    || 'http://localhost:3002,https://connectlove.in,https://www.connectlove.in';
   return configured
     .split(',')
     .map((origin) => origin.trim())
