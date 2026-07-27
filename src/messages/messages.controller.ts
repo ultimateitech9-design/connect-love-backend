@@ -61,6 +61,11 @@ export class MessagesController {
     return this.messagesService.toggleStar(id, req.user.userId);
   }
 
+  @Patch(':id/reaction')
+  async toggleReaction(@Request() req, @Param('id') id: string, @Body('emoji') emoji: string) {
+    return this.messagesService.toggleReaction(id, req.user.userId, emoji);
+  }
+
   @Patch(':conversationId/read')
   async markAsRead(@Request() req, @Param('conversationId') conversationId: string) {
     await this.messagesService.markAsRead(conversationId, req.user.userId);
