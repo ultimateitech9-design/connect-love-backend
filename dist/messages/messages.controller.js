@@ -44,6 +44,9 @@ let MessagesController = class MessagesController {
     async deleteMessage(req, id, scope) {
         return this.messagesService.remove(id, req.user.userId, scope || 'me');
     }
+    async deleteMessageAction(req, id, scope) {
+        return this.messagesService.remove(id, req.user.userId, scope || 'me');
+    }
     async clearConversation(req, conversationId) {
         await this.messagesService.clearConversation(conversationId, req.user.userId);
         return {
@@ -58,6 +61,9 @@ let MessagesController = class MessagesController {
     }
     async toggleStar(req, id) {
         return this.messagesService.toggleStar(id, req.user.userId);
+    }
+    async toggleReaction(req, id, emoji) {
+        return this.messagesService.toggleReaction(id, req.user.userId, emoji);
     }
     async markAsRead(req, conversationId) {
         await this.messagesService.markAsRead(conversationId, req.user.userId);
@@ -135,6 +141,19 @@ _ts_decorate([
     _ts_metadata("design:returntype", Promise)
 ], MessagesController.prototype, "deleteMessage", null);
 _ts_decorate([
+    (0, _common.Post)(':id/delete'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Param)('id')),
+    _ts_param(2, (0, _common.Body)('scope')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        void 0,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesController.prototype, "deleteMessageAction", null);
+_ts_decorate([
     (0, _common.Delete)('conversation/:conversationId'),
     _ts_param(0, (0, _common.Request)()),
     _ts_param(1, (0, _common.Param)('conversationId')),
@@ -180,6 +199,19 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MessagesController.prototype, "toggleStar", null);
+_ts_decorate([
+    (0, _common.Patch)(':id/reaction'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Param)('id')),
+    _ts_param(2, (0, _common.Body)('emoji')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        void 0,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MessagesController.prototype, "toggleReaction", null);
 _ts_decorate([
     (0, _common.Patch)(':conversationId/read'),
     _ts_param(0, (0, _common.Request)()),

@@ -2,41 +2,44 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-Object.defineProperty(exports, "SupportModule", {
+Object.defineProperty(exports, "PushNotificationsModule", {
     enumerable: true,
     get: function() {
-        return SupportModule;
+        return PushNotificationsModule;
     }
 });
 const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
-const _supportcontroller = require("./support.controller");
-const _supportservice = require("./support.service");
-const _contactentity = require("./contact.entity");
-const _rolesguard = require("../auth/roles.guard");
+const _userentity = require("../users/user.entity");
+const _pushnotificationscontroller = require("./push-notifications.controller");
+const _pushnotificationsservice = require("./push-notifications.service");
+const _userdeviceentity = require("./user-device.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
     else for(var i = decorators.length - 1; i >= 0; i--)if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 }
-let SupportModule = class SupportModule {
+let PushNotificationsModule = class PushNotificationsModule {
 };
-SupportModule = _ts_decorate([
+PushNotificationsModule = _ts_decorate([
     (0, _common.Module)({
         imports: [
             _typeorm.TypeOrmModule.forFeature([
-                _contactentity.Contact
+                _userdeviceentity.UserDevice,
+                _userentity.User
             ])
         ],
         controllers: [
-            _supportcontroller.SupportController
+            _pushnotificationscontroller.PushNotificationsController
         ],
         providers: [
-            _supportservice.SupportService,
-            _rolesguard.RolesGuard
+            _pushnotificationsservice.PushNotificationsService
+        ],
+        exports: [
+            _pushnotificationsservice.PushNotificationsService
         ]
     })
-], SupportModule);
+], PushNotificationsModule);
 
-//# sourceMappingURL=support.module.js.map
+//# sourceMappingURL=push-notifications.module.js.map

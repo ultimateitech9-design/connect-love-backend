@@ -26,6 +26,7 @@ const _searchmodule = require("./search/search.module");
 const _boostsmodule = require("./boosts/boosts.module");
 const _chatbotmodule = require("./chatbot/chatbot.module");
 const _divorcedmodule = require("./divorced/divorced.module");
+const _pushnotificationsmodule = require("./push-notifications/push-notifications.module");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -92,7 +93,9 @@ AppModule = _ts_decorate([
                 migrations: [
                     __dirname + '/migrations/*{.ts,.js}'
                 ],
-                migrationsRun: process.env.TYPEORM_MIGRATIONS_RUN === 'true',
+                // Production releases must apply pending schema changes before accepting traffic.
+                // TYPEORM_MIGRATIONS_RUN remains available for explicitly enabling this locally.
+                migrationsRun: process.env.NODE_ENV === 'production' || process.env.TYPEORM_MIGRATIONS_RUN === 'true',
                 synchronize: false,
                 logging: false,
                 extra: {
@@ -114,7 +117,8 @@ AppModule = _ts_decorate([
             _searchmodule.SearchModule,
             _boostsmodule.BoostsModule,
             _chatbotmodule.ChatbotModule,
-            _divorcedmodule.DivorcedModule
+            _divorcedmodule.DivorcedModule,
+            _pushnotificationsmodule.PushNotificationsModule
         ],
         controllers: [
             _healthcontroller.HealthController

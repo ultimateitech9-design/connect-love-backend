@@ -73,6 +73,8 @@ function _ts_param(paramIndex, decorator) {
 }
 let AdminService = class AdminService {
     async getStats() {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const totalUsers = await this.userRepo.count();
         const premiumUsers = await this.userRepo.count({
             where: [
@@ -96,6 +98,8 @@ let AdminService = class AdminService {
         });
         const revenue = await this.paymentRepo.createQueryBuilder('payment').select('COALESCE(SUM(payment.amount), 0)', 'total').where('payment.status = :status', {
             status: 'successful'
+        }).andWhere('payment.createdAt >= :monthStart', {
+            monthStart
         }).getRawOne();
         return {
             totalUsers,
@@ -111,21 +115,29 @@ let AdminService = class AdminService {
         const total = await this.userRepo.count();
         const rows = await this.userRepo.createQueryBuilder('user').select([
             'user.id',
-            'user.createdAt'
+            'user.name',
+            'user.email',
+            'user.role',
+            'user.plan',
+            'user.status',
+            'user.isVerified',
+            'user.city',
+            'user.createdAt',
+            'user.updatedAt'
         ]).orderBy('user.createdAt', 'DESC').addOrderBy('user.id', 'DESC').skip((safePage - 1) * safeLimit).take(safeLimit).getMany();
-        const ids = rows.map((row)=>row.id);
-        const users = ids.length ? await this.userRepo.find({
-            where: {
-                id: (0, _typeorm1.In)(ids)
-            }
-        }) : [];
-        const position = new Map(ids.map((id, index)=>[
-                id,
-                index
-            ]));
-        users.sort((left, right)=>(position.get(left.id) ?? 0) - (position.get(right.id) ?? 0));
         return {
-            users,
+            users: rows.map((user)=>({
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    role: user.role,
+                    plan: user.plan,
+                    status: user.status,
+                    isVerified: user.isVerified,
+                    city: user.city,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                })),
             total,
             page: safePage,
             limit: safeLimit
@@ -174,7 +186,7 @@ let AdminService = class AdminService {
         });
     }
     async getPayments() {
-        return this.paymentRepo.find({
+        const payments = await this.paymentRepo.find({
             relations: [
                 'user'
             ],
@@ -183,9 +195,23 @@ let AdminService = class AdminService {
             },
             take: 100
         });
+        return payments.map((payment)=>({
+                id: payment.id,
+                userId: payment.userId,
+                user: payment.user ? {
+                    id: payment.user.id,
+                    name: payment.user.name,
+                    email: payment.user.email
+                } : null,
+                planName: payment.planName,
+                amount: Number(payment.amount),
+                currency: payment.currency,
+                status: payment.status,
+                createdAt: payment.createdAt
+            }));
     }
     async getVerificationQueue() {
-        return this.verificationRepo.find({
+        const queue = await this.verificationRepo.find({
             relations: [
                 'user'
             ],
@@ -194,6 +220,20 @@ let AdminService = class AdminService {
             },
             take: 100
         });
+        return queue.map((request)=>({
+                id: request.id,
+                userId: request.userId,
+                user: request.user ? {
+                    id: request.user.id,
+                    name: request.user.name,
+                    email: request.user.email,
+                    isVerified: request.user.isVerified
+                } : null,
+                idType: request.idType,
+                priority: request.priority,
+                status: request.status,
+                createdAt: request.createdAt
+            }));
     }
     async getSubscriptions() {
         const users = await this.userRepo.find({

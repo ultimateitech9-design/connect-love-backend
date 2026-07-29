@@ -2,10 +2,10 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-Object.defineProperty(exports, "CreateManagementUserDto", {
+Object.defineProperty(exports, "UnregisterDeviceDto", {
     enumerable: true,
     get: function() {
-        return CreateManagementUserDto;
+        return UnregisterDeviceDto;
     }
 });
 const _classvalidator = require("class-validator");
@@ -18,29 +18,19 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let CreateManagementUserDto = class CreateManagementUserDto {
+let UnregisterDeviceDto = class UnregisterDeviceDto {
 };
 _ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
-    (0, _classvalidator.MinLength)(2),
+    (0, _classvalidator.Length)(10, 512),
     _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "name", void 0);
+], UnregisterDeviceDto.prototype, "token", void 0);
 _ts_decorate([
-    (0, _classvalidator.IsEmail)(),
-    _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "email", void 0);
-_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
-    (0, _classvalidator.MinLength)(8),
+    (0, _classvalidator.MaxLength)(191),
     _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "password", void 0);
-_ts_decorate([
-    (0, _classvalidator.IsIn)([
-        'admin',
-        'sales',
-        'support'
-    ]),
-    _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "role", void 0);
+], UnregisterDeviceDto.prototype, "deviceId", void 0);
 
-//# sourceMappingURL=create-management-user.dto.js.map
+//# sourceMappingURL=unregister-device.dto.js.map

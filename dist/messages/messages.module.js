@@ -21,6 +21,8 @@ const _videocallscontroller = require("./video-calls.controller");
 const _usersmodule = require("../users/users.module");
 const _matchesmodule = require("../matches/matches.module");
 const _authmodule = require("../auth/auth.module");
+const _userentity = require("../users/user.entity");
+const _pushnotificationsmodule = require("../push-notifications/push-notifications.module");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -35,11 +37,13 @@ MessagesModule = _ts_decorate([
             _typeorm.TypeOrmModule.forFeature([
                 _messageentity.Message,
                 _matchentity.MatchRelation,
-                _videocallentity.VideoCall
+                _videocallentity.VideoCall,
+                _userentity.User
             ]),
             _usersmodule.UsersModule,
             _matchesmodule.MatchesModule,
-            _authmodule.AuthModule
+            _authmodule.AuthModule,
+            _pushnotificationsmodule.PushNotificationsModule
         ],
         providers: [
             _messagesservice.MessagesService,

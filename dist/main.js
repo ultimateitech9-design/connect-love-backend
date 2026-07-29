@@ -57,7 +57,7 @@ function _interop_require_wildcard(obj, nodeInterop) {
 }
 _dotenv.config();
 function parseAllowedOrigins() {
-    const configured = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3002';
+    const configured = process.env.FRONTEND_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3002,https://connectlove.in,https://www.connectlove.in';
     return configured.split(',').map((origin)=>origin.trim()).filter(Boolean);
 }
 function isAllowedOrigin(origin) {

@@ -85,20 +85,6 @@ let AuthController = class AuthController {
             user: result.user
         };
     }
-    async marketingLogin(dto, request, response) {
-        const result = await this.authService.marketingLogin(dto, this.loginContext(request));
-        response.cookie('admin_token', result.access_token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            path: '/',
-            maxAge: 1000 * 60 * 60 * 24
-        });
-        return {
-            message: 'Marketing login successful',
-            user: result.user
-        };
-    }
     async managementLogin(dto, request, response) {
         const result = await this.authService.managementLogin(dto, this.loginContext(request));
         response.cookie('management_token', result.access_token, {
@@ -216,22 +202,6 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], AuthController.prototype, "superAdminLogin", null);
-_ts_decorate([
-    (0, _common.Post)('marketing/login'),
-    (0, _common.HttpCode)(_common.HttpStatus.OK),
-    _ts_param(0, (0, _common.Body)()),
-    _ts_param(1, (0, _common.Req)()),
-    _ts_param(2, (0, _common.Res)({
-        passthrough: true
-    })),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", [
-        typeof _logindto.LoginDto === "undefined" ? Object : _logindto.LoginDto,
-        typeof _express.Request === "undefined" ? Object : _express.Request,
-        typeof _express.Response === "undefined" ? Object : _express.Response
-    ]),
-    _ts_metadata("design:returntype", Promise)
-], AuthController.prototype, "marketingLogin", null);
 _ts_decorate([
     (0, _common.Post)('management/login'),
     (0, _common.HttpCode)(_common.HttpStatus.OK),

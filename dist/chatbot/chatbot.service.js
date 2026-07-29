@@ -16,6 +16,10 @@ function _ts_decorate(decorators, target, key, desc) {
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 }
 let ChatbotService = class ChatbotService {
+    shouldSuggestSupport(messageInput) {
+        const message = messageInput.trim().toLowerCase();
+        return /support|human|agent|ticket|refund|charged|payment failed|not working|bug|error|hacked|scam|harass|threat|सपोर्ट|मदद|एजेंट|टिकट|रिफंड|पेमेंट|काम नहीं|हैक|धोखा|परेशान/.test(message);
+    }
     reply(messageInput, language) {
         const message = messageInput.trim().toLowerCase();
         const hindi = language === 'hi';

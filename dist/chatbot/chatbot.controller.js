@@ -43,7 +43,8 @@ _ts_decorate([
 let ChatbotController = class ChatbotController {
     message(body) {
         return {
-            reply: this.chatbotService.reply(body.message, body.language)
+            reply: this.chatbotService.reply(body.message, body.language),
+            supportSuggested: this.chatbotService.shouldSuggestSupport(body.message)
         };
     }
     constructor(chatbotService){

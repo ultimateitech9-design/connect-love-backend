@@ -70,6 +70,11 @@ let SupportService = class SupportService {
     }
     async overview() {
         const contacts = await this.findAll();
+        const today = new Date();
+        const isToday = (date)=>{
+            const value = new Date(date);
+            return value.getFullYear() === today.getFullYear() && value.getMonth() === today.getMonth() && value.getDate() === today.getDate();
+        };
         const trend = {};
         contacts.forEach((ticket)=>{
             const day = this.dayKey(ticket.createdAt);
@@ -91,7 +96,7 @@ let SupportService = class SupportService {
         return {
             stats: {
                 totalTickets: contacts.length,
-                resolvedToday: contacts.filter((c)=>c.status === 'closed' || c.status === 'resolved').length,
+                resolvedToday: contacts.filter((c)=>(c.status === 'closed' || c.status === 'resolved') && isToday(c.updatedAt || c.createdAt)).length,
                 openTickets: contacts.filter((c)=>c.status === 'open').length,
                 escalated: contacts.filter((c)=>c.status === 'escalated').length
             },

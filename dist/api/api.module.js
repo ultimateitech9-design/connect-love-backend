@@ -21,6 +21,7 @@ const _platformnotificationentity = require("../platform/platform-notification.e
 const _auditlogentity = require("../platform/audit-log.entity");
 const _platformsettingentity = require("../platform/platform-setting.entity");
 const _roleentity = require("../platform/role.entity");
+const _rolesguard = require("../auth/roles.guard");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -47,6 +48,9 @@ ApiModule = _ts_decorate([
         ],
         controllers: [
             _platformapicontroller.PlatformApiController
+        ],
+        providers: [
+            _rolesguard.RolesGuard
         ]
     })
 ], ApiModule);

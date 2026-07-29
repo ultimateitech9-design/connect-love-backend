@@ -13,6 +13,7 @@ const _passport = require("@nestjs/passport");
 const _supportservice = require("./support.service");
 const _createcontactdto = require("./dto/create-contact.dto");
 const _createnewslettersubscriptiondto = require("./dto/create-newsletter-subscription.dto");
+const _rolesguard = require("../auth/roles.guard");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -71,21 +72,24 @@ _ts_decorate([
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "subscribeNewsletter", null);
 _ts_decorate([
-    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('support', 'admin', 'super_admin'),
     (0, _common.Get)('contacts'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "findAll", null);
 _ts_decorate([
-    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('support', 'admin', 'super_admin'),
     (0, _common.Get)('overview'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "overview", null);
 _ts_decorate([
-    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('support', 'admin', 'super_admin'),
     (0, _common.Get)('tickets'),
     _ts_param(0, (0, _common.Query)('status')),
     _ts_metadata("design:type", Function),
@@ -95,7 +99,8 @@ _ts_decorate([
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "tickets", null);
 _ts_decorate([
-    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('support', 'admin', 'super_admin'),
     (0, _common.Patch)('tickets/:id/status'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)('status')),

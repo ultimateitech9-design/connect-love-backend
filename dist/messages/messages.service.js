@@ -14,6 +14,8 @@ const _typeorm1 = require("typeorm");
 const _crypto = require("crypto");
 const _messageentity = require("./message.entity");
 const _matchentity = require("../matches/match.entity");
+const _userentity = require("../users/user.entity");
+const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -29,6 +31,45 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let MessagesService = class MessagesService {
+    queueMessagePush(message) {
+        void (async ()=>{
+            const [sender, receiver] = await Promise.all([
+                this.userRepo.findOne({
+                    where: {
+                        id: message.senderId
+                    },
+                    select: [
+                        'id',
+                        'name'
+                    ]
+                }),
+                this.userRepo.findOne({
+                    where: {
+                        id: message.receiverId
+                    },
+                    select: [
+                        'id',
+                        'notifyMessages'
+                    ]
+                })
+            ]);
+            if (!receiver?.notifyMessages) return;
+            const cleanContent = String(message.content || '').replace(/\s+/g, ' ').trim();
+            const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}…` : cleanContent;
+            await this.pushNotifications.sendToUser(message.receiverId, {
+                title: sender?.name ? `New message from ${sender.name}` : 'New message',
+                body: preview || 'You received a new message.',
+                data: {
+                    type: 'message',
+                    messageId: message.id,
+                    conversationId: message.conversationId,
+                    senderId: message.senderId
+                }
+            });
+        })().catch((error)=>{
+            this.logger.warn(`Could not queue message push: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        });
+    }
     isOptionalMessageSchemaMismatch(error) {
         const code = error?.driverError?.code || error?.code;
         return code === 'ER_BAD_FIELD_ERROR' || code === 'ER_NO_DEFAULT_FOR_FIELD';
@@ -123,7 +164,9 @@ let MessagesService = class MessagesService {
             replyToMessageId: replyToMessageId || null
         });
         try {
-            return await this.msgRepo.save(msg);
+            const savedMessage = await this.msgRepo.save(msg);
+            this.queueMessagePush(savedMessage);
+            return savedMessage;
         } catch (error) {
             if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
             const id = (0, _crypto.randomUUID)();
@@ -137,7 +180,9 @@ let MessagesService = class MessagesService {
             const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE id = ? LIMIT 1', [
                 id
             ]);
-            return this.normalizeCoreMessage(rows[0]);
+            const savedMessage = this.normalizeCoreMessage(rows[0]);
+            this.queueMessagePush(savedMessage);
+            return savedMessage;
         }
     }
     async remove(id, userId, scope = 'everyone') {
@@ -294,19 +339,25 @@ let MessagesService = class MessagesService {
     async getInfo(id, userId) {
         return this.assertMessageAccess(id, userId);
     }
-    constructor(msgRepo, matchRepo){
+    constructor(msgRepo, matchRepo, userRepo, pushNotifications){
         this.msgRepo = msgRepo;
         this.matchRepo = matchRepo;
+        this.userRepo = userRepo;
+        this.pushNotifications = pushNotifications;
+        this.logger = new _common.Logger(MessagesService.name);
     }
 };
 MessagesService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_messageentity.Message)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_userentity.User)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService
     ])
 ], MessagesService);
 

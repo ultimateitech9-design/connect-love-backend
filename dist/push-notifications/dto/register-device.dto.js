@@ -2,13 +2,14 @@
 Object.defineProperty(exports, "__esModule", {
     value: true
 });
-Object.defineProperty(exports, "CreateManagementUserDto", {
+Object.defineProperty(exports, "RegisterDeviceDto", {
     enumerable: true,
     get: function() {
-        return CreateManagementUserDto;
+        return RegisterDeviceDto;
     }
 });
 const _classvalidator = require("class-validator");
+const _userdeviceentity = require("../user-device.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -18,29 +19,39 @@ function _ts_decorate(decorators, target, key, desc) {
 function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
-let CreateManagementUserDto = class CreateManagementUserDto {
+let RegisterDeviceDto = class RegisterDeviceDto {
 };
 _ts_decorate([
     (0, _classvalidator.IsString)(),
-    (0, _classvalidator.MinLength)(2),
+    (0, _classvalidator.Length)(10, 512),
     _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "name", void 0);
-_ts_decorate([
-    (0, _classvalidator.IsEmail)(),
-    _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "email", void 0);
-_ts_decorate([
-    (0, _classvalidator.IsString)(),
-    (0, _classvalidator.MinLength)(8),
-    _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "password", void 0);
+], RegisterDeviceDto.prototype, "token", void 0);
 _ts_decorate([
     (0, _classvalidator.IsIn)([
-        'admin',
-        'sales',
-        'support'
+        'android',
+        'ios',
+        'web',
+        'unknown'
     ]),
+    _ts_metadata("design:type", typeof _userdeviceentity.DevicePlatform === "undefined" ? Object : _userdeviceentity.DevicePlatform)
+], RegisterDeviceDto.prototype, "platform", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(191),
     _ts_metadata("design:type", String)
-], CreateManagementUserDto.prototype, "role", void 0);
+], RegisterDeviceDto.prototype, "deviceId", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(100),
+    _ts_metadata("design:type", String)
+], RegisterDeviceDto.prototype, "deviceName", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(50),
+    _ts_metadata("design:type", String)
+], RegisterDeviceDto.prototype, "appVersion", void 0);
 
-//# sourceMappingURL=create-management-user.dto.js.map
+//# sourceMappingURL=register-device.dto.js.map

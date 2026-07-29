@@ -26,6 +26,7 @@ const _videocallentity = require("./messages/video-call.entity");
 const _emailregistrationotpentity = require("./auth/email-registration-otp.entity");
 const _divorcedleadentity = require("./divorced/divorced-lead.entity");
 const _profileviewentity = require("./users/profile-view.entity");
+const _userdeviceentity = require("./push-notifications/user-device.entity");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -90,7 +91,8 @@ const _default = new _typeorm.DataSource({
         _videocallentity.VideoCall,
         _emailregistrationotpentity.EmailRegistrationOtp,
         _divorcedleadentity.DivorcedLead,
-        _profileviewentity.ProfileView
+        _profileviewentity.ProfileView,
+        _userdeviceentity.UserDevice
     ],
     migrations: [
         __dirname + '/migrations/*{.ts,.js}'

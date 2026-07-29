@@ -21,8 +21,14 @@ _export(exports, {
     get PlatformApiController () {
         return PlatformApiController;
     },
+    get RejectNotificationDto () {
+        return RejectNotificationDto;
+    },
     get SavePlanDto () {
         return SavePlanDto;
+    },
+    get UpdateNotificationDto () {
+        return UpdateNotificationDto;
     },
     get UpdatePlatformUserDto () {
         return UpdatePlatformUserDto;
@@ -32,6 +38,7 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _bcryptjs = /*#__PURE__*/ _interop_require_wildcard(require("bcryptjs"));
+const _passport = require("@nestjs/passport");
 const _userentity = require("../users/user.entity");
 const _contactentity = require("../support/contact.entity");
 const _matchentity = require("../matches/match.entity");
@@ -43,6 +50,7 @@ const _auditlogentity = require("../platform/audit-log.entity");
 const _platformsettingentity = require("../platform/platform-setting.entity");
 const _roleentity = require("../platform/role.entity");
 const _classvalidator = require("class-validator");
+const _rolesguard = require("../auth/roles.guard");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -140,6 +148,106 @@ _ts_decorate([
     (0, _classvalidator.IsString)(),
     _ts_metadata("design:type", String)
 ], CreateNotificationDto.prototype, "status", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MinLength)(3),
+    (0, _classvalidator.MaxLength)(500),
+    _ts_metadata("design:type", String)
+], CreateNotificationDto.prototype, "description", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsInt)(),
+    (0, _classvalidator.Min)(1),
+    (0, _classvalidator.Max)(100),
+    _ts_metadata("design:type", Number)
+], CreateNotificationDto.prototype, "discountPercent", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(80),
+    _ts_metadata("design:type", String)
+], CreateNotificationDto.prototype, "ctaLabel", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(255),
+    (0, _classvalidator.Matches)(/^(\/|https?:\/\/)/, {
+        message: 'ctaUrl must be a site path or an http(s) URL.'
+    }),
+    _ts_metadata("design:type", String)
+], CreateNotificationDto.prototype, "ctaUrl", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsDateString)(),
+    _ts_metadata("design:type", String)
+], CreateNotificationDto.prototype, "startsAt", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsDateString)(),
+    _ts_metadata("design:type", String)
+], CreateNotificationDto.prototype, "endsAt", void 0);
+let UpdateNotificationDto = class UpdateNotificationDto {
+};
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MinLength)(2),
+    (0, _classvalidator.MaxLength)(160),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "campaign", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(120),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "audience", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MinLength)(3),
+    (0, _classvalidator.MaxLength)(500),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "description", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsInt)(),
+    (0, _classvalidator.Min)(1),
+    (0, _classvalidator.Max)(100),
+    _ts_metadata("design:type", Number)
+], UpdateNotificationDto.prototype, "discountPercent", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(80),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "ctaLabel", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(255),
+    (0, _classvalidator.Matches)(/^(\/|https?:\/\/)/, {
+        message: 'ctaUrl must be a site path or an http(s) URL.'
+    }),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "ctaUrl", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsDateString)(),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "startsAt", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsDateString)(),
+    _ts_metadata("design:type", String)
+], UpdateNotificationDto.prototype, "endsAt", void 0);
+let RejectNotificationDto = class RejectNotificationDto {
+};
+_ts_decorate([
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MinLength)(3),
+    (0, _classvalidator.MaxLength)(500),
+    _ts_metadata("design:type", String)
+], RejectNotificationDto.prototype, "reason", void 0);
 let CreateRoleDto = class CreateRoleDto {
 };
 _ts_decorate([
@@ -284,8 +392,88 @@ let PlatformApiController = class PlatformApiController {
             weekday: 'short'
         });
     }
+    periodDelta(current, previous) {
+        if (previous === 0) return current === 0 ? '0%' : '+100%';
+        const value = (current - previous) / previous * 100;
+        return `${value >= 0 ? '+' : ''}${value.toFixed(1)}%`;
+    }
     normalizeRole(value) {
         return String(value || 'user').toLowerCase().replace(/[- ]/g, '_');
+    }
+    requestUser(request) {
+        return {
+            userId: String(request?.user?.userId || ''),
+            role: this.normalizeRole(request?.user?.role)
+        };
+    }
+    statusLabel(status) {
+        return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' ? 'Suspended' : 'Under Review';
+    }
+    campaignResponse(campaign) {
+        const ctr = campaign.impressions > 0 ? Number((campaign.clicks / campaign.impressions * 100).toFixed(2)) : 0;
+        return {
+            id: campaign.id,
+            campaign: campaign.campaign,
+            description: campaign.description,
+            type: campaign.type,
+            audience: campaign.audience,
+            discountPercent: campaign.discountPercent,
+            ctaLabel: campaign.ctaLabel,
+            ctaUrl: campaign.ctaUrl,
+            placement: campaign.placement,
+            status: campaign.status,
+            createdByUserId: campaign.createdByUserId,
+            createdByRole: campaign.createdByRole,
+            approvedByUserId: campaign.approvedByUserId,
+            submittedAt: campaign.submittedAt,
+            approvedAt: campaign.approvedAt,
+            rejectedAt: campaign.rejectedAt,
+            rejectionReason: campaign.rejectionReason,
+            startsAt: campaign.startsAt,
+            endsAt: campaign.endsAt,
+            impressions: campaign.impressions,
+            clicks: campaign.clicks,
+            dismissals: campaign.dismissals,
+            ctr,
+            createdAt: campaign.createdAt,
+            updatedAt: campaign.updatedAt
+        };
+    }
+    validateCampaignDates(startsAt, endsAt) {
+        if (startsAt && endsAt && endsAt <= startsAt) {
+            throw new _common.BadRequestException('Campaign end date must be after its start date.');
+        }
+    }
+    canAccessCampaign(campaign, actor) {
+        return actor.role === 'admin' || actor.role === 'super_admin' || actor.role === 'sales' && campaign.createdByUserId === actor.userId;
+    }
+    audienceMatches(audience, user) {
+        const value = String(audience || 'All users').trim().toLowerCase();
+        if (value === 'all' || value === 'all users' || value === 'everyone') return true;
+        if (value.includes('premium')) return user.plan === 'gold' || user.plan === 'platinum';
+        if (value.includes('free')) return user.plan === 'free';
+        if (value.includes('gold')) return user.plan === 'gold';
+        if (value.includes('platinum') || value.includes('elite')) return user.plan === 'platinum';
+        if (value.startsWith('city:')) return String(user.city || '').toLowerCase() === value.slice(5).trim();
+        return false;
+    }
+    async visibleCampaignForUser(id, request) {
+        const user = await this.userRepo.findOne({
+            where: {
+                id: this.requestUser(request).userId
+            }
+        });
+        const campaign = await this.notificationRepo.findOne({
+            where: {
+                id,
+                status: 'active'
+            }
+        });
+        const now = new Date();
+        if (!user || !campaign || campaign.startsAt && campaign.startsAt > now || campaign.endsAt && campaign.endsAt < now || !this.audienceMatches(campaign.audience, user)) {
+            throw new _common.NotFoundException('Campaign not found.');
+        }
+        return campaign;
     }
     initials(name) {
         return name.split(' ').map((part)=>part[0]).join('').slice(0, 2).toUpperCase();
@@ -294,49 +482,7 @@ let PlatformApiController = class PlatformApiController {
         return String(currency || 'USD').toUpperCase() === 'INR' ? '₹' : '$';
     }
     normalizeSubscriptionPlan(plan) {
-        const canonical = {
-            free: {
-                displayName: 'Basic Plan',
-                price: 0,
-                currency: 'INR',
-                features: [
-                    '20 Likes per day',
-                    'Basic Matching',
-                    'Chat after Match',
-                    'View Basic Profile'
-                ]
-            },
-            gold: {
-                displayName: 'Premium Plan',
-                price: 199,
-                currency: 'INR',
-                features: [
-                    'Unlimited Likes',
-                    'See Who Liked You',
-                    '5 Super Likes per day',
-                    'Profile Boost (1 per week)',
-                    'No Ads',
-                    'Priority Matching'
-                ]
-            },
-            platinum: {
-                displayName: 'Elite Plan',
-                price: 399,
-                currency: 'INR',
-                features: [
-                    'Unlimited Likes',
-                    'See Who Liked You',
-                    'Unlimited Super Likes',
-                    'Unlimited Profile Boost',
-                    'Priority Matching',
-                    'Advanced Filters',
-                    'Top Search Ranking',
-                    'Premium Badge',
-                    'No Ads'
-                ]
-            }
-        };
-        return canonical[plan.name] || {
+        return {
             displayName: plan.displayName,
             price: Number(plan.price),
             currency: plan.currency,
@@ -385,7 +531,9 @@ let PlatformApiController = class PlatformApiController {
         const totalRevenue = Number(revenue?.total || 0);
         const users = await this.userRepo.find({
             select: [
-                'createdAt'
+                'createdAt',
+                'plan',
+                'status'
             ]
         });
         const matches = await this.matchRepo.find({
@@ -393,6 +541,26 @@ let PlatformApiController = class PlatformApiController {
                 'createdAt'
             ]
         });
+        const payments = await this.paymentRepo.find({
+            where: {
+                status: 'successful'
+            },
+            select: [
+                'amount',
+                'createdAt'
+            ]
+        });
+        const reports = await this.contactRepo.find({
+            select: [
+                'createdAt',
+                'status'
+            ]
+        });
+        const now = Date.now();
+        const currentStart = now - 30 * 86400000;
+        const previousStart = now - 60 * 86400000;
+        const countPeriod = (rows, start, end)=>rows.filter((row)=>new Date(row.createdAt).getTime() >= start && new Date(row.createdAt).getTime() < end).length;
+        const sumPeriod = (rows, start, end)=>rows.filter((row)=>new Date(row.createdAt).getTime() >= start && new Date(row.createdAt).getTime() < end).reduce((sum, row)=>sum + Number(row.amount), 0);
         const monthly = {};
         const ensureMonth = (date)=>{
             const key = date.toLocaleString('en-US', {
@@ -417,38 +585,38 @@ let PlatformApiController = class PlatformApiController {
                 {
                     label: 'Total Users',
                     value: String(totalUsers),
-                    delta: '+4.2%'
+                    delta: this.periodDelta(countPeriod(users, currentStart, now), countPeriod(users, previousStart, currentStart))
                 },
                 {
                     label: 'Active Users',
                     value: String(activeUsers),
-                    delta: '+2.8%'
+                    delta: 'Live DB'
                 },
                 {
                     label: 'Matches Done',
                     value: String(matchesDone),
-                    delta: '+6.1%'
+                    delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart))
                 },
                 {
                     label: 'Total Revenue',
-                    value: `$${totalRevenue.toLocaleString()}`,
-                    delta: '+11.6%'
+                    value: `₹${totalRevenue.toLocaleString()}`,
+                    delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart))
                 },
                 {
                     label: 'Pending Reports',
                     value: String(pendingReports),
-                    delta: '-1.3%'
+                    delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart))
                 },
                 {
                     label: 'Premium Users',
                     value: String(premiumUsers),
-                    delta: '+2.1%'
+                    delta: this.periodDelta(countPeriod(users.filter((user)=>user.plan !== 'free'), currentStart, now), countPeriod(users.filter((user)=>user.plan !== 'free'), previousStart, currentStart))
                 }
             ],
             growth
         };
     }
-    async users(search, pageValue, limitValue) {
+    async users(request, search, pageValue, limitValue) {
         const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
         const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
         const query = this.userRepo.createQueryBuilder('user').select([
@@ -475,6 +643,7 @@ let PlatformApiController = class PlatformApiController {
             });
         }
         const [users, total] = await query.skip((page - 1) * limit).take(limit).getManyAndCount();
+        const actor = this.requestUser(request);
         return {
             total,
             page,
@@ -484,7 +653,9 @@ let PlatformApiController = class PlatformApiController {
                     id: user.id,
                     name: user.name,
                     email: user.email,
-                    role: user.role,
+                    ...actor.role === 'super_admin' || actor.role === 'admin' ? {
+                        role: user.role
+                    } : {},
                     plan: user.plan,
                     account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
                     city: user.city || 'Unknown',
@@ -523,18 +694,32 @@ let PlatformApiController = class PlatformApiController {
             user: safe
         };
     }
-    async getUserDetails(id) {
+    async getUserDetails(id, request) {
         const user = await this.userRepo.findOne({
             where: {
                 id
             }
         });
         if (!user) throw new _common.NotFoundException('User not found.');
+        const actor = this.requestUser(request);
+        const necessary = {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            city: user.city,
+            isVerified: user.isVerified,
+            plan: user.plan,
+            account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
+            ...actor.role === 'super_admin' || actor.role === 'admin' ? {
+                role: user.role
+            } : {},
+            status: this.statusLabel(user.status),
+            joined: user.createdAt,
+            lastActive: user.lastSeen || user.updatedAt
+        };
         return {
-            user: {
-                id: user.id,
-                name: user.name,
-                email: user.email,
+            user: actor.role === 'super_admin' ? {
+                ...necessary,
                 age: user.age,
                 birthDate: user.birthDate,
                 gender: user.gender,
@@ -547,14 +732,8 @@ let PlatformApiController = class PlatformApiController {
                 personality: user.personalityWords || [],
                 hobbies: user.hobbies || [],
                 avatarUrl: user.avatarUrl,
-                photos: user.photos || [],
-                isVerified: user.isVerified,
-                plan: user.plan,
-                role: user.role,
-                status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review',
-                joined: user.createdAt,
-                lastActive: user.lastSeen || user.updatedAt
-            }
+                photos: user.photos || []
+            } : necessary
         };
     }
     async updateUser(id, body) {
@@ -590,7 +769,6 @@ let PlatformApiController = class PlatformApiController {
             'user',
             'admin',
             'super_admin',
-            'marketing',
             'sales',
             'support'
         ].includes(String(body.role)) ? body.role : undefined;
@@ -667,7 +845,15 @@ let PlatformApiController = class PlatformApiController {
         await this.audit('Users', 'Update Status', `Updated user ${user.email} status to ${status}`);
         return {
             success: true,
-            user
+            user: {
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                plan: user.plan,
+                status: user.status,
+                isVerified: user.isVerified
+            }
         };
     }
     async deleteUser(id) {
@@ -683,7 +869,8 @@ let PlatformApiController = class PlatformApiController {
             success: true
         };
     }
-    async verification() {
+    async verification(request) {
+        const includePrivateMedia = this.requestUser(request).role === 'super_admin';
         const pending = await this.verificationRepo.find({
             relations: [
                 'user'
@@ -733,9 +920,11 @@ let PlatformApiController = class PlatformApiController {
                         priority: request.priority === 'high' ? 'High' : request.priority === 'low' ? 'Low' : 'Normal',
                         status: request.status.replace('_', ' ').replace(/\b\w/g, (c)=>c.toUpperCase()),
                         date: request.createdAt,
-                        documents: request.documents || [],
-                        photo: request.user?.avatarUrl || null,
-                        birthDate: request.user?.birthDate || null
+                        ...includePrivateMedia ? {
+                            documents: request.documents || [],
+                            photo: request.user?.avatarUrl || null,
+                            birthDate: request.user?.birthDate || null
+                        } : {}
                     })),
                 ...kycUsers.filter((user)=>!requestedUserIds.has(user.id) && !user.isVerified).map((user)=>({
                         id: `kyc-${user.id}`,
@@ -745,12 +934,14 @@ let PlatformApiController = class PlatformApiController {
                         priority: user.kycMatched ? 'Normal' : 'High',
                         status: user.isVerified ? 'Approved' : user.kycMatched ? 'Pending' : 'Under Review',
                         date: user.kycVerifiedAt || user.updatedAt || user.createdAt,
-                        documents: [
-                            user.kycLivePhoto
-                        ].filter(Boolean),
-                        photo: user.avatarUrl || user.photos?.[0] || null,
-                        birthDate: user.birthDate || null,
-                        matchScore: user.kycMatchScore
+                        ...includePrivateMedia ? {
+                            documents: [
+                                user.kycLivePhoto
+                            ].filter(Boolean),
+                            photo: user.avatarUrl || user.photos?.[0] || null,
+                            birthDate: user.birthDate || null,
+                            matchScore: user.kycMatchScore
+                        } : {}
                     })),
                 ...reviewUsers.filter((user)=>!requestedUserIds.has(user.id) && !kycUserIds.has(user.id)).map((user)=>({
                         id: `user-${user.id}`,
@@ -760,9 +951,11 @@ let PlatformApiController = class PlatformApiController {
                         priority: user.status === 'pending_verification' ? 'High' : 'Low',
                         status: user.status === 'pending_verification' ? 'Pending' : 'Unverified',
                         date: user.updatedAt || user.createdAt,
-                        documents: user.photos || [],
-                        photo: user.avatarUrl || user.photos?.[0] || null,
-                        birthDate: user.birthDate || null
+                        ...includePrivateMedia ? {
+                            documents: user.photos || [],
+                            photo: user.avatarUrl || user.photos?.[0] || null,
+                            birthDate: user.birthDate || null
+                        } : {}
                     }))
             ]
         };
@@ -850,20 +1043,20 @@ let PlatformApiController = class PlatformApiController {
             ]
         };
     }
-    async notifications() {
+    async notifications(request) {
+        const actor = this.requestUser(request);
         const notifications = await this.notificationRepo.find({
+            ...actor.role === 'sales' ? {
+                where: {
+                    createdByUserId: actor.userId
+                }
+            } : {},
             order: {
                 createdAt: 'DESC'
             }
         });
         return {
-            notifications: notifications.map((notification)=>({
-                    id: notification.id,
-                    campaign: notification.campaign,
-                    type: notification.type,
-                    audience: notification.audience,
-                    status: notification.status.replace(/\b\w/g, (c)=>c.toUpperCase())
-                }))
+            notifications: notifications.map((notification)=>this.campaignResponse(notification))
         };
     }
     async createPlan(body) {
@@ -894,31 +1087,170 @@ let PlatformApiController = class PlatformApiController {
         await this.audit('Admin', 'Plan updated', `Updated subscription plan ${plan.displayName}`);
         return plan;
     }
-    async createNotification(body) {
+    async createNotification(body, request) {
+        const actor = this.requestUser(request);
+        const startsAt = body.startsAt ? new Date(body.startsAt) : null;
+        const endsAt = body.endsAt ? new Date(body.endsAt) : null;
+        this.validateCampaignDates(startsAt, endsAt);
+        const activateNow = (actor.role === 'admin' || actor.role === 'super_admin') && body.status === 'active';
+        const now = new Date();
         const notification = await this.notificationRepo.save(this.notificationRepo.create({
             campaign: body.campaign || 'Untitled campaign',
-            type: body.type || 'Push',
+            type: body.type || 'In-app',
             audience: body.audience || 'All users',
-            status: body.status || 'draft'
+            description: body.description,
+            discountPercent: body.discountPercent ?? null,
+            ctaLabel: body.ctaLabel?.trim() || 'View offer',
+            ctaUrl: body.ctaUrl?.trim() || '/user/premium',
+            placement: 'user_dashboard',
+            status: activateNow ? 'active' : 'draft',
+            createdByUserId: actor.userId,
+            createdByRole: actor.role,
+            approvedByUserId: activateNow ? actor.userId : null,
+            approvedAt: activateNow ? now : null,
+            startsAt,
+            endsAt
         }));
-        await this.audit('Notifications', 'Create', `Created notification campaign ${notification.campaign}`);
-        return notification;
+        await this.audit('Campaigns', 'Create', `${actor.role} created campaign ${notification.campaign}`);
+        return this.campaignResponse(notification);
+    }
+    async updateNotification(id, body, request) {
+        const actor = this.requestUser(request);
+        const notification = await this.notificationRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!notification) throw new _common.NotFoundException('Campaign not found.');
+        if (!this.canAccessCampaign(notification, actor)) throw new _common.ForbiddenException('You cannot edit this campaign.');
+        if (actor.role === 'sales' && ![
+            'draft',
+            'rejected'
+        ].includes(notification.status)) {
+            throw new _common.ForbiddenException('Sales can edit only draft or rejected campaigns.');
+        }
+        const startsAt = body.startsAt !== undefined ? body.startsAt ? new Date(body.startsAt) : null : notification.startsAt;
+        const endsAt = body.endsAt !== undefined ? body.endsAt ? new Date(body.endsAt) : null : notification.endsAt;
+        this.validateCampaignDates(startsAt, endsAt);
+        Object.assign(notification, {
+            ...body.campaign !== undefined ? {
+                campaign: body.campaign.trim()
+            } : {},
+            ...body.audience !== undefined ? {
+                audience: body.audience.trim()
+            } : {},
+            ...body.description !== undefined ? {
+                description: body.description.trim()
+            } : {},
+            ...body.discountPercent !== undefined ? {
+                discountPercent: body.discountPercent
+            } : {},
+            ...body.ctaLabel !== undefined ? {
+                ctaLabel: body.ctaLabel.trim()
+            } : {},
+            ...body.ctaUrl !== undefined ? {
+                ctaUrl: body.ctaUrl.trim()
+            } : {},
+            ...body.startsAt !== undefined ? {
+                startsAt
+            } : {},
+            ...body.endsAt !== undefined ? {
+                endsAt
+            } : {},
+            ...notification.status === 'rejected' ? {
+                status: 'draft',
+                rejectedAt: null,
+                rejectionReason: null
+            } : {}
+        });
+        const saved = await this.notificationRepo.save(notification);
+        await this.audit('Campaigns', 'Update', `${actor.role} updated campaign ${saved.campaign}`);
+        return this.campaignResponse(saved);
+    }
+    async submitNotification(id, request) {
+        const actor = this.requestUser(request);
+        const notification = await this.notificationRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!notification) throw new _common.NotFoundException('Campaign not found.');
+        if (!this.canAccessCampaign(notification, actor)) throw new _common.ForbiddenException('You cannot submit this campaign.');
+        if (![
+            'draft',
+            'rejected'
+        ].includes(notification.status)) {
+            throw new _common.BadRequestException('Only draft or rejected campaigns can be submitted.');
+        }
+        notification.status = 'pending_approval';
+        notification.submittedAt = new Date();
+        notification.rejectedAt = null;
+        notification.rejectionReason = null;
+        const saved = await this.notificationRepo.save(notification);
+        await this.audit('Campaigns', 'Submit', `${actor.role} submitted campaign ${saved.campaign} for approval`);
+        return this.campaignResponse(saved);
+    }
+    async approveNotification(id, request) {
+        const actor = this.requestUser(request);
+        const notification = await this.notificationRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!notification) throw new _common.NotFoundException('Campaign not found.');
+        if (![
+            'pending_approval',
+            'draft'
+        ].includes(notification.status)) {
+            throw new _common.BadRequestException('Only submitted or admin-created draft campaigns can be approved.');
+        }
+        notification.status = 'active';
+        notification.approvedByUserId = actor.userId;
+        notification.approvedAt = new Date();
+        notification.rejectedAt = null;
+        notification.rejectionReason = null;
+        const saved = await this.notificationRepo.save(notification);
+        await this.audit('Campaigns', 'Approve', `${actor.role} approved campaign ${saved.campaign}`);
+        return this.campaignResponse(saved);
+    }
+    async rejectNotification(id, body, request) {
+        const actor = this.requestUser(request);
+        const notification = await this.notificationRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!notification) throw new _common.NotFoundException('Campaign not found.');
+        if (notification.status !== 'pending_approval') throw new _common.BadRequestException('Only submitted campaigns can be rejected.');
+        notification.status = 'rejected';
+        notification.rejectionReason = body.reason.trim();
+        notification.rejectedAt = new Date();
+        notification.approvedByUserId = null;
+        notification.approvedAt = null;
+        const saved = await this.notificationRepo.save(notification);
+        await this.audit('Campaigns', 'Reject', `${actor.role} rejected campaign ${saved.campaign}`);
+        return this.campaignResponse(saved);
     }
     async updateNotificationStatus(id, status) {
+        const allowed = [
+            'active',
+            'paused',
+            'expired'
+        ];
+        if (!allowed.includes(status)) throw new _common.BadRequestException('Unsupported campaign status change.');
         const notification = await this.notificationRepo.findOne({
             where: {
                 id
             }
         });
-        if (!notification) return {
-            message: 'Notification campaign not found.'
-        };
+        if (!notification) throw new _common.NotFoundException('Campaign not found.');
         notification.status = status;
         await this.notificationRepo.save(notification);
-        await this.audit('Notifications', 'Update', `Changed ${notification.campaign} to ${status}`);
-        return notification;
+        await this.audit('Campaigns', 'Status', `Changed ${notification.campaign} to ${status}`);
+        return this.campaignResponse(notification);
     }
-    async deleteNotification(id) {
+    async deleteNotification(id, request) {
+        const actor = this.requestUser(request);
         const notification = await this.notificationRepo.findOne({
             where: {
                 id
@@ -927,10 +1259,75 @@ let PlatformApiController = class PlatformApiController {
         if (!notification) return {
             deleted: true
         };
+        if (!this.canAccessCampaign(notification, actor)) throw new _common.ForbiddenException('You cannot delete this campaign.');
+        if (actor.role === 'sales' && ![
+            'draft',
+            'rejected'
+        ].includes(notification.status)) {
+            throw new _common.ForbiddenException('Sales can delete only draft or rejected campaigns.');
+        }
         await this.notificationRepo.remove(notification);
-        await this.audit('Notifications', 'Delete', `Deleted notification campaign ${notification.campaign}`);
+        await this.audit('Campaigns', 'Delete', `${actor.role} deleted campaign ${notification.campaign}`);
         return {
             deleted: true
+        };
+    }
+    async activeUserCampaigns(request) {
+        const user = await this.userRepo.findOne({
+            where: {
+                id: this.requestUser(request).userId
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User not found.');
+        const now = new Date();
+        const campaigns = await this.notificationRepo.find({
+            where: {
+                status: 'active'
+            },
+            order: {
+                approvedAt: 'DESC',
+                createdAt: 'DESC'
+            },
+            take: 100
+        });
+        return {
+            campaigns: campaigns.filter((campaign)=>(!campaign.startsAt || campaign.startsAt <= now) && (!campaign.endsAt || campaign.endsAt >= now) && this.audienceMatches(campaign.audience, user)).slice(0, 10).map((campaign)=>({
+                    id: campaign.id,
+                    title: campaign.campaign,
+                    description: campaign.description,
+                    discountPercent: campaign.discountPercent,
+                    ctaLabel: campaign.ctaLabel,
+                    ctaUrl: campaign.ctaUrl,
+                    startsAt: campaign.startsAt,
+                    endsAt: campaign.endsAt
+                }))
+        };
+    }
+    async recordCampaignImpression(id, request) {
+        await this.visibleCampaignForUser(id, request);
+        await this.notificationRepo.increment({
+            id
+        }, 'impressions', 1);
+        return {
+            recorded: true
+        };
+    }
+    async recordCampaignClick(id, request) {
+        await this.visibleCampaignForUser(id, request);
+        await this.notificationRepo.increment({
+            id
+        }, 'clicks', 1);
+        return {
+            recorded: true
+        };
+    }
+    async recordCampaignDismiss(id, request) {
+        await this.visibleCampaignForUser(id, request);
+        await this.notificationRepo.increment({
+            id
+        }, 'dismissals', 1);
+        return {
+            recorded: true
         };
     }
     async security() {
@@ -1000,7 +1397,7 @@ let PlatformApiController = class PlatformApiController {
             }
         })).filter((role)=>{
             const key = role.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-            return key !== 'data_entry' && key !== 'finance';
+            return key !== 'data_entry' && key !== 'finance' && key !== 'marketing';
         });
         const counts = users.reduce((acc, user)=>{
             acc[user.role] = (acc[user.role] || 0) + 1;
@@ -1020,7 +1417,7 @@ let PlatformApiController = class PlatformApiController {
     }
     async createRole(body) {
         const roleKey = body.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
-        if (roleKey === 'data_entry' || roleKey === 'finance') {
+        if (roleKey === 'data_entry' || roleKey === 'finance' || roleKey === 'marketing') {
             throw new _common.BadRequestException('This role is no longer available.');
         }
         const role = await this.roleRepo.save(this.roleRepo.create({
@@ -1040,7 +1437,23 @@ let PlatformApiController = class PlatformApiController {
         if (!role) return {
             message: 'Role not found.'
         };
-        Object.assign(role, body);
+        if (body.role) {
+            const roleKey = body.role.trim().toLowerCase().replace(/[\s-]+/g, '_');
+            if (roleKey === 'data_entry' || roleKey === 'finance' || roleKey === 'marketing') {
+                throw new _common.BadRequestException('This role is no longer available.');
+            }
+        }
+        Object.assign(role, {
+            ...body.role !== undefined ? {
+                role: body.role
+            } : {},
+            ...body.permissions !== undefined ? {
+                permissions: body.permissions
+            } : {},
+            ...body.status !== undefined ? {
+                status: body.status
+            } : {}
+        });
         await this.roleRepo.save(role);
         await this.audit('Roles', 'Update', `Updated role ${role.role}`);
         return role;
@@ -1117,143 +1530,6 @@ let PlatformApiController = class PlatformApiController {
         await this.audit('Verification', 'Update', `Verification ${id} marked ${status}`);
         return request;
     }
-    async marketingOverview() {
-        const users = await this.userRepo.find({
-            order: {
-                createdAt: 'ASC'
-            }
-        });
-        const campaigns = await this.notificationRepo.find({
-            order: {
-                createdAt: 'DESC'
-            }
-        });
-        const weekly = {};
-        users.forEach((user)=>{
-            const day = this.dayKey(user.createdAt);
-            weekly[day] ||= {
-                day,
-                spend: 0,
-                users: 0
-            };
-            weekly[day].users += 1;
-            weekly[day].spend += 300 + weekly[day].users * 18;
-        });
-        const channelData = [
-            {
-                channel: 'Organic',
-                value: users.filter((u)=>u.plan === 'free').length
-            },
-            {
-                channel: 'Premium Referral',
-                value: users.filter((u)=>u.plan !== 'free').length
-            },
-            {
-                channel: 'Campaigns',
-                value: campaigns.length
-            },
-            {
-                channel: 'Support Leads',
-                value: await this.contactRepo.count()
-            }
-        ];
-        const totalSpend = Object.values(weekly).reduce((sum, row)=>sum + row.spend, 0);
-        const premiumUsers = users.filter((u)=>u.plan !== 'free').length;
-        const conversionRate = users.length ? (premiumUsers / users.length * 100).toFixed(1) : '0.0';
-        return {
-            kpis: [
-                {
-                    label: 'Total Marketing Spend',
-                    value: `$${totalSpend.toLocaleString()}`,
-                    delta: '+8.4%'
-                },
-                {
-                    label: 'New Users Acquired',
-                    value: users.length.toLocaleString(),
-                    delta: '+4.2%'
-                },
-                {
-                    label: 'Active Campaigns',
-                    value: String(campaigns.filter((c)=>c.status === 'active').length),
-                    delta: `${campaigns.length} total`
-                },
-                {
-                    label: 'Cost Per Acquisition',
-                    value: `$${users.length ? (totalSpend / users.length).toFixed(2) : '0.00'}`,
-                    delta: '-2.1%'
-                },
-                {
-                    label: 'Conversion Rate',
-                    value: `${conversionRate}%`,
-                    delta: '+1.1%'
-                }
-            ],
-            spendTrend: Object.values(weekly),
-            channelData
-        };
-    }
-    async marketingCampaigns() {
-        const campaigns = await this.notificationRepo.find({
-            order: {
-                createdAt: 'DESC'
-            }
-        });
-        return {
-            campaigns: campaigns.map((c, index)=>({
-                    id: c.id,
-                    name: c.campaign,
-                    channel: c.type,
-                    status: c.status,
-                    audience: c.audience,
-                    spend: 1200 + index * 730,
-                    conversions: 80 + index * 31,
-                    roi: 1.8 + index * 0.2
-                }))
-        };
-    }
-    async marketingReports() {
-        const users = await this.userRepo.find({
-            select: [
-                'createdAt',
-                'plan'
-            ]
-        });
-        const campaigns = await this.notificationRepo.find({
-            order: {
-                createdAt: 'DESC'
-            }
-        });
-        const contacts = await this.contactRepo.count();
-        const premiumUsers = users.filter((user)=>user.plan !== 'free').length;
-        return {
-            reports: [
-                {
-                    title: 'Daily Report',
-                    desc: 'Users, campaigns, and support leads created today.',
-                    meta: `${users.filter((user)=>user.createdAt.toDateString() === new Date().toDateString()).length} users today`,
-                    type: 'daily'
-                },
-                {
-                    title: 'Users Report',
-                    desc: 'Live user acquisition and premium conversion summary.',
-                    meta: `${users.length} users, ${premiumUsers} premium`,
-                    type: 'users'
-                },
-                {
-                    title: 'Campaigns Report',
-                    desc: 'Notification campaigns currently stored in the platform.',
-                    meta: `${campaigns.length} campaigns`,
-                    type: 'campaigns'
-                },
-                {
-                    title: 'Leads Report',
-                    desc: 'Support/contact leads submitted from the website.',
-                    meta: `${contacts} leads`,
-                    type: 'leads'
-                }
-            ]
-        };
-    }
     async salesOverview() {
         const payments = await this.paymentRepo.find({
             relations: [
@@ -1264,6 +1540,24 @@ let PlatformApiController = class PlatformApiController {
             }
         });
         const users = await this.userRepo.find();
+        const successfulPayments = payments.filter((payment)=>payment.status === 'successful');
+        const now = Date.now();
+        const currentStart = now - 30 * 86400000;
+        const previousStart = now - 60 * 86400000;
+        const premiumUsers = users.filter((user)=>user.plan !== 'free');
+        const currentPremiumSignups = premiumUsers.filter((user)=>new Date(user.createdAt).getTime() >= currentStart).length;
+        const previousPremiumSignups = premiumUsers.filter((user)=>{
+            const created = new Date(user.createdAt).getTime();
+            return created >= previousStart && created < currentStart;
+        }).length;
+        const paymentCountByUser = successfulPayments.reduce((acc, payment)=>{
+            if (payment.userId) acc[payment.userId] = (acc[payment.userId] || 0) + 1;
+            return acc;
+        }, {});
+        const payingUserIds = Object.keys(paymentCountByUser);
+        const renewedUserIds = payingUserIds.filter((userId)=>paymentCountByUser[userId] > 1);
+        const renewalRate = payingUserIds.length ? renewedUserIds.length / payingUserIds.length * 100 : null;
+        const conversionRate = users.length ? premiumUsers.length / users.length * 100 : 0;
         const revenueData = {};
         payments.forEach((payment)=>{
             const day = this.dayKey(payment.createdAt);
@@ -1294,31 +1588,31 @@ let PlatformApiController = class PlatformApiController {
             kpis: [
                 {
                     label: 'Total Subscriptions',
-                    value: String(users.filter((u)=>u.plan !== 'free').length),
-                    delta: 8.4
+                    value: String(premiumUsers.length),
+                    delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', ''))
                 },
                 {
                     label: 'New Premium Users',
-                    value: String(users.filter((u)=>u.plan !== 'free').length),
-                    delta: 4.1
+                    value: String(currentPremiumSignups),
+                    delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', ''))
                 },
                 {
                     label: 'Renewal Rate',
-                    value: '78.6%',
-                    delta: 2.3
+                    value: renewalRate === null ? '—' : `${renewalRate.toFixed(1)}%`,
+                    delta: 0
                 },
                 {
                     label: 'Conversion Rate',
-                    value: `${users.length ? (users.filter((u)=>u.plan !== 'free').length / users.length * 100).toFixed(1) : '0.0'}%`,
-                    delta: -1.1
+                    value: `${conversionRate.toFixed(1)}%`,
+                    delta: 0
                 }
             ],
             revenueData: Object.values(revenueData),
             planSplit,
-            recentUpgrades: payments.slice(-5).reverse().map((p)=>({
+            recentUpgrades: successfulPayments.slice(-5).reverse().map((p)=>({
                     name: p.user?.name || 'Deleted user',
                     plan: p.planName,
-                    amt: `$${Number(p.amount).toFixed(2)}`,
+                    amt: `${this.currencySymbol(p.currency)}${Number(p.amount).toFixed(2)}`,
                     t: p.createdAt.toLocaleString()
                 }))
         };
@@ -1466,6 +1760,140 @@ let PlatformApiController = class PlatformApiController {
         const ipWhitelist = [
             ...new Set(logs.map((log)=>log.ipAddress).filter(Boolean))
         ];
+        const modules = [
+            {
+                name: 'Dashboard',
+                icon: 'LayoutDashboard',
+                route: '/super-admin',
+                access: true,
+                actions: [
+                    {
+                        label: 'View',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Users',
+                icon: 'Users',
+                route: '/super-admin/users',
+                access: true,
+                actions: [
+                    {
+                        label: 'Manage',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Verification',
+                icon: 'ShieldCheck',
+                route: '/super-admin/verification',
+                access: true,
+                actions: [
+                    {
+                        label: 'Review',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Payments',
+                icon: 'CreditCard',
+                route: '/super-admin/payments',
+                access: true,
+                actions: [
+                    {
+                        label: 'Manage',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Reports',
+                icon: 'Flag',
+                route: '/super-admin/reports',
+                access: true,
+                actions: [
+                    {
+                        label: 'Moderate',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Campaigns',
+                icon: 'Bell',
+                route: '/super-admin/notifications',
+                access: true,
+                actions: [
+                    {
+                        label: 'Manage',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Security',
+                icon: 'Lock',
+                route: '/super-admin/security',
+                access: true,
+                actions: [
+                    {
+                        label: 'Audit',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Settings',
+                icon: 'Settings',
+                route: '/super-admin/settings',
+                access: true,
+                actions: [
+                    {
+                        label: 'Configure',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Roles & Permissions',
+                icon: 'KeyRound',
+                route: '/super-admin/roles',
+                access: true,
+                actions: [
+                    {
+                        label: 'Manage',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'System Logs',
+                icon: 'ScrollText',
+                route: '/super-admin/logs',
+                access: true,
+                actions: [
+                    {
+                        label: 'View',
+                        allowed: true
+                    }
+                ]
+            },
+            {
+                name: 'Super Admin Profile',
+                icon: 'User',
+                route: '/super-admin/super-admin',
+                access: true,
+                actions: [
+                    {
+                        label: 'Update',
+                        allowed: true
+                    }
+                ]
+            }
+        ];
         return {
             superAdmin: {
                 profile: {
@@ -1486,144 +1914,11 @@ let PlatformApiController = class PlatformApiController {
                 },
                 accessLevel: {
                     level: 'Owner',
-                    totalPermissions: 42,
-                    modulesAccessible: 10,
+                    totalPermissions: modules.reduce((count, module)=>count + module.actions.filter((action)=>action.allowed).length, 0),
+                    modulesAccessible: modules.filter((module)=>module.access).length,
                     description: 'Full platform access'
                 },
-                modules: [
-                    {
-                        name: 'Dashboard',
-                        icon: 'LayoutDashboard',
-                        route: '/super-admin',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'View',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Users',
-                        icon: 'Users',
-                        route: '/super-admin/users',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Manage',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Verification',
-                        icon: 'ShieldCheck',
-                        route: '/super-admin/verification',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Review',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Payments',
-                        icon: 'CreditCard',
-                        route: '/super-admin/payments',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Manage',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Reports',
-                        icon: 'Flag',
-                        route: '/super-admin/reports',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Moderate',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Notifications',
-                        icon: 'Bell',
-                        route: '/super-admin/notifications',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Send',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Security',
-                        icon: 'Lock',
-                        route: '/super-admin/security',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Audit',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Settings',
-                        icon: 'Settings',
-                        route: '/super-admin/settings',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Configure',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Roles & Permissions',
-                        icon: 'KeyRound',
-                        route: '/super-admin/roles',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Manage',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'System Logs',
-                        icon: 'ScrollText',
-                        route: '/super-admin/logs',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'View',
-                                allowed: true
-                            }
-                        ]
-                    },
-                    {
-                        name: 'Super Admin Profile',
-                        icon: 'User',
-                        route: '/super-admin/super-admin',
-                        access: true,
-                        actions: [
-                            {
-                                label: 'Update',
-                                allowed: true
-                            }
-                        ]
-                    }
-                ],
+                modules,
                 activityLog: logs.map((log)=>({
                         action: log.activity,
                         time: log.createdAt.toLocaleString(),
@@ -1653,11 +1948,14 @@ _ts_decorate([
 ], PlatformApiController.prototype, "dashboard", null);
 _ts_decorate([
     (0, _common.Get)('users'),
-    _ts_param(0, (0, _common.Query)('search')),
-    _ts_param(1, (0, _common.Query)('page')),
-    _ts_param(2, (0, _common.Query)('limit')),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales', 'support'),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_param(1, (0, _common.Query)('search')),
+    _ts_param(2, (0, _common.Query)('page')),
+    _ts_param(3, (0, _common.Query)('limit')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        Object,
         String,
         String,
         String
@@ -1666,6 +1964,7 @@ _ts_decorate([
 ], PlatformApiController.prototype, "users", null);
 _ts_decorate([
     (0, _common.Post)('users'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
@@ -1675,15 +1974,19 @@ _ts_decorate([
 ], PlatformApiController.prototype, "createUser", null);
 _ts_decorate([
     (0, _common.Get)('users/:id'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales', 'support'),
     _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        String
+        String,
+        Object
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "getUserDetails", null);
 _ts_decorate([
     (0, _common.Patch)('users/:id'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
@@ -1695,6 +1998,7 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updateUser", null);
 _ts_decorate([
     (0, _common.Patch)('users/:id/status'),
+    (0, _rolesguard.Roles)('admin', 'super_admin'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)('status')),
     _ts_metadata("design:type", Function),
@@ -1706,6 +2010,7 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updateUserStatus", null);
 _ts_decorate([
     (0, _common.Delete)('users/:id'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
@@ -1715,8 +2020,11 @@ _ts_decorate([
 ], PlatformApiController.prototype, "deleteUser", null);
 _ts_decorate([
     (0, _common.Get)('verification'),
+    _ts_param(0, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "verification", null);
 _ts_decorate([
@@ -1733,8 +2041,12 @@ _ts_decorate([
 ], PlatformApiController.prototype, "reports", null);
 _ts_decorate([
     (0, _common.Get)('notifications'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales'),
+    _ts_param(0, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "notifications", null);
 _ts_decorate([
@@ -1759,15 +2071,71 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updatePlan", null);
 _ts_decorate([
     (0, _common.Post)('notifications'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales'),
     _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof CreateNotificationDto === "undefined" ? Object : CreateNotificationDto
+        typeof CreateNotificationDto === "undefined" ? Object : CreateNotificationDto,
+        Object
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "createNotification", null);
 _ts_decorate([
+    (0, _common.Patch)('notifications/:id'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof UpdateNotificationDto === "undefined" ? Object : UpdateNotificationDto,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "updateNotification", null);
+_ts_decorate([
+    (0, _common.Post)('notifications/:id/submit'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "submitNotification", null);
+_ts_decorate([
+    (0, _common.Post)('notifications/:id/approve'),
+    (0, _rolesguard.Roles)('admin', 'super_admin'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "approveNotification", null);
+_ts_decorate([
+    (0, _common.Post)('notifications/:id/reject'),
+    (0, _rolesguard.Roles)('admin', 'super_admin'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_param(2, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        typeof RejectNotificationDto === "undefined" ? Object : RejectNotificationDto,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "rejectNotification", null);
+_ts_decorate([
     (0, _common.Patch)('notifications/:id/status'),
+    (0, _rolesguard.Roles)('admin', 'super_admin'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)('status')),
     _ts_metadata("design:type", Function),
@@ -1779,13 +2147,62 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updateNotificationStatus", null);
 _ts_decorate([
     (0, _common.Delete)('notifications/:id'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'sales'),
     _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        String
+        String,
+        Object
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "deleteNotification", null);
+_ts_decorate([
+    (0, _common.Get)('campaigns/active'),
+    (0, _rolesguard.Roles)('user'),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "activeUserCampaigns", null);
+_ts_decorate([
+    (0, _common.Post)('campaigns/:id/impression'),
+    (0, _rolesguard.Roles)('user'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "recordCampaignImpression", null);
+_ts_decorate([
+    (0, _common.Post)('campaigns/:id/click'),
+    (0, _rolesguard.Roles)('user'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "recordCampaignClick", null);
+_ts_decorate([
+    (0, _common.Post)('campaigns/:id/dismiss'),
+    (0, _rolesguard.Roles)('user'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "recordCampaignDismiss", null);
 _ts_decorate([
     (0, _common.Get)('security'),
     _ts_metadata("design:type", Function),
@@ -1794,12 +2211,14 @@ _ts_decorate([
 ], PlatformApiController.prototype, "security", null);
 _ts_decorate([
     (0, _common.Get)('settings'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "settings", null);
 _ts_decorate([
     (0, _common.Patch)('settings'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
@@ -1809,12 +2228,14 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updateSettings", null);
 _ts_decorate([
     (0, _common.Get)('roles'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "roles", null);
 _ts_decorate([
     (0, _common.Post)('roles'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
@@ -1824,6 +2245,7 @@ _ts_decorate([
 ], PlatformApiController.prototype, "createRole", null);
 _ts_decorate([
     (0, _common.Patch)('roles/:id'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)()),
     _ts_metadata("design:type", Function),
@@ -1845,37 +2267,22 @@ _ts_decorate([
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "updateVerification", null);
 _ts_decorate([
-    (0, _common.Get)('marketing/overview'),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
-    _ts_metadata("design:returntype", Promise)
-], PlatformApiController.prototype, "marketingOverview", null);
-_ts_decorate([
-    (0, _common.Get)('marketing/campaigns'),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
-    _ts_metadata("design:returntype", Promise)
-], PlatformApiController.prototype, "marketingCampaigns", null);
-_ts_decorate([
-    (0, _common.Get)('marketing/reports'),
-    _ts_metadata("design:type", Function),
-    _ts_metadata("design:paramtypes", []),
-    _ts_metadata("design:returntype", Promise)
-], PlatformApiController.prototype, "marketingReports", null);
-_ts_decorate([
     (0, _common.Get)('sales/overview'),
+    (0, _rolesguard.Roles)('sales', 'admin', 'super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "salesOverview", null);
 _ts_decorate([
     (0, _common.Get)('sales/trends'),
+    (0, _rolesguard.Roles)('sales', 'admin', 'super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "salesTrends", null);
 _ts_decorate([
     (0, _common.Get)('sales/plans'),
+    (0, _rolesguard.Roles)('sales', 'admin', 'super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
@@ -1891,18 +2298,22 @@ _ts_decorate([
 ], PlatformApiController.prototype, "refundPayment", null);
 _ts_decorate([
     (0, _common.Get)('logs'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "logs", null);
 _ts_decorate([
     (0, _common.Get)('super-admin'),
+    (0, _rolesguard.Roles)('super_admin'),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "superAdmin", null);
 PlatformApiController = _ts_decorate([
     (0, _common.Controller)('api'),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('admin', 'super_admin'),
     _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_contactentity.Contact)),
     _ts_param(2, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),

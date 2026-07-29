@@ -74,6 +74,10 @@ _ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], Contact.prototype, "createdAt", void 0);
+_ts_decorate([
+    (0, _typeorm.UpdateDateColumn)(),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], Contact.prototype, "updatedAt", void 0);
 Contact = _ts_decorate([
     (0, _typeorm.Entity)('contacts')
 ], Contact);
