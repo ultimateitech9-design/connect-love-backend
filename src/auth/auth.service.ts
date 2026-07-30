@@ -108,6 +108,25 @@ export class AuthService {
     return this.registrationOtpService.request(email);
   }
 
+  requestPasswordResetOtp(email: string) {
+    return this.registrationOtpService.requestPasswordReset(email);
+  }
+
+  async resetPassword(emailInput: string, otp: string, newPassword: string) {
+    const email = emailInput.trim().toLowerCase();
+    const user = await this.userRepo
+      .createQueryBuilder('u')
+      .addSelect('u.password')
+      .where('u.email = :email', { email })
+      .getOne();
+    if (!user) throw new UnauthorizedException('No account was found with this email address.');
+
+    await this.registrationOtpService.verify(email, otp);
+    user.password = await bcrypt.hash(newPassword, 12);
+    await this.userRepo.save(user);
+    return { message: 'Password updated successfully.' };
+  }
+
   async register(dto: VerifyRegistrationDto) {
     const email = dto.email.trim().toLowerCase();
     const existing = await this.userRepo.findOne({ where: { email } });

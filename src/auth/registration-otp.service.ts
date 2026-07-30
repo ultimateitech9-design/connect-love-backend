@@ -134,11 +134,75 @@ export class RegistrationOtpService {
     return { message: 'OTP sent successfully.', expiresInSeconds: OTP_EXPIRY_MINUTES * 60 };
   }
 
+  async requestPasswordReset(emailInput: string) {
+    const email = this.normalizeEmail(emailInput);
+    const existingUser = await this.userRepo.findOne({ where: { email } });
+    if (!existingUser) {
+      throw new UnauthorizedException('No account was found with this email address.');
+    }
+
+    const now = new Date();
+    const current = await this.otpRepo.findOne({ where: { email } });
+    if (current) {
+      const elapsedMs = now.getTime() - current.lastSentAt.getTime();
+      if (elapsedMs < OTP_RESEND_SECONDS * 1000) {
+        const waitSeconds = Math.ceil((OTP_RESEND_SECONDS * 1000 - elapsedMs) / 1000);
+        throw new HttpException(
+          `Please wait ${waitSeconds} seconds before requesting another OTP.`,
+          HttpStatus.TOO_MANY_REQUESTS,
+        );
+      }
+    }
+
+    const oneHourMs = 60 * 60 * 1000;
+    const sameWindow = current && now.getTime() - current.sendWindowStartedAt.getTime() < oneHourMs;
+    if (sameWindow && current.sendCount >= OTP_MAX_SENDS_PER_HOUR) {
+      throw new HttpException(
+        'Too many OTP requests. Please try again in one hour.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    const otp = randomInt(100000, 1000000).toString();
+    await this.otpRepo.save(this.otpRepo.create({
+      email,
+      otpHash: this.hashOtp(email, otp),
+      expiresAt: new Date(now.getTime() + OTP_EXPIRY_MINUTES * 60 * 1000),
+      attempts: 0,
+      lastSentAt: now,
+      sendWindowStartedAt: sameWindow ? current.sendWindowStartedAt : now,
+      sendCount: sameWindow ? current.sendCount + 1 : 1,
+    }));
+
+    const fromAddress = process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim();
+    try {
+      await this.mailer().sendMail({
+        from: fromAddress,
+        to: email,
+        subject: `${otp} is your ConnectLove password reset code`,
+        text: `Your ConnectLove password reset code is ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes. Never share this code with anyone.`,
+        html: `
+          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
+            <h1 style="font-size:24px;margin:0 0 12px;color:#e11d48">ConnectLove</h1>
+            <p style="font-size:16px;line-height:1.6">Use this code to reset your account password:</p>
+            <div style="font-size:34px;font-weight:800;letter-spacing:8px;text-align:center;padding:20px;margin:22px 0;background:#fff1f2;border-radius:14px;color:#be123c">${otp}</div>
+            <p style="font-size:14px;line-height:1.6;color:#596273">This code expires in ${OTP_EXPIRY_MINUTES} minutes. If you did not request a password reset, you can ignore this email.</p>
+          </div>
+        `,
+      });
+    } catch {
+      await this.otpRepo.delete({ email });
+      throw new ServiceUnavailableException('We could not send the OTP email. Please try again.');
+    }
+
+    return { message: 'Password reset OTP sent successfully.', expiresInSeconds: OTP_EXPIRY_MINUTES * 60 };
+  }
+
   async verify(emailInput: string, otp: string) {
     const email = this.normalizeEmail(emailInput);
     const challenge = await this.otpRepo.findOne({ where: { email } });
     if (!challenge) {
-      throw new UnauthorizedException('Request a new OTP before creating your account.');
+      throw new UnauthorizedException('Request a new OTP before continuing.');
     }
 
     if (challenge.expiresAt.getTime() <= Date.now()) {

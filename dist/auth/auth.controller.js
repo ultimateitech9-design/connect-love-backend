@@ -16,6 +16,8 @@ const _logindto = require("./dto/login.dto");
 const _googleauthdto = require("./dto/google-auth.dto");
 const _requestregistrationotpdto = require("./dto/request-registration-otp.dto");
 const _verifyregistrationdto = require("./dto/verify-registration.dto");
+const _requestpasswordresetdto = require("./dto/request-password-reset.dto");
+const _resetpassworddto = require("./dto/reset-password.dto");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -46,6 +48,12 @@ let AuthController = class AuthController {
     }
     requestRegistrationOtp(dto) {
         return this.authService.requestRegistrationOtp(dto.email);
+    }
+    requestPasswordResetOtp(dto) {
+        return this.authService.requestPasswordResetOtp(dto.email);
+    }
+    resetPassword(dto) {
+        return this.authService.resetPassword(dto.email, dto.otp, dto.newPassword);
     }
     register(dto) {
         return this.authService.register(dto);
@@ -137,6 +145,26 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], AuthController.prototype, "requestRegistrationOtp", null);
+_ts_decorate([
+    (0, _common.Post)('forgot-password/request-otp'),
+    (0, _common.HttpCode)(_common.HttpStatus.OK),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _requestpasswordresetdto.RequestPasswordResetDto === "undefined" ? Object : _requestpasswordresetdto.RequestPasswordResetDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], AuthController.prototype, "requestPasswordResetOtp", null);
+_ts_decorate([
+    (0, _common.Post)('forgot-password/reset'),
+    (0, _common.HttpCode)(_common.HttpStatus.OK),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _resetpassworddto.ResetPasswordDto === "undefined" ? Object : _resetpassworddto.ResetPasswordDto
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], AuthController.prototype, "resetPassword", null);
 _ts_decorate([
     (0, _common.Post)('register'),
     _ts_param(0, (0, _common.Body)()),

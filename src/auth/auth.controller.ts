@@ -15,6 +15,8 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
 import { RequestRegistrationOtpDto } from './dto/request-registration-otp.dto';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -45,6 +47,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   requestRegistrationOtp(@Body() dto: RequestRegistrationOtpDto) {
     return this.authService.requestRegistrationOtp(dto.email);
+  }
+
+  @Post('forgot-password/request-otp')
+  @HttpCode(HttpStatus.OK)
+  requestPasswordResetOtp(@Body() dto: RequestPasswordResetDto) {
+    return this.authService.requestPasswordResetOtp(dto.email);
+  }
+
+  @Post('forgot-password/reset')
+  @HttpCode(HttpStatus.OK)
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto.email, dto.otp, dto.newPassword);
   }
 
   @Post('register')
