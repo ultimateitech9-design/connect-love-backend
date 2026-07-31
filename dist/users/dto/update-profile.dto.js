@@ -63,6 +63,20 @@ _ts_decorate([
 ], UpdateProfileDto.prototype, "city", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsNumber)(),
+    (0, _classvalidator.Min)(-90),
+    (0, _classvalidator.Max)(90),
+    _ts_metadata("design:type", Number)
+], UpdateProfileDto.prototype, "locationLatitude", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsNumber)(),
+    (0, _classvalidator.Min)(-180),
+    (0, _classvalidator.Max)(180),
+    _ts_metadata("design:type", Number)
+], UpdateProfileDto.prototype, "locationLongitude", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
     (0, _classvalidator.IsIn)([
         'Long-term',
