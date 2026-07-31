@@ -9,6 +9,8 @@ Object.defineProperty(exports, "HealthController", {
     }
 });
 const _common = require("@nestjs/common");
+const _typeorm = require("typeorm");
+const _platformsettingentity = require("./platform/platform-setting.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -26,6 +28,20 @@ let HealthController = class HealthController {
             timestamp: new Date().toISOString()
         };
     }
+    async maintenanceStatus() {
+        const setting = await this.dataSource.getRepository(_platformsettingentity.PlatformSetting).findOne({
+            where: {
+                key: 'platform_flags'
+            }
+        });
+        const flags = setting?.value || {};
+        return {
+            maintenanceMode: flags.maintenanceMode ?? false
+        };
+    }
+    constructor(dataSource){
+        this.dataSource = dataSource;
+    }
 };
 _ts_decorate([
     (0, _common.Get)('health'),
@@ -33,8 +49,18 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], HealthController.prototype, "health", null);
+_ts_decorate([
+    (0, _common.Get)('maintenance-status'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], HealthController.prototype, "maintenanceStatus", null);
 HealthController = _ts_decorate([
-    (0, _common.Controller)('api')
+    (0, _common.Controller)('api'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof _typeorm.DataSource === "undefined" ? Object : _typeorm.DataSource
+    ])
 ], HealthController);
 
 //# sourceMappingURL=health.controller.js.map

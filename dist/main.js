@@ -9,6 +9,9 @@ const _appmodule = require("./app.module");
 const _helmet = /*#__PURE__*/ _interop_require_default(require("helmet"));
 const _dotenv = /*#__PURE__*/ _interop_require_wildcard(require("dotenv"));
 const _express = /*#__PURE__*/ _interop_require_wildcard(require("express"));
+const _jwt = require("@nestjs/jwt");
+const _typeorm = require("typeorm");
+const _platformsettingentity = require("./platform/platform-setting.entity");
 function _interop_require_default(obj) {
     return obj && obj.__esModule ? obj : {
         default: obj
@@ -86,6 +89,47 @@ async function bootstrap() {
         limit: '10mb',
         extended: true
     }));
+    const dataSource = app.get(_typeorm.DataSource);
+    const jwtService = app.get(_jwt.JwtService, {
+        strict: false
+    });
+    let maintenanceCache = {
+        enabled: false,
+        checkedAt: 0
+    };
+    app.use(async (request, response, next)=>{
+        const path = request.path.replace(/\/$/, '') || '/';
+        const alwaysAllowed = path === '/api/health' || path === '/api/maintenance-status' || path === '/auth/super-admin/login' || path === '/auth/management/login';
+        if (alwaysAllowed) return next();
+        try {
+            if (Date.now() - maintenanceCache.checkedAt > 2_000) {
+                const setting = await dataSource.getRepository(_platformsettingentity.PlatformSetting).findOne({
+                    where: {
+                        key: 'platform_flags'
+                    }
+                });
+                const flags = setting?.value || {};
+                maintenanceCache = {
+                    enabled: flags.maintenanceMode ?? false,
+                    checkedAt: Date.now()
+                };
+            }
+            if (!maintenanceCache.enabled) return next();
+            const authorization = request.headers.authorization;
+            const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
+            if (token) {
+                const payload = await jwtService.verifyAsync(token);
+                if (payload.role === 'super_admin') return next();
+            }
+        } catch  {
+        // Invalid or expired credentials do not bypass maintenance mode.
+        }
+        return response.status(503).json({
+            statusCode: 503,
+            maintenanceMode: true,
+            message: 'ConnectLove is temporarily unavailable for scheduled maintenance.'
+        });
+    });
     // Security: Secure HTTP headers
     app.use((0, _helmet.default)());
     // Enable CORS for independently deployed frontend origins.
