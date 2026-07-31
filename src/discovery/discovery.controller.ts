@@ -15,6 +15,7 @@ export class DiscoveryController {
     @Query('ageMax') ageMax?: string,
     @Query('interestedIn') interestedIn?: string,
     @Query('goals') goals?: string,
+    @Query('maxDistance') maxDistance?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
@@ -24,6 +25,7 @@ export class DiscoveryController {
       ageMax: ageMax ? Number(ageMax) : undefined,
       interestedIn,
       goals: goals ? goals.split(',').map((goal) => goal.trim()).filter(Boolean) : undefined,
+      maxDistance: maxDistance ? Number(maxDistance) : undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     });

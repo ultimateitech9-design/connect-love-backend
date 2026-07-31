@@ -26,13 +26,14 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let DiscoveryController = class DiscoveryController {
-    async getSuggestions(req, search, ageMin, ageMax, interestedIn, goals, page, limit) {
+    async getSuggestions(req, search, ageMin, ageMax, interestedIn, goals, maxDistance, page, limit) {
         return this.discoveryService.getSuggestions(req.user.userId, {
             search,
             ageMin: ageMin ? Number(ageMin) : undefined,
             ageMax: ageMax ? Number(ageMax) : undefined,
             interestedIn,
             goals: goals ? goals.split(',').map((goal)=>goal.trim()).filter(Boolean) : undefined,
+            maxDistance: maxDistance ? Number(maxDistance) : undefined,
             page: page ? Number(page) : undefined,
             limit: limit ? Number(limit) : undefined
         });
@@ -52,11 +53,13 @@ _ts_decorate([
     _ts_param(3, (0, _common.Query)('ageMax')),
     _ts_param(4, (0, _common.Query)('interestedIn')),
     _ts_param(5, (0, _common.Query)('goals')),
-    _ts_param(6, (0, _common.Query)('page')),
-    _ts_param(7, (0, _common.Query)('limit')),
+    _ts_param(6, (0, _common.Query)('maxDistance')),
+    _ts_param(7, (0, _common.Query)('page')),
+    _ts_param(8, (0, _common.Query)('limit')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
         String,
         String,
         String,

@@ -57,7 +57,7 @@ let DiscoveryService = class DiscoveryService {
         const ageMin = clampAge(filters.ageMin, DEFAULT_MIN_AGE);
         const ageMax = Math.max(ageMin, clampAge(filters.ageMax, DEFAULT_MAX_AGE));
         const page = Math.max(1, Math.trunc(filters.page || 1));
-        const limit = Math.min(50, Math.max(1, Math.trunc(filters.limit || 20)));
+        const limit = Math.min(500, Math.max(1, Math.trunc(filters.limit || 20)));
         const offset = (page - 1) * limit;
         const maxBirthDate = toDateOnly(yearsAgo(ageMin));
         const minBirthDate = yearsAgo(ageMax + 1);
@@ -112,19 +112,30 @@ let DiscoveryService = class DiscoveryService {
                 verified: true
             });
         }
+        const requestedDistance = Number.isFinite(filters.maxDistance) ? Math.max(1, Math.min(10000, filters.maxDistance)) : 10000;
+        const currentLatitude = currentUser?.locationLatitude ?? null;
+        const currentLongitude = currentUser?.locationLongitude ?? null;
+        const distanceSql = `6371.0088 * ACOS(LEAST(1, GREATEST(-1,
+      COS(RADIANS(:currentLatitude)) * COS(RADIANS(user.locationLatitude))
+      * COS(RADIANS(user.locationLongitude) - RADIANS(:currentLongitude))
+      + SIN(RADIANS(:currentLatitude)) * SIN(RADIANS(user.locationLatitude))
+    )))`;
+        query.setParameters({
+            currentLatitude,
+            currentLongitude
+        });
+        if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
+            query.andWhere('user.locationLatitude IS NOT NULL').andWhere('user.locationLongitude IS NOT NULL').andWhere(`${distanceSql} <= :maxDistance`, {
+                maxDistance: requestedDistance
+            });
+        }
         if (!(filters.search && filters.search.trim())) {
-            const currentLatitude = currentUser?.locationLatitude ?? null;
-            const currentLongitude = currentUser?.locationLongitude ?? null;
             query.addSelect(filters.goals?.length ? 'CASE WHEN user.relationshipGoal IN (:...preferredGoals) THEN 0 ELSE 1 END' : '0', 'relationshipGoalScore').addSelect(`CASE WHEN :currentLatitude IS NULL OR :currentLongitude IS NULL
           OR user.locationLatitude IS NULL OR user.locationLongitude IS NULL
           OR user.showDistance = 0 THEN 1 ELSE 0 END`, 'locationMissingScore').addSelect(`CASE WHEN :currentLatitude IS NULL OR :currentLongitude IS NULL
           OR user.locationLatitude IS NULL OR user.locationLongitude IS NULL
           OR user.showDistance = 0 THEN 999999
-          ELSE 6371.0088 * ACOS(LEAST(1, GREATEST(-1,
-            COS(RADIANS(:currentLatitude)) * COS(RADIANS(user.locationLatitude))
-            * COS(RADIANS(user.locationLongitude) - RADIANS(:currentLongitude))
-            + SIN(RADIANS(:currentLatitude)) * SIN(RADIANS(user.locationLatitude))
-          ))) END`, 'distanceScore').addSelect(`CASE WHEN EXISTS (
+          ELSE ${distanceSql} END`, 'distanceScore').addSelect(`CASE WHEN EXISTS (
           SELECT 1 FROM profile_boosts boost
           WHERE boost.userId = user.id AND boost.startsAt <= CURRENT_TIMESTAMP AND boost.endsAt > CURRENT_TIMESTAMP
         ) THEN 1 ELSE 0 END`, 'boostScore').addSelect('CASE WHEN user.city = :currentCity THEN 1 ELSE 0 END', 'cityScore').addSelect('CASE WHEN user.religion = :currentReligion THEN 1 ELSE 0 END', 'religionScore').setParameters({
