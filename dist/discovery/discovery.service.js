@@ -57,13 +57,43 @@ let DiscoveryService = class DiscoveryService {
         const ageMin = clampAge(filters.ageMin, DEFAULT_MIN_AGE);
         const ageMax = Math.max(ageMin, clampAge(filters.ageMax, DEFAULT_MAX_AGE));
         const page = Math.max(1, Math.trunc(filters.page || 1));
-        const limit = Math.min(500, Math.max(1, Math.trunc(filters.limit || 20)));
+        // Keep discovery responses small enough for profiles with base64 photos.
+        // Subsequent batches are fetched as the current batch is swiped away.
+        const limit = Math.min(24, Math.max(1, Math.trunc(filters.limit || 12)));
         const offset = (page - 1) * limit;
         const maxBirthDate = toDateOnly(yearsAgo(ageMin));
         const minBirthDate = yearsAgo(ageMax + 1);
         minBirthDate.setDate(minBirthDate.getDate() + 1);
         // We want to find all users that are NOT the current user
-        const query = this.userRepo.createQueryBuilder('user').where('user.id != :currentUserId', {
+        const query = this.userRepo.createQueryBuilder('user')// Discovery cards only need the primary photo. Avoid loading every user's
+        // complete base64 photo gallery before the first card can render.
+        .select([
+            'user.id',
+            'user.name',
+            'user.gender',
+            'user.birthDate',
+            'user.profession',
+            'user.religion',
+            'user.height',
+            'user.city',
+            'user.bio',
+            'user.relationshipGoal',
+            'user.zodiac',
+            'user.plan',
+            'user.isVerified',
+            'user.isOnline',
+            'user.lastSeen',
+            'user.avatarUrl',
+            'user.photosVisibleToNonMatches',
+            'user.showOnlineStatus',
+            'user.showDistance',
+            'user.locationLatitude',
+            'user.locationLongitude',
+            'user.personalityWords',
+            'user.hobbies',
+            'user.interests',
+            'user.createdAt'
+        ]).where('user.id != :currentUserId', {
             currentUserId
         })// Only show active and verified users
         .andWhere('user.status = :status', {
@@ -151,7 +181,7 @@ let DiscoveryService = class DiscoveryService {
         const users = await query.take(limit).getMany();
         return users.map((user)=>{
             const primaryPhoto = user.avatarUrl;
-            const visiblePhotos = user.photosVisibleToNonMatches ? (user.photos || []).filter(Boolean) : primaryPhoto ? [
+            const visiblePhotos = primaryPhoto ? [
                 primaryPhoto
             ] : [];
             return {
