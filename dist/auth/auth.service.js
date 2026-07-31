@@ -177,6 +177,13 @@ let AuthService = class AuthService {
     }
     async register(dto) {
         const email = dto.email.trim().toLowerCase();
+        const birthDate = new Date(`${dto.birthDate}T00:00:00Z`);
+        const minimumBirthDate = new Date();
+        minimumBirthDate.setUTCHours(0, 0, 0, 0);
+        minimumBirthDate.setUTCFullYear(minimumBirthDate.getUTCFullYear() - 18);
+        if (Number.isNaN(birthDate.getTime()) || birthDate > minimumBirthDate) {
+            throw new _common.BadRequestException('You must be at least 18 years old to create an account.');
+        }
         const existing = await this.userRepo.findOne({
             where: {
                 email
@@ -191,7 +198,7 @@ let AuthService = class AuthService {
             name: dto.name,
             email,
             password: hashed,
-            birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
+            birthDate,
             gender: dto.gender,
             city: dto.city,
             locationLatitude: dto.locationLatitude,

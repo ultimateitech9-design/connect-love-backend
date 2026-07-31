@@ -35,7 +35,6 @@ _ts_decorate([
     _ts_metadata("design:type", String)
 ], RegisterDto.prototype, "password", void 0);
 _ts_decorate([
-    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsDateString)(),
     _ts_metadata("design:type", String)
 ], RegisterDto.prototype, "birthDate", void 0);

@@ -22,9 +22,8 @@ export class RegisterDto {
   @MinLength(8)
   password: string;
 
-  @IsOptional()
   @IsDateString()
-  birthDate?: string;
+  birthDate: string;
 
   @IsOptional()
   @IsString()
