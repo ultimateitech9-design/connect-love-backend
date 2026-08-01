@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { MatchRelation } from '../matches/match.entity';
 import { SearchService } from '../search/search.service';
@@ -78,7 +78,6 @@ export class DiscoveryService {
         'user.isVerified',
         'user.isOnline',
         'user.lastSeen',
-        'user.avatarUrl',
         'user.photosVisibleToNonMatches',
         'user.showOnlineStatus',
         'user.showDistance',
@@ -191,6 +190,21 @@ export class DiscoveryService {
         .skip(offset);
     }
     const users = await query.take(limit).getMany();
+
+    // Photos can contain large base64 payloads. Selecting them in the ranked
+    // query makes MySQL carry those payloads through its sort buffer and can
+    // fail with ER_OUT_OF_SORTMEMORY. Fetch photos only for the small, final
+    // page after ranking has completed.
+    if (users.length > 0) {
+      const photoRows = await this.userRepo.find({
+        select: ['id', 'photos'],
+        where: { id: In(users.map((user) => user.id)) },
+      });
+      const photosByUserId = new Map(photoRows.map((user) => [user.id, user.photos]));
+      users.forEach((user) => {
+        user.photos = photosByUserId.get(user.id) || [];
+      });
+    }
 
     return users.map(user => {
       const primaryPhoto = user.avatarUrl;

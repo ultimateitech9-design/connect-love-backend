@@ -83,7 +83,6 @@ let DiscoveryService = class DiscoveryService {
             'user.isVerified',
             'user.isOnline',
             'user.lastSeen',
-            'user.avatarUrl',
             'user.photosVisibleToNonMatches',
             'user.showOnlineStatus',
             'user.showDistance',
@@ -179,6 +178,28 @@ let DiscoveryService = class DiscoveryService {
             }).orderBy('relationshipGoalScore', 'ASC').addOrderBy('locationMissingScore', 'ASC').addOrderBy('distanceScore', 'ASC').addOrderBy('boostScore', 'DESC').addOrderBy('cityScore', 'DESC').addOrderBy('religionScore', 'DESC').addOrderBy('user.createdAt', 'DESC').skip(offset);
         }
         const users = await query.take(limit).getMany();
+        // Photos can contain large base64 payloads. Selecting them in the ranked
+        // query makes MySQL carry those payloads through its sort buffer and can
+        // fail with ER_OUT_OF_SORTMEMORY. Fetch photos only for the small, final
+        // page after ranking has completed.
+        if (users.length > 0) {
+            const photoRows = await this.userRepo.find({
+                select: [
+                    'id',
+                    'photos'
+                ],
+                where: {
+                    id: (0, _typeorm1.In)(users.map((user)=>user.id))
+                }
+            });
+            const photosByUserId = new Map(photoRows.map((user)=>[
+                    user.id,
+                    user.photos
+                ]));
+            users.forEach((user)=>{
+                user.photos = photosByUserId.get(user.id) || [];
+            });
+        }
         return users.map((user)=>{
             const primaryPhoto = user.avatarUrl;
             const visiblePhotos = primaryPhoto ? [
