@@ -42,6 +42,9 @@ let ProfilePhotosService = class ProfilePhotosService {
         if (uniquePhotos.length > 5) {
             throw new _common.BadRequestException('Maximum 5 photos allowed');
         }
+        if (uniquePhotos.length < (user.photos?.length || 0)) {
+            throw new _common.BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+        }
         const primaryPhotoChanged = user.photos?.[0] !== uniquePhotos[0];
         user.photos = uniquePhotos;
         if (primaryPhotoChanged) {

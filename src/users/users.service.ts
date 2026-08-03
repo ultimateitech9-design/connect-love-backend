@@ -100,6 +100,9 @@ export class UsersService {
       if (uniquePhotos.length > 5) {
         throw new BadRequestException('Maximum 5 photos allowed.');
       }
+      if (uniquePhotos.length < (existingUser.photos?.length || 0)) {
+        throw new BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+      }
       const photosChanged = JSON.stringify(existingUser.photos || []) !== JSON.stringify(uniquePhotos);
       sanitizedData.photos = uniquePhotos;
       if (photosChanged) {

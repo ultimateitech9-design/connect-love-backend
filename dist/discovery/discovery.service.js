@@ -225,7 +225,7 @@ let DiscoveryService = class DiscoveryService {
                 avatarUrl: primaryPhoto,
                 photo: primaryPhoto,
                 photos: visiblePhotos,
-                photoCount: visiblePhotos.length,
+                photoCount: user.photos?.length || 0,
                 photosVisibleToNonMatches: user.photosVisibleToNonMatches,
                 verified: user.isVerified,
                 personality: user.personalityWords || [],
