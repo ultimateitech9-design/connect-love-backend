@@ -3,11 +3,14 @@ import {
   IsEmail,
   IsLatitude,
   IsLongitude,
+  IsNumber,
   IsOptional,
   IsIn,
   IsString,
   MaxLength,
   MinLength,
+  Max,
+  Min,
 } from 'class-validator';
 
 export class RegisterDto {
@@ -42,4 +45,10 @@ export class RegisterDto {
   @IsOptional()
   @IsLongitude()
   locationLongitude?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(1500)
+  locationAccuracy?: number;
 }

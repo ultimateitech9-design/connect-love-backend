@@ -129,6 +129,10 @@ export class AuthService {
 
   async register(dto: VerifyRegistrationDto) {
     const email = dto.email.trim().toLowerCase();
+    const hasGpsCoordinates = dto.locationLatitude != null || dto.locationLongitude != null;
+    if (hasGpsCoordinates && (dto.locationLatitude == null || dto.locationLongitude == null || dto.locationAccuracy == null || dto.locationAccuracy > 1500)) {
+      throw new BadRequestException('A precise GPS location is required. Please enable Precise Location and try again.');
+    }
     const birthDate = new Date(`${dto.birthDate}T00:00:00Z`);
     const minimumBirthDate = new Date();
     minimumBirthDate.setUTCHours(0, 0, 0, 0);
