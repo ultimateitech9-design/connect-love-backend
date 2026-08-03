@@ -250,14 +250,31 @@ let MatchesService = class MatchesService {
         return this.matchesRepository.save(match);
     }
     async respond(id, action, userId) {
+        if (userId) {
+            const status = action === 'accept' ? _matchentity.MatchStatus.MATCHED : _matchentity.MatchStatus.DECLINED;
+            const result = await this.matchesRepository.update({
+                id,
+                receiverId: userId,
+                status: _matchentity.MatchStatus.PENDING
+            }, {
+                status
+            });
+            if (result.affected) {
+                return {
+                    id,
+                    receiverId: userId,
+                    status
+                };
+            }
+        }
         const match = await this.matchesRepository.findOne({
             where: {
                 id
             }
         });
         if (!match) throw new _common.NotFoundException('Match request not found.');
-        if (userId && match.senderId !== userId && match.receiverId !== userId) {
-            throw new _common.ForbiddenException('You are not part of this match request.');
+        if (userId && match.receiverId !== userId) {
+            throw new _common.ForbiddenException('Only the receiver can respond to this match request.');
         }
         if (action === 'accept') {
             match.status = _matchentity.MatchStatus.MATCHED;

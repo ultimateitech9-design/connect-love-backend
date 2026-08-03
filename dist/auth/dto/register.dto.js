@@ -65,5 +65,12 @@ _ts_decorate([
     (0, _classvalidator.IsLongitude)(),
     _ts_metadata("design:type", Number)
 ], RegisterDto.prototype, "locationLongitude", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsNumber)(),
+    (0, _classvalidator.Min)(0),
+    (0, _classvalidator.Max)(1500),
+    _ts_metadata("design:type", Number)
+], RegisterDto.prototype, "locationAccuracy", void 0);
 
 //# sourceMappingURL=register.dto.js.map

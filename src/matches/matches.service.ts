@@ -218,10 +218,21 @@ export class MatchesService {
   }
 
   async respond(id: string, action: 'accept' | 'decline', userId?: string): Promise<MatchRelation> {
+    if (userId) {
+      const status = action === 'accept' ? MatchStatus.MATCHED : MatchStatus.DECLINED;
+      const result = await this.matchesRepository.update(
+        { id, receiverId: userId, status: MatchStatus.PENDING },
+        { status },
+      );
+      if (result.affected) {
+        return { id, receiverId: userId, status } as MatchRelation;
+      }
+    }
+
     const match = await this.matchesRepository.findOne({ where: { id } });
     if (!match) throw new NotFoundException('Match request not found.');
-    if (userId && match.senderId !== userId && match.receiverId !== userId) {
-      throw new ForbiddenException('You are not part of this match request.');
+    if (userId && match.receiverId !== userId) {
+      throw new ForbiddenException('Only the receiver can respond to this match request.');
     }
 
     if (action === 'accept') {
