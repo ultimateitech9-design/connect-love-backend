@@ -22,7 +22,9 @@ export class MatchesService {
       ...user,
       age: user.age,
       avatarUrl: user.avatarUrl,
-      photos: user.photos || [],
+      // Match cards only display the primary photo. Returning every full-size
+      // base64 photo made the response tens of MB for users with many matches.
+      photos: user.photos?.length ? [user.photos[0]] : [],
       photosVisibleToNonMatches: true,
       interests: user.interests || [],
       personality: user.personalityWords || [],
