@@ -21,7 +21,9 @@ export class MatchesService {
     return {
       ...user,
       age: user.age,
-      avatarUrl: user.avatarUrl,
+      // `photos[0]` is the card image. Do not duplicate the same large base64
+      // value in `avatarUrl`, which previously doubled the response payload.
+      avatarUrl: null,
       // Match cards only display the primary photo. Returning every full-size
       // base64 photo made the response tens of MB for users with many matches.
       photos: user.photos?.length ? [user.photos[0]] : [],
