@@ -10,7 +10,6 @@ Object.defineProperty(exports, "MatchesController", {
 });
 const _common = require("@nestjs/common");
 const _matchesservice = require("./matches.service");
-const _matchentity = require("./match.entity");
 const _passport = require("@nestjs/passport");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
@@ -29,17 +28,7 @@ function _ts_param(paramIndex, decorator) {
 let MatchesController = class MatchesController {
     async getMatches(filter, req) {
         const userId = req.user.userId;
-        const allMatches = await this.matchesService.findAll(userId);
-        if (filter === 'active') {
-            return allMatches.filter((m)=>m.status === _matchentity.MatchStatus.MATCHED);
-        } else if (filter === 'sent') {
-            return allMatches.filter((m)=>m.status === _matchentity.MatchStatus.PENDING && m.senderId === userId);
-        } else if (filter === 'received') {
-            return allMatches.filter((m)=>m.status === _matchentity.MatchStatus.PENDING && m.receiverId === userId);
-        } else if (filter === 'blocked') {
-            return allMatches.filter((m)=>m.status === _matchentity.MatchStatus.BLOCKED && m.senderId === userId);
-        }
-        return allMatches;
+        return this.matchesService.findForFilter(userId, filter);
     }
     async swipeProfile(req, receiverId, action) {
         const userId = req.user.userId;

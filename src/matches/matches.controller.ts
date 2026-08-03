@@ -11,19 +11,7 @@ export class MatchesController {
   @Get()
   async getMatches(@Query('filter') filter: 'active' | 'sent' | 'received' | 'blocked', @Request() req) {
     const userId = req.user.userId;
-    const allMatches = await this.matchesService.findAll(userId);
-
-    if (filter === 'active') {
-      return allMatches.filter(m => m.status === MatchStatus.MATCHED);
-    } else if (filter === 'sent') {
-      return allMatches.filter(m => m.status === MatchStatus.PENDING && m.senderId === userId);
-    } else if (filter === 'received') {
-      return allMatches.filter(m => m.status === MatchStatus.PENDING && m.receiverId === userId);
-    } else if (filter === 'blocked') {
-      return allMatches.filter(m => m.status === MatchStatus.BLOCKED && m.senderId === userId);
-    }
-    
-    return allMatches;
+    return this.matchesService.findForFilter(userId, filter);
   }
 
   @Post('swipe')

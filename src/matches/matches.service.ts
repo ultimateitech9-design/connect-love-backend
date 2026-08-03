@@ -46,26 +46,35 @@ export class MatchesService {
   }
 
   private async enrichMatches(matches: MatchRelation[], userId: string): Promise<any[]> {
-    const enriched = await Promise.all(matches.map(async (match) => {
-      const lastMessage = await this.msgRepo
-        .createQueryBuilder('message')
-        .select(['message.content', 'message.createdAt'])
-        .where('message.conversationId = :conversationId', { conversationId: match.id })
-        .orderBy('message.createdAt', 'DESC')
-        .getOne();
-      const unreadCount = await this.msgRepo.count({
-        where: { conversationId: match.id, receiverId: userId, isRead: false },
-      });
+    if (matches.length === 0) return [];
 
+    // Fetch message metadata for every conversation in one query. The old code
+    // executed two queries per match, which made this endpoint increasingly slow.
+    const messageSummary = await this.msgRepo
+      .createQueryBuilder('message')
+      .select('message.conversationId', 'conversationId')
+      .addSelect('MAX(message.createdAt)', 'lastMessageTime')
+      .addSelect(
+        'SUM(CASE WHEN message.receiverId = :userId AND message.isRead = :isRead THEN 1 ELSE 0 END)',
+        'unreadCount',
+      )
+      .where('message.conversationId IN (:...matchIds)', { matchIds: matches.map((match) => match.id) })
+      .setParameters({ userId, isRead: false })
+      .groupBy('message.conversationId')
+      .getRawMany<{ conversationId: string; lastMessageTime: string | Date | null; unreadCount: string }>();
+
+    const summaries = new Map(messageSummary.map((row) => [row.conversationId, row]));
+    const enriched = matches.map((match) => {
+      const summary = summaries.get(match.id);
       return {
         ...match,
         sender: this.serializeUser(match.sender),
         receiver: this.serializeUser(match.receiver),
-        lastMessage: lastMessage ? lastMessage.content : 'No messages yet.',
-        lastMessageTime: lastMessage ? lastMessage.createdAt : match.createdAt,
-        unreadCount,
+        lastMessage: 'No messages yet.',
+        lastMessageTime: summary?.lastMessageTime || match.createdAt,
+        unreadCount: Number(summary?.unreadCount || 0),
       };
-    }));
+    });
 
     return enriched.sort(
       (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime(),
@@ -98,6 +107,31 @@ export class MatchesService {
       .orderBy('match.createdAt', 'DESC')
       .getMany();
 
+    return this.enrichMatches(matches, userId);
+  }
+
+  async findForFilter(
+    userId: string,
+    filter?: 'active' | 'sent' | 'received' | 'blocked',
+  ): Promise<any[]> {
+    const query = this.matchesWithProfilesQuery()
+      .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId });
+
+    if (filter === 'active') {
+      query.andWhere('match.status = :status', { status: MatchStatus.MATCHED });
+    } else if (filter === 'sent') {
+      query.andWhere('match.status = :status AND match.senderId = :userId', { status: MatchStatus.PENDING, userId });
+    } else if (filter === 'received') {
+      query.andWhere('match.status = :status AND match.receiverId = :userId', { status: MatchStatus.PENDING, userId });
+    } else if (filter === 'blocked') {
+      query.andWhere('match.status = :status AND match.senderId = :userId', { status: MatchStatus.BLOCKED, userId });
+    } else {
+      query.andWhere('match.status IN (:...statuses)', {
+        statuses: [MatchStatus.MATCHED, MatchStatus.PENDING, MatchStatus.BLOCKED],
+      });
+    }
+
+    const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
     return this.enrichMatches(matches, userId);
   }
 
