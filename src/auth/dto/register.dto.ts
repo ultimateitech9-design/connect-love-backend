@@ -1,5 +1,4 @@
 import {
-  Equals,
   IsDateString,
   IsEmail,
   IsLatitude,
@@ -23,12 +22,8 @@ export class RegisterDto {
   @MinLength(8)
   password: string;
 
-  @Equals(true, { message: 'You must confirm that you are at least 18 years old.' })
-  ageConfirmed: boolean;
-
-  @IsOptional()
   @IsDateString()
-  birthDate?: string;
+  birthDate: string;
 
   @IsOptional()
   @IsString()
