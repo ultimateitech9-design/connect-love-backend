@@ -319,6 +319,22 @@ let MatchesService = class MatchesService {
             deleted: true
         };
     }
+    async undoSwipe(senderId, receiverId) {
+        const match = await this.matchesRepository.findOne({
+            where: {
+                senderId,
+                receiverId
+            }
+        });
+        if (!match) throw new _common.NotFoundException('Swipe not found.');
+        if (match.status === _matchentity.MatchStatus.MATCHED || match.status === _matchentity.MatchStatus.BLOCKED) {
+            throw new _common.BadRequestException('This swipe can no longer be undone.');
+        }
+        await this.matchesRepository.remove(match);
+        return {
+            deleted: true
+        };
+    }
     constructor(matchesRepository, msgRepo, userRepo){
         this.matchesRepository = matchesRepository;
         this.msgRepo = msgRepo;

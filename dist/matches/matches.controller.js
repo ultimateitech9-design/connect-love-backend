@@ -38,6 +38,9 @@ let MatchesController = class MatchesController {
         // Delete the blocked relation so they return to discovery
         return this.matchesService.delete(id, req.user.userId);
     }
+    async undoSwipe(req, receiverId) {
+        return this.matchesService.undoSwipe(req.user.userId, receiverId);
+    }
     async deletePendingRequest(req, id) {
         return this.matchesService.deletePendingRequest(id, req.user.userId);
     }
@@ -86,6 +89,17 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MatchesController.prototype, "unblockUser", null);
+_ts_decorate([
+    (0, _common.Delete)('swipe/:receiverId'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Param)('receiverId')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        void 0,
+        String
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MatchesController.prototype, "undoSwipe", null);
 _ts_decorate([
     (0, _common.Delete)('pending/:id'),
     _ts_param(0, (0, _common.Request)()),

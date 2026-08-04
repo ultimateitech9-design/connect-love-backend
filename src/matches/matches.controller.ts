@@ -26,6 +26,11 @@ export class MatchesController {
     return this.matchesService.delete(id, req.user.userId);
   }
 
+  @Delete('swipe/:receiverId')
+  async undoSwipe(@Request() req, @Param('receiverId') receiverId: string) {
+    return this.matchesService.undoSwipe(req.user.userId, receiverId);
+  }
+
   @Delete('pending/:id')
   async deletePendingRequest(@Request() req, @Param('id') id: string) {
     return this.matchesService.deletePendingRequest(id, req.user.userId);

@@ -271,4 +271,15 @@ export class MatchesService {
     return { deleted: true };
   }
 
+  async undoSwipe(senderId: string, receiverId: string): Promise<{ deleted: boolean }> {
+    const match = await this.matchesRepository.findOne({ where: { senderId, receiverId } });
+    if (!match) throw new NotFoundException('Swipe not found.');
+    if (match.status === MatchStatus.MATCHED || match.status === MatchStatus.BLOCKED) {
+      throw new BadRequestException('This swipe can no longer be undone.');
+    }
+
+    await this.matchesRepository.remove(match);
+    return { deleted: true };
+  }
+
 }
