@@ -665,7 +665,7 @@ export class PlatformApiController {
           } : {}),
         })),
         ...kycUsers
-          .filter((user) => !requestedUserIds.has(user.id) && !user.isVerified)
+          .filter((user) => !requestedUserIds.has(user.id))
           .map((user) => ({
             id: `kyc-${user.id}`,
             name: user.name || 'Unknown user',
