@@ -76,6 +76,29 @@ _ts_decorate([
     _ts_metadata("design:type", typeof PaymentStatus === "undefined" ? Object : PaymentStatus)
 ], Payment.prototype, "status", void 0);
 _ts_decorate([
+    (0, _typeorm.Column)({
+        length: 30,
+        default: 'razorpay'
+    }),
+    _ts_metadata("design:type", String)
+], Payment.prototype, "gateway", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        length: 80,
+        nullable: true,
+        unique: true
+    }),
+    _ts_metadata("design:type", String)
+], Payment.prototype, "gatewayOrderId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        length: 80,
+        nullable: true,
+        unique: true
+    }),
+    _ts_metadata("design:type", String)
+], Payment.prototype, "gatewayPaymentId", void 0);
+_ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], Payment.prototype, "createdAt", void 0);

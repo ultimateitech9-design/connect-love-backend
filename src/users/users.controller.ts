@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request }
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { Roles, RolesGuard } from '../auth/roles.guard';
 
 @Controller('users')
 export class UsersController {
@@ -38,6 +39,32 @@ export class UsersController {
   @Post('me/coins/spend')
   spendCoins(@Request() req: any, @Body('amount') amount: number) {
     return this.usersService.spendCoins(req.user.userId, amount);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/coins/gift')
+  sendGift(@Request() req: any, @Body() body: { receiverId?: string; amount?: number; label?: string }) {
+    return this.usersService.sendGift(req.user.userId, String(body.receiverId || ''), Number(body.amount), body.label);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/coins/withdraw')
+  requestWithdrawal(@Request() req: any, @Body() body: { amount?: number; payoutAccount?: string }) {
+    return this.usersService.requestWithdrawal(req.user.userId, Number(body.amount), String(body.payoutAccount || ''));
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('super_admin')
+  @Get('admin/coin-transactions')
+  getCoinTransactions() {
+    return this.usersService.getCoinTransactions();
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('super_admin')
+  @Patch('admin/coin-transactions/:id/withdrawal')
+  updateWithdrawalStatus(@Param('id') id: string, @Body('status') status: 'completed' | 'rejected') {
+    return this.usersService.updateWithdrawalStatus(id, status);
   }
 
   /** GET /users/me/export - returns a portable copy of the authenticated user's data */

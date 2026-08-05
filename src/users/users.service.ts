@@ -1,11 +1,12 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
+import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { ProfileView } from './profile-view.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { distanceBetweenKm } from '../location/distance';
+import { CoinTransaction } from './coin-transaction.entity';
 
 const normalizeTags = (tags: string[]) => {
   if (!tags || !Array.isArray(tags)) return tags;
@@ -23,6 +24,9 @@ export class UsersService {
     private readonly matchRepo: Repository<MatchRelation>,
     @InjectRepository(ProfileView)
     private readonly profileViewRepo: Repository<ProfileView>,
+    @InjectRepository(CoinTransaction)
+    private readonly coinTransactionRepo: Repository<CoinTransaction>,
+    private readonly dataSource: DataSource,
   ) {}
 
   serializeUser(user: User): any {
@@ -277,23 +281,116 @@ export class UsersService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found.');
     await this.userRepo.increment({ id: userId }, 'coinBalance', coins);
+    await this.coinTransactionRepo.save(this.coinTransactionRepo.create({
+      type: 'recharge', status: 'completed', userId, senderId: null, receiverId: null,
+      grossCoins: coins, userCoins: coins, platformCoins: 0, label: 'Wallet recharge', payoutAccount: null,
+    }));
     const updated = await this.userRepo.findOne({ where: { id: userId } });
     return { coinBalance: updated?.coinBalance || 0 };
   }
 
-  async spendCoins(userId: string, amount: number): Promise<{ coinBalance: number }> {
+  async spendCoins(userId: string, amount: number): Promise<{ coinBalance: number; earnedCoinBalance: number }> {
     const coins = Number(amount);
     if (!Number.isInteger(coins) || coins < 1) {
       throw new BadRequestException('Invalid coin amount.');
     }
-    const result = await this.userRepo.createQueryBuilder()
-      .update(User)
-      .set({ coinBalance: () => `coinBalance - ${coins}` })
-      .where('id = :userId', { userId })
-      .andWhere('coinBalance >= :coins', { coins })
-      .execute();
-    if (!result.affected) throw new BadRequestException('Not enough coins. Please recharge your wallet.');
-    const updated = await this.userRepo.findOne({ where: { id: userId } });
-    return { coinBalance: updated?.coinBalance || 0 };
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+      if (!user || user.coinBalance + user.earnedCoinBalance < coins) throw new BadRequestException('Not enough coins. Please recharge your wallet.');
+      this.deductRechargeFirst(user, coins);
+      await manager.getRepository(User).save(user);
+      await manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({
+        type: 'theme', status: 'completed', userId, senderId: userId, receiverId: null,
+        grossCoins: coins, userCoins: 0, platformCoins: coins, label: 'Premium theme unlock', payoutAccount: null,
+      }));
+      return { coinBalance: user.coinBalance, earnedCoinBalance: user.earnedCoinBalance };
+    });
+  }
+
+  private deductRechargeFirst(user: User, coins: number) {
+    const rechargeCoinsUsed = Math.min(user.coinBalance || 0, coins);
+    const earnedCoinsUsed = coins - rechargeCoinsUsed;
+    user.coinBalance -= rechargeCoinsUsed;
+    user.earnedCoinBalance -= earnedCoinsUsed;
+  }
+
+  async sendGift(userId: string, receiverId: string, amount: number, label?: string) {
+    const coins = Number(amount);
+    if (!receiverId || receiverId === userId) throw new BadRequestException('Choose another user to receive this gift.');
+    if (!Number.isInteger(coins) || coins < 1) throw new BadRequestException('Invalid gift amount.');
+    return this.dataSource.transaction(async (manager) => {
+      const users = await manager.getRepository(User).find({
+        where: { id: In([userId, receiverId]) },
+        lock: { mode: 'pessimistic_write' },
+      });
+      const sender = users.find((user) => user.id === userId);
+      const receiver = users.find((user) => user.id === receiverId);
+      if (!sender || !receiver) throw new NotFoundException('Gift sender or receiver was not found.');
+      if (sender.coinBalance + sender.earnedCoinBalance < coins) throw new BadRequestException('Not enough coins. Please recharge your wallet.');
+      const receiverCoins = Math.floor(coins * 0.8);
+      const platformCoins = coins - receiverCoins;
+      this.deductRechargeFirst(sender, coins);
+      receiver.earnedCoinBalance += receiverCoins;
+      await manager.getRepository(User).save([sender, receiver]);
+      await manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({
+        type: 'gift', status: 'completed', userId, senderId: userId, receiverId,
+        grossCoins: coins, userCoins: receiverCoins, platformCoins,
+        label: String(label || 'Gift').slice(0, 120), payoutAccount: null,
+      }));
+      return { coinBalance: sender.coinBalance, earnedCoinBalance: sender.earnedCoinBalance, receiverCoins, platformCoins };
+    });
+  }
+
+  async requestWithdrawal(userId: string, amount: number, payoutAccount: string) {
+    const coins = Number(amount);
+    const account = String(payoutAccount || '').trim();
+    if (!Number.isInteger(coins) || coins < 50) throw new BadRequestException('Minimum withdrawal is 50 coins.');
+    if (account.length < 3 || account.length > 160) throw new BadRequestException('Enter a valid UPI ID or payout account.');
+    return this.dataSource.transaction(async (manager) => {
+      const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+      if (!user) throw new NotFoundException('User not found.');
+      if (user.earnedCoinBalance < coins) {
+        throw new BadRequestException('Only gift earnings can be withdrawn. Your available earned balance is too low.');
+      }
+      user.earnedCoinBalance -= coins;
+      await manager.getRepository(User).save(user);
+      const transaction = await manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({
+        type: 'withdrawal', status: 'pending', userId, senderId: null, receiverId: userId,
+        grossCoins: coins, userCoins: coins, platformCoins: 0, label: 'Withdrawal request', payoutAccount: account,
+      }));
+      return { id: transaction.id, status: transaction.status, coinBalance: user.coinBalance, earnedCoinBalance: user.earnedCoinBalance };
+    });
+  }
+
+  async getCoinTransactions() {
+    const rows = await this.coinTransactionRepo.find({ order: { createdAt: 'DESC' }, take: 1000 });
+    const ids = [...new Set(rows.flatMap((row) => [row.userId, row.senderId, row.receiverId]).filter((id): id is string => Boolean(id)))];
+    const users = ids.length ? await this.userRepo.find({ select: ['id', 'name', 'email'], where: { id: In(ids) } }) : [];
+    const names = new Map(users.map((user) => [user.id, { name: user.name, email: user.email }]));
+    return rows.map((row) => ({
+      ...row,
+      user: row.userId ? names.get(row.userId) || null : null,
+      sender: row.senderId ? names.get(row.senderId) || null : null,
+      receiver: row.receiverId ? names.get(row.receiverId) || null : null,
+    }));
+  }
+
+  async updateWithdrawalStatus(id: string, status: 'completed' | 'rejected') {
+    if (status !== 'completed' && status !== 'rejected') throw new BadRequestException('Invalid withdrawal status.');
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(CoinTransaction);
+      const transaction = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!transaction || transaction.type !== 'withdrawal') throw new NotFoundException('Withdrawal request not found.');
+      if (transaction.status !== 'pending') throw new BadRequestException('This withdrawal request is already processed.');
+      if (status === 'rejected' && transaction.userId) {
+        const user = await manager.getRepository(User).findOne({ where: { id: transaction.userId }, lock: { mode: 'pessimistic_write' } });
+        if (user) {
+          user.earnedCoinBalance += transaction.grossCoins;
+          await manager.getRepository(User).save(user);
+        }
+      }
+      transaction.status = status;
+      return repository.save(transaction);
+    });
   }
 }

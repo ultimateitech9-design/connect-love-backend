@@ -205,6 +205,13 @@ _ts_decorate([
 ], User.prototype, "plan", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        nullable: true,
+        type: 'datetime'
+    }),
+    _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
+], User.prototype, "planExpiresAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'enum',
         enum: [
             'active',
@@ -313,6 +320,14 @@ _ts_decorate([
     }),
     _ts_metadata("design:type", Number)
 ], User.prototype, "coinBalance", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'int',
+        unsigned: true,
+        default: 0
+    }),
+    _ts_metadata("design:type", Number)
+], User.prototype, "earnedCoinBalance", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
         default: false

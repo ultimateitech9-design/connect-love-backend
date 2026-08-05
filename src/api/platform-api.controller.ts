@@ -479,7 +479,7 @@ export class PlatformApiController {
         email: user.email,
         ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
         plan: user.plan,
-        account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
+        account: user.plan === 'platinum' ? 'Diamond' : user.plan === 'gold' ? 'Gold' : 'Free',
         city: user.city || 'Unknown',
         joined: user.createdAt,
         lastActive: user.lastSeen || user.updatedAt,
@@ -525,7 +525,7 @@ export class PlatformApiController {
       city: user.city,
       isVerified: user.isVerified,
       plan: user.plan,
-      account: user.plan === 'platinum' ? 'Premium Plus' : user.plan === 'gold' ? 'Premium' : 'Free Tier',
+      account: user.plan === 'platinum' ? 'Diamond' : user.plan === 'gold' ? 'Gold' : 'Free',
       ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
       status: this.statusLabel(user.status),
       joined: user.createdAt,
@@ -999,18 +999,50 @@ export class PlatformApiController {
   }
 
   @Get('security')
+  @Roles('super_admin')
   async security() {
-    const logs = await this.auditRepo.find({ order: { createdAt: 'ASC' } });
-    const weekly = logs.reduce<Record<string, { day: string; success: number; failed: number }>>((acc, log) => {
-      const day = log.createdAt.toLocaleDateString('en-US', { weekday: 'short' });
-      acc[day] ||= { day, success: 0, failed: 0 };
-      if (log.action.toLowerCase().includes('fail')) acc[day].failed += 1;
-      else if (log.action.toLowerCase().includes('login')) acc[day].success += 1;
-      return acc;
-    }, {});
+    const now = new Date();
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 6);
+    const logs = await this.auditRepo
+      .createQueryBuilder('log')
+      .where('log.createdAt >= :start', { start })
+      .orderBy('log.createdAt', 'ASC')
+      .getMany();
+    const weekly = Array.from({ length: 7 }, (_, offset) => {
+      const date = new Date(start);
+      date.setDate(start.getDate() + offset);
+      return {
+        key: date.toISOString().slice(0, 10),
+        day: date.toLocaleDateString('en-US', { weekday: 'short' }),
+        success: 0,
+        failed: 0,
+      };
+    });
+    const byDate = new Map(weekly.map((row) => [row.key, row]));
+    for (const log of logs) {
+      const row = byDate.get(log.createdAt.toISOString().slice(0, 10));
+      if (!row || log.module !== 'Authentication') continue;
+      if (log.action.toLowerCase() === 'failed') row.failed += 1;
+      else if (log.loginAt) row.success += 1;
+    }
+    const activeCutoff = new Date(now.getTime() - 2 * 60 * 1000);
+    const activeSessions = await this.auditRepo
+      .createQueryBuilder('log')
+      .where('log.module = :module', { module: 'Authentication' })
+      .andWhere('log.loginAt IS NOT NULL')
+      .andWhere('log.logoutAt IS NULL')
+      .andWhere('log.lastActivityAt >= :activeCutoff', { activeCutoff })
+      .getCount();
+    const successfulLogins = weekly.reduce((total, row) => total + row.success, 0);
+    const failedLogins = weekly.reduce((total, row) => total + row.failed, 0);
     const blockedAccounts = await this.userRepo.count({ where: { status: 'banned' } });
     return {
-      loginActivity: Object.values(weekly),
+      loginActivity: weekly.map(({ day, success, failed }) => ({ day, success, failed })),
+      loginAttempts: successfulLogins + failedLogins,
+      failedLogins,
+      activeSessions,
       blockedAccounts,
     };
   }
@@ -1319,6 +1351,7 @@ export class PlatformApiController {
       { name: 'Users', icon: 'Users', route: '/super-admin/users', access: true, actions: [{ label: 'Manage', allowed: true }] },
       { name: 'Verification', icon: 'ShieldCheck', route: '/super-admin/verification', access: true, actions: [{ label: 'Review', allowed: true }] },
       { name: 'Payments', icon: 'CreditCard', route: '/super-admin/payments', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'Transactions', icon: 'WalletCards', route: '/super-admin/transactions', access: true, actions: [{ label: 'View', allowed: true }] },
       { name: 'Reports', icon: 'Flag', route: '/super-admin/reports', access: true, actions: [{ label: 'Moderate', allowed: true }] },
       { name: 'Campaigns', icon: 'Bell', route: '/super-admin/notifications', access: true, actions: [{ label: 'Manage', allowed: true }] },
       { name: 'Security', icon: 'Lock', route: '/super-admin/security', access: true, actions: [{ label: 'Audit', allowed: true }] },

@@ -17,6 +17,7 @@ import { EmailRegistrationOtp } from './auth/email-registration-otp.entity';
 import { DivorcedLead } from './divorced/divorced-lead.entity';
 import { ProfileView } from './users/profile-view.entity';
 import { UserDevice } from './push-notifications/user-device.entity';
+import { CoinTransaction } from './users/coin-transaction.entity';
 
 dotenv.config();
 
@@ -44,6 +45,7 @@ export default new DataSource({
     DivorcedLead,
     ProfileView,
     UserDevice,
+    CoinTransaction,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

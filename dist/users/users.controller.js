@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _passport = require("@nestjs/passport");
 const _usersservice = require("./users.service");
 const _updateprofiledto = require("./dto/update-profile.dto");
+const _rolesguard = require("../auth/roles.guard");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -41,6 +42,18 @@ let UsersController = class UsersController {
     }
     spendCoins(req, amount) {
         return this.usersService.spendCoins(req.user.userId, amount);
+    }
+    sendGift(req, body) {
+        return this.usersService.sendGift(req.user.userId, String(body.receiverId || ''), Number(body.amount), body.label);
+    }
+    requestWithdrawal(req, body) {
+        return this.usersService.requestWithdrawal(req.user.userId, Number(body.amount), String(body.payoutAccount || ''));
+    }
+    getCoinTransactions() {
+        return this.usersService.getCoinTransactions();
+    }
+    updateWithdrawalStatus(id, status) {
+        return this.usersService.updateWithdrawalStatus(id, status);
     }
     /** GET /users/me/export - returns a portable copy of the authenticated user's data */ exportMe(req) {
         return this.usersService.exportMe(req.user.userId);
@@ -123,6 +136,51 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], UsersController.prototype, "spendCoins", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Post)('me/coins/gift'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "sendGift", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Post)('me/coins/withdraw'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "requestWithdrawal", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('super_admin'),
+    (0, _common.Get)('admin/coin-transactions'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "getCoinTransactions", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('super_admin'),
+    (0, _common.Patch)('admin/coin-transactions/:id/withdrawal'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Body)('status')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "updateWithdrawalStatus", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Get)('me/export'),

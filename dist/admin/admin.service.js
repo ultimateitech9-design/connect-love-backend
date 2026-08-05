@@ -254,7 +254,7 @@ let AdminService = class AdminService {
                     id: user.id,
                     name: user.name,
                     email: user.email,
-                    plan: user.plan === 'platinum' ? 'Premium' : 'Plus',
+                    plan: user.plan === 'platinum' ? 'Diamond' : user.plan === 'gold' ? 'Gold' : 'Free',
                     joined: user.createdAt
                 }))
         };

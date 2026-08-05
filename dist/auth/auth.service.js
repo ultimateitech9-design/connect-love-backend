@@ -111,6 +111,17 @@ let AuthService = class AuthService {
         log.sessionId = log.id;
         return this.auditRepo.save(log);
     }
+    async rejectLogin(email, context, message) {
+        await this.auditRepo.save(this.auditRepo.create({
+            user: email.trim().toLowerCase() || 'Unknown user',
+            activity: 'Failed login attempt',
+            ipAddress: context.ipAddress || 'Unknown',
+            action: 'Failed',
+            module: 'Authentication',
+            device: (context.device || 'Unknown device').slice(0, 255)
+        }));
+        throw new _common.UnauthorizedException(message);
+    }
     async touchSession(token) {
         const payload = this.readToken(token);
         if (!payload?.sid) return {
@@ -220,15 +231,15 @@ let AuthService = class AuthService {
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
         }).getOne();
-        if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         if (user.role !== 'user') {
-            throw new _common.UnauthorizedException('Please use the management login for this account.');
+            return this.rejectLogin(dto.email, context, 'Please use the management login for this account.');
         }
         if (user.status !== 'active') {
-            throw new _common.UnauthorizedException('This account is not active. Please contact support.');
+            return this.rejectLogin(dto.email, context, 'This account is not active. Please contact support.');
         }
         const match = await _bcryptjs.compare(dto.password, user.password);
-        if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!match) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         const session = await this.startSession(user, context);
         const token = this.signUserToken(user, session.sessionId);
         return {
@@ -314,14 +325,14 @@ let AuthService = class AuthService {
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
         }).getOne();
-        if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         // 3. Ensure role is admin or super_admin
         if (user.role !== 'admin' && user.role !== 'super_admin') {
-            throw new _common.UnauthorizedException('Access denied. Admin privileges required.');
+            return this.rejectLogin(dto.email, context, 'Access denied. Admin privileges required.');
         }
         // 4. Verify password
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
-        if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!match) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         const session = await this.startSession(user, context);
         const token = this.signUserToken(user, session.sessionId);
         return {
@@ -339,12 +350,12 @@ let AuthService = class AuthService {
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
         }).getOne();
-        if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         if (user.role !== 'super_admin') {
-            throw new _common.UnauthorizedException('Access denied. Super Admin privileges required.');
+            return this.rejectLogin(dto.email, context, 'Access denied. Super Admin privileges required.');
         }
         const match = await _bcryptjs.compare(decryptedPassword, user.password);
-        if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!match) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         const session = await this.startSession(user, context);
         const token = this.signUserToken(user, session.sessionId);
         return {
@@ -378,18 +389,18 @@ let AuthService = class AuthService {
         };
         const allowedRoles = roleMap[dto.role];
         if (!allowedRoles) {
-            throw new _common.UnauthorizedException('Unknown management role.');
+            return this.rejectLogin(dto.email, context, 'Unknown management role.');
         }
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
             email: dto.email
         }).getOne();
-        if (!user) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         if (!allowedRoles.includes(user.role)) {
-            throw new _common.UnauthorizedException('Access denied for this management portal.');
+            return this.rejectLogin(dto.email, context, 'Access denied for this management portal.');
         }
         const password = this.decryptOrUsePlainPassword(dto.password);
         const match = await _bcryptjs.compare(password, user.password);
-        if (!match) throw new _common.UnauthorizedException('Invalid email or password.');
+        if (!match) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
         const session = await this.startSession(user, context);
         const token = this.signUserToken(user, session.sessionId);
         return {

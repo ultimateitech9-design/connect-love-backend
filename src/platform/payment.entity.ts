@@ -27,6 +27,15 @@ export class Payment {
   @Column({ type: 'enum', enum: ['successful', 'pending', 'refunded', 'failed'], default: 'pending' })
   status: PaymentStatus;
 
+  @Column({ length: 30, default: 'razorpay' })
+  gateway: string;
+
+  @Column({ length: 80, nullable: true, unique: true })
+  gatewayOrderId: string;
+
+  @Column({ length: 80, nullable: true, unique: true })
+  gatewayPaymentId: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

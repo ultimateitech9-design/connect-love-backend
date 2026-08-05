@@ -102,6 +102,9 @@ export class User {
   @Column({ type: 'enum', enum: ['free', 'gold', 'platinum'], default: 'free' })
   plan: UserPlan;
 
+  @Column({ nullable: true, type: 'datetime' })
+  planExpiresAt: Date;
+
   @Column({ type: 'enum', enum: ['active', 'suspended', 'banned', 'pending_verification'], default: 'active' })
   status: UserStatus;
 
@@ -152,6 +155,9 @@ export class User {
 
   @Column({ type: 'int', unsigned: true, default: 0 })
   coinBalance: number;
+
+  @Column({ type: 'int', unsigned: true, default: 0 })
+  earnedCoinBalance: number;
 
   @Column({ default: false })
   darkMode: boolean;

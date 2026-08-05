@@ -27,6 +27,7 @@ const _emailregistrationotpentity = require("./auth/email-registration-otp.entit
 const _divorcedleadentity = require("./divorced/divorced-lead.entity");
 const _profileviewentity = require("./users/profile-view.entity");
 const _userdeviceentity = require("./push-notifications/user-device.entity");
+const _cointransactionentity = require("./users/coin-transaction.entity");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -92,7 +93,8 @@ const _default = new _typeorm.DataSource({
         _emailregistrationotpentity.EmailRegistrationOtp,
         _divorcedleadentity.DivorcedLead,
         _profileviewentity.ProfileView,
-        _userdeviceentity.UserDevice
+        _userdeviceentity.UserDevice,
+        _cointransactionentity.CoinTransaction
     ],
     migrations: [
         __dirname + '/migrations/*{.ts,.js}'

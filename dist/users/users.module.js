@@ -15,6 +15,8 @@ const _usersservice = require("./users.service");
 const _userentity = require("./user.entity");
 const _matchentity = require("../matches/match.entity");
 const _profileviewentity = require("./profile-view.entity");
+const _cointransactionentity = require("./coin-transaction.entity");
+const _rolesguard = require("../auth/roles.guard");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -29,14 +31,16 @@ UsersModule = _ts_decorate([
             _typeorm.TypeOrmModule.forFeature([
                 _userentity.User,
                 _matchentity.MatchRelation,
-                _profileviewentity.ProfileView
+                _profileviewentity.ProfileView,
+                _cointransactionentity.CoinTransaction
             ])
         ],
         controllers: [
             _userscontroller.UsersController
         ],
         providers: [
-            _usersservice.UsersService
+            _usersservice.UsersService,
+            _rolesguard.RolesGuard
         ],
         exports: [
             _usersservice.UsersService

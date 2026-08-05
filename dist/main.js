@@ -8,7 +8,6 @@ const _common = require("@nestjs/common");
 const _appmodule = require("./app.module");
 const _helmet = /*#__PURE__*/ _interop_require_default(require("helmet"));
 const _dotenv = /*#__PURE__*/ _interop_require_wildcard(require("dotenv"));
-const _express = /*#__PURE__*/ _interop_require_wildcard(require("express"));
 const _jwt = require("@nestjs/jwt");
 const _typeorm = require("typeorm");
 const _platformsettingentity = require("./platform/platform-setting.entity");
@@ -74,7 +73,9 @@ function isAllowedOrigin(origin) {
     return false;
 }
 async function bootstrap() {
-    const app = await _core.NestFactory.create(_appmodule.AppModule);
+    const app = await _core.NestFactory.create(_appmodule.AppModule, {
+        rawBody: true
+    });
     app.enableShutdownHooks();
     app.setGlobalPrefix(process.env.API_PREFIX || '', {
         exclude: [
@@ -82,13 +83,13 @@ async function bootstrap() {
         ]
     });
     // Increase JSON body limit to 10 MB (needed for base64 profile photos)
-    app.use(_express.json({
+    app.useBodyParser('json', {
         limit: '10mb'
-    }));
-    app.use(_express.urlencoded({
+    });
+    app.useBodyParser('urlencoded', {
         limit: '10mb',
         extended: true
-    }));
+    });
     const dataSource = app.get(_typeorm.DataSource);
     const jwtService = app.get(_jwt.JwtService, {
         strict: false
@@ -100,7 +101,8 @@ async function bootstrap() {
     app.use(async (request, response, next)=>{
         const path = request.path.replace(/\/$/, '') || '/';
         const alwaysAllowed = path === '/api/health' || path === '/api/maintenance-status' || path === '/auth/super-admin/login' || path === '/auth/management/login';
-        if (alwaysAllowed) return next();
+        const paymentWebhook = path === '/payments/razorpay/webhook';
+        if (alwaysAllowed || paymentWebhook) return next();
         try {
             if (Date.now() - maintenanceCache.checkedAt > 2_000) {
                 const setting = await dataSource.getRepository(_platformsettingentity.PlatformSetting).findOne({

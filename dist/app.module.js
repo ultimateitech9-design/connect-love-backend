@@ -27,6 +27,7 @@ const _boostsmodule = require("./boosts/boosts.module");
 const _chatbotmodule = require("./chatbot/chatbot.module");
 const _divorcedmodule = require("./divorced/divorced.module");
 const _pushnotificationsmodule = require("./push-notifications/push-notifications.module");
+const _paymentsmodule = require("./payments/payments.module");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -118,7 +119,8 @@ AppModule = _ts_decorate([
             _boostsmodule.BoostsModule,
             _chatbotmodule.ChatbotModule,
             _divorcedmodule.DivorcedModule,
-            _pushnotificationsmodule.PushNotificationsModule
+            _pushnotificationsmodule.PushNotificationsModule,
+            _paymentsmodule.PaymentsModule
         ],
         controllers: [
             _healthcontroller.HealthController

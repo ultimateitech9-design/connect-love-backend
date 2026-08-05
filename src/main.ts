@@ -4,7 +4,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
 import helmet from 'helmet';
 import * as dotenv from 'dotenv';
-import * as express from 'express';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import type { NextFunction, Request, Response } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { DataSource } from 'typeorm';
@@ -36,13 +36,13 @@ function isAllowedOrigin(origin: string | undefined): boolean {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { rawBody: true });
   app.enableShutdownHooks();
   app.setGlobalPrefix(process.env.API_PREFIX || '', { exclude: ['/health'] });
 
   // Increase JSON body limit to 10 MB (needed for base64 profile photos)
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+  app.useBodyParser('json', { limit: '10mb' });
+  app.useBodyParser('urlencoded', { limit: '10mb', extended: true });
 
   const dataSource = app.get(DataSource);
   const jwtService = app.get(JwtService, { strict: false });
@@ -54,7 +54,8 @@ async function bootstrap() {
       || path === '/api/maintenance-status'
       || path === '/auth/super-admin/login'
       || path === '/auth/management/login';
-    if (alwaysAllowed) return next();
+    const paymentWebhook = path === '/payments/razorpay/webhook';
+    if (alwaysAllowed || paymentWebhook) return next();
 
     try {
       if (Date.now() - maintenanceCache.checkedAt > 2_000) {
