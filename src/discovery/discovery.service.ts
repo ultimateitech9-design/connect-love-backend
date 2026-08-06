@@ -19,7 +19,8 @@ interface DiscoveryFilters {
 
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 90;
-const DISCOVERABLE_GENDERS = new Set(['female', 'male', 'non-binary']);
+const DISCOVERABLE_GENDERS = new Set(['female', 'male', 'non-binary', 'prefer-not']);
+const THIRD_GENDER_VALUES = ['non-binary', 'prefer-not'];
 
 function clampAge(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value!), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
@@ -99,8 +100,18 @@ export class DiscoveryService {
         maxBirthDate,
       });
 
-    if (filters.interestedIn && filters.interestedIn !== 'everyone' && DISCOVERABLE_GENDERS.has(filters.interestedIn)) {
-      query.andWhere('LOWER(user.gender) = :interestedIn', { interestedIn: filters.interestedIn });
+    const currentGender = String(currentUser?.gender || '').trim().toLowerCase();
+    const allowedGenders = currentGender === 'male'
+      ? ['female', ...THIRD_GENDER_VALUES]
+      : currentGender === 'female'
+        ? ['male', ...THIRD_GENDER_VALUES]
+        : [...DISCOVERABLE_GENDERS];
+    const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
+    query
+      .addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore')
+      .setParameter('allowedGenders', allowedGenders);
+    if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
+      query.andWhere('LOWER(user.gender) = :interestedIn', { interestedIn: requestedGender });
     }
 
     if (filters.search && filters.search.trim()) {
@@ -111,7 +122,9 @@ export class DiscoveryService {
         query.andWhere('user.id IN (:...searchIds)', { searchIds });
         const rankSql = searchIds.map((_, index) => `WHEN :rank${index} THEN ${index}`).join(' ');
         searchIds.forEach((id, index) => query.setParameter(`rank${index}`, id));
-        query.orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC');
+        query
+          .orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC')
+          .addOrderBy('genderPreferenceScore', 'ASC');
       } else {
         query.andWhere('(LOWER(user.name) LIKE :search OR LOWER(user.city) LIKE :search OR LOWER(user.profession) LIKE :search)', {
           search: `%${term.toLowerCase()}%`,
@@ -181,7 +194,8 @@ export class DiscoveryService {
           currentReligion: currentUser?.religion || '',
           ...(filters.goals?.length ? { preferredGoals: filters.goals } : {}),
         })
-        .orderBy('relationshipGoalScore', 'ASC')
+        .orderBy('genderPreferenceScore', 'ASC')
+        .addOrderBy('relationshipGoalScore', 'ASC')
         .addOrderBy('locationMissingScore', 'ASC')
         .addOrderBy('distanceScore', 'ASC')
         .addOrderBy('boostScore', 'DESC')

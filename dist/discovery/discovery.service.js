@@ -34,8 +34,13 @@ const DEFAULT_MAX_AGE = 90;
 const DISCOVERABLE_GENDERS = new Set([
     'female',
     'male',
-    'non-binary'
+    'non-binary',
+    'prefer-not'
 ]);
+const THIRD_GENDER_VALUES = [
+    'non-binary',
+    'prefer-not'
+];
 function clampAge(value, fallback) {
     return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
 }
@@ -104,9 +109,21 @@ let DiscoveryService = class DiscoveryService {
             minBirthDate: toDateOnly(minBirthDate),
             maxBirthDate
         });
-        if (filters.interestedIn && filters.interestedIn !== 'everyone' && DISCOVERABLE_GENDERS.has(filters.interestedIn)) {
+        const currentGender = String(currentUser?.gender || '').trim().toLowerCase();
+        const allowedGenders = currentGender === 'male' ? [
+            'female',
+            ...THIRD_GENDER_VALUES
+        ] : currentGender === 'female' ? [
+            'male',
+            ...THIRD_GENDER_VALUES
+        ] : [
+            ...DISCOVERABLE_GENDERS
+        ];
+        const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
+        query.addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore').setParameter('allowedGenders', allowedGenders);
+        if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
             query.andWhere('LOWER(user.gender) = :interestedIn', {
-                interestedIn: filters.interestedIn
+                interestedIn: requestedGender
             });
         }
         if (filters.search && filters.search.trim()) {
@@ -124,7 +141,7 @@ let DiscoveryService = class DiscoveryService {
                 });
                 const rankSql = searchIds.map((_, index)=>`WHEN :rank${index} THEN ${index}`).join(' ');
                 searchIds.forEach((id, index)=>query.setParameter(`rank${index}`, id));
-                query.orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC');
+                query.orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC').addOrderBy('genderPreferenceScore', 'ASC');
             } else {
                 query.andWhere('(LOWER(user.name) LIKE :search OR LOWER(user.city) LIKE :search OR LOWER(user.profession) LIKE :search)', {
                     search: `%${term.toLowerCase()}%`
@@ -176,7 +193,7 @@ let DiscoveryService = class DiscoveryService {
                 ...filters.goals?.length ? {
                     preferredGoals: filters.goals
                 } : {}
-            }).orderBy('relationshipGoalScore', 'ASC').addOrderBy('locationMissingScore', 'ASC').addOrderBy('distanceScore', 'ASC').addOrderBy('boostScore', 'DESC').addOrderBy('cityScore', 'DESC').addOrderBy('religionScore', 'DESC').addOrderBy('user.createdAt', 'DESC').skip(offset);
+            }).orderBy('genderPreferenceScore', 'ASC').addOrderBy('relationshipGoalScore', 'ASC').addOrderBy('locationMissingScore', 'ASC').addOrderBy('distanceScore', 'ASC').addOrderBy('boostScore', 'DESC').addOrderBy('cityScore', 'DESC').addOrderBy('religionScore', 'DESC').addOrderBy('user.createdAt', 'DESC').skip(offset);
         }
         const users = await query.take(limit).getMany();
         // Photos can contain large base64 payloads. Selecting them in the ranked

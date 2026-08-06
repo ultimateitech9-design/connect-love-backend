@@ -13,6 +13,7 @@ import { AuditLog } from './platform/audit-log.entity';
 import { PlatformSetting } from './platform/platform-setting.entity';
 import { PlatformRole } from './platform/role.entity';
 import { VideoCall } from './messages/video-call.entity';
+import { FirstImpression } from './first-impressions/first-impression.entity';
 import { EmailRegistrationOtp } from './auth/email-registration-otp.entity';
 import { DivorcedLead } from './divorced/divorced-lead.entity';
 import { ProfileView } from './users/profile-view.entity';
@@ -41,6 +42,7 @@ export default new DataSource({
     PlatformSetting,
     PlatformRole,
     VideoCall,
+    FirstImpression,
     EmailRegistrationOtp,
     DivorcedLead,
     ProfileView,

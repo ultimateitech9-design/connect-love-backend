@@ -23,6 +23,7 @@ const _auditlogentity = require("./platform/audit-log.entity");
 const _platformsettingentity = require("./platform/platform-setting.entity");
 const _roleentity = require("./platform/role.entity");
 const _videocallentity = require("./messages/video-call.entity");
+const _firstimpressionentity = require("./first-impressions/first-impression.entity");
 const _emailregistrationotpentity = require("./auth/email-registration-otp.entity");
 const _divorcedleadentity = require("./divorced/divorced-lead.entity");
 const _profileviewentity = require("./users/profile-view.entity");
@@ -90,6 +91,7 @@ const _default = new _typeorm.DataSource({
         _platformsettingentity.PlatformSetting,
         _roleentity.PlatformRole,
         _videocallentity.VideoCall,
+        _firstimpressionentity.FirstImpression,
         _emailregistrationotpentity.EmailRegistrationOtp,
         _divorcedleadentity.DivorcedLead,
         _profileviewentity.ProfileView,

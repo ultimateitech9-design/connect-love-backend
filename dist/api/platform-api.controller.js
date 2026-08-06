@@ -926,7 +926,7 @@ let PlatformApiController = class PlatformApiController {
                             birthDate: request.user?.birthDate || null
                         } : {}
                     })),
-                ...kycUsers.filter((user)=>!requestedUserIds.has(user.id) && !user.isVerified).map((user)=>({
+                ...kycUsers.filter((user)=>!requestedUserIds.has(user.id)).map((user)=>({
                         id: `kyc-${user.id}`,
                         name: user.name || 'Unknown user',
                         email: user.email || '',
