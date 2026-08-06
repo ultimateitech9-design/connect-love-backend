@@ -20,7 +20,13 @@ interface DiscoveryFilters {
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 90;
 const DISCOVERABLE_GENDERS = new Set(['female', 'male', 'non-binary', 'prefer-not']);
-const THIRD_GENDER_VALUES = ['non-binary', 'prefer-not'];
+
+function preferredGendersFor(gender: string): string[] {
+  if (gender === 'male') return ['female', 'non-binary'];
+  if (gender === 'female') return ['male', 'non-binary'];
+  if (gender === 'non-binary') return ['female', 'male'];
+  return [...DISCOVERABLE_GENDERS];
+}
 
 function clampAge(value: number | undefined, fallback: number): number {
   return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value!), DEFAULT_MIN_AGE), DEFAULT_MAX_AGE) : fallback;
@@ -101,11 +107,7 @@ export class DiscoveryService {
       });
 
     const currentGender = String(currentUser?.gender || '').trim().toLowerCase();
-    const allowedGenders = currentGender === 'male'
-      ? ['female', ...THIRD_GENDER_VALUES]
-      : currentGender === 'female'
-        ? ['male', ...THIRD_GENDER_VALUES]
-        : [...DISCOVERABLE_GENDERS];
+    const allowedGenders = preferredGendersFor(currentGender);
     const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
     query
       .addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore')
