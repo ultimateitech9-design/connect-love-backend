@@ -45,7 +45,8 @@ let MatchesService = class MatchesService {
     serializeUser(user) {
         if (!user) return null;
         return {
-            ...user,
+            id: user.id,
+            name: user.name,
             age: user.age,
             // `photos[0]` is the card image. Do not duplicate the same large base64
             // value in `avatarUrl`, which previously doubled the response payload.
@@ -55,11 +56,8 @@ let MatchesService = class MatchesService {
             photos: user.photos?.length ? [
                 user.photos[0]
             ] : [],
-            photosVisibleToNonMatches: true,
-            interests: user.interests || [],
-            personality: user.personalityWords || [],
-            hobbies: user.hobbies || [],
-            planBadge: (0, _planentitlements.entitlementsFor)(user).verifiedBadge
+            bio: user.bio,
+            isOnline: user.isOnline
         };
     }
     matchesWithProfilesQuery() {
@@ -69,29 +67,15 @@ let MatchesService = class MatchesService {
             'sender.id',
             'sender.name',
             'sender.birthDate',
-            'sender.gender',
             'sender.bio',
             'sender.photos',
             'sender.isOnline',
-            'sender.showOnlineStatus',
-            'sender.city',
-            'sender.profession',
-            'sender.isVerified',
-            'sender.plan',
-            'sender.planExpiresAt',
             'receiver.id',
             'receiver.name',
             'receiver.birthDate',
-            'receiver.gender',
             'receiver.bio',
             'receiver.photos',
-            'receiver.isOnline',
-            'receiver.showOnlineStatus',
-            'receiver.city',
-            'receiver.profession',
-            'receiver.isVerified',
-            'receiver.plan',
-            'receiver.planExpiresAt'
+            'receiver.isOnline'
         ]);
     }
     async enrichMatches(matches, userId) {
@@ -178,7 +162,7 @@ let MatchesService = class MatchesService {
         }).orderBy('match.createdAt', 'DESC').getMany();
         return this.enrichMatches(matches, userId);
     }
-    async findForFilter(userId, filter) {
+    async findForFilter(userId, filter, limit = 12, offset = 0) {
         const query = this.matchesWithProfilesQuery().where('(match.senderId = :userId OR match.receiverId = :userId)', {
             userId
         });
@@ -210,7 +194,10 @@ let MatchesService = class MatchesService {
                 ]
             });
         }
-        const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
+        // Each dashboard tab renders a small page only. Loading every related
+        // profile (and its photo) made accounts with many requests unnecessarily
+        // slow to open.
+        const matches = await query.orderBy('match.createdAt', 'DESC').take(Math.min(Math.max(limit, 1), 20)).skip(Math.max(offset, 0)).getMany();
         const enriched = await this.enrichMatches(matches, userId);
         if (filter !== 'received') return enriched;
         const { user, limits } = await this.planUsage.get(userId);
@@ -250,6 +237,33 @@ let MatchesService = class MatchesService {
                 },
                 locked: true
             }));
+    }
+    async getSummary(userId) {
+        const count = (status, field)=>{
+            const where = {
+                status
+            };
+            if (field) where[field] = userId;
+            return field ? this.matchesRepository.count({
+                where
+            }) : this.matchesRepository.createQueryBuilder('match').where('(match.senderId = :userId OR match.receiverId = :userId)', {
+                userId
+            }).andWhere('match.status = :status', {
+                status
+            }).getCount();
+        };
+        const [active, sent, received, blocked] = await Promise.all([
+            count(_matchentity.MatchStatus.MATCHED),
+            count(_matchentity.MatchStatus.PENDING, 'senderId'),
+            count(_matchentity.MatchStatus.PENDING, 'receiverId'),
+            count(_matchentity.MatchStatus.BLOCKED, 'senderId')
+        ]);
+        return {
+            active,
+            sent,
+            received,
+            blocked
+        };
     }
     async create(senderId, receiverId, isSuperLike = false) {
         const match = this.matchesRepository.create({

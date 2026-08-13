@@ -26,9 +26,12 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let MatchesController = class MatchesController {
-    async getMatches(filter, req) {
+    async getMatches(filter, limit, offset, req) {
         const userId = req.user.userId;
-        return this.matchesService.findForFilter(userId, filter);
+        return this.matchesService.findForFilter(userId, filter, Number(limit) || 12, Number(offset) || 0);
+    }
+    async getSummary(req) {
+        return this.matchesService.getSummary(req.user.userId);
     }
     async swipeProfile(req, receiverId, action) {
         const userId = req.user.userId;
@@ -57,14 +60,27 @@ let MatchesController = class MatchesController {
 _ts_decorate([
     (0, _common.Get)(),
     _ts_param(0, (0, _common.Query)('filter')),
-    _ts_param(1, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Query)('limit')),
+    _ts_param(2, (0, _common.Query)('offset')),
+    _ts_param(3, (0, _common.Request)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        String,
+        String,
         String,
         void 0
     ]),
     _ts_metadata("design:returntype", Promise)
 ], MatchesController.prototype, "getMatches", null);
+_ts_decorate([
+    (0, _common.Get)('summary'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        void 0
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], MatchesController.prototype, "getSummary", null);
 _ts_decorate([
     (0, _common.Post)('swipe'),
     _ts_param(0, (0, _common.Request)()),
