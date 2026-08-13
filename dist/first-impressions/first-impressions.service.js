@@ -15,6 +15,7 @@ const _userentity = require("../users/user.entity");
 const _firstimpressionentity = require("./first-impression.entity");
 const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
 const _planusageservice = require("../plans/plan-usage.service");
+const _matchentity = require("../matches/match.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -62,6 +63,29 @@ let FirstImpressionsService = class FirstImpressionsService {
                 throw new _common.ConflictException('You have already sent this user a First Impression.');
             }
             throw error;
+        }
+        // A First Impression is also a normal profile like. This makes the profile
+        // appear in Sent Likes for the sender and Likes Received for the receiver.
+        // Do not replace or duplicate an existing relation between the same users.
+        const relation = await this.matches.findOne({
+            where: [
+                {
+                    senderId,
+                    receiverId
+                },
+                {
+                    senderId: receiverId,
+                    receiverId: senderId
+                }
+            ]
+        });
+        if (!relation) {
+            await this.matches.save(this.matches.create({
+                senderId,
+                receiverId,
+                status: _matchentity.MatchStatus.PENDING,
+                isSuperLike: false
+            }));
         }
         void this.pushNotifications.sendToUser(receiverId, {
             title: 'New First Impression',
@@ -123,9 +147,10 @@ let FirstImpressionsService = class FirstImpressionsService {
                 }))
         };
     }
-    constructor(impressions, users, pushNotifications, planUsage){
+    constructor(impressions, users, matches, pushNotifications, planUsage){
         this.impressions = impressions;
         this.users = users;
+        this.matches = matches;
         this.pushNotifications = pushNotifications;
         this.planUsage = planUsage;
     }
@@ -134,8 +159,10 @@ FirstImpressionsService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_firstimpressionentity.FirstImpression)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService,

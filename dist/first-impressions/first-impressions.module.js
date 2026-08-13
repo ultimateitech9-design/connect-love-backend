@@ -15,6 +15,7 @@ const _firstimpressionentity = require("./first-impression.entity");
 const _firstimpressionscontroller = require("./first-impressions.controller");
 const _firstimpressionsservice = require("./first-impressions.service");
 const _pushnotificationsmodule = require("../push-notifications/push-notifications.module");
+const _matchentity = require("../matches/match.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -28,7 +29,8 @@ FirstImpressionsModule = _ts_decorate([
         imports: [
             _typeorm.TypeOrmModule.forFeature([
                 _firstimpressionentity.FirstImpression,
-                _userentity.User
+                _userentity.User,
+                _matchentity.MatchRelation
             ]),
             _pushnotificationsmodule.PushNotificationsModule
         ],

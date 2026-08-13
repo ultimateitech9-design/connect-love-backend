@@ -17,6 +17,8 @@ const _matchentity = require("../matches/match.entity");
 const _profileviewentity = require("./profile-view.entity");
 const _cointransactionentity = require("./coin-transaction.entity");
 const _rolesguard = require("../auth/roles.guard");
+const _walletpaymentsservice = require("./wallet-payments.service");
+const _walletpaymentscontroller = require("./wallet-payments.controller");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -36,10 +38,12 @@ UsersModule = _ts_decorate([
             ])
         ],
         controllers: [
-            _userscontroller.UsersController
+            _userscontroller.UsersController,
+            _walletpaymentscontroller.WalletPaymentsController
         ],
         providers: [
             _usersservice.UsersService,
+            _walletpaymentsservice.WalletPaymentsService,
             _rolesguard.RolesGuard
         ],
         exports: [

@@ -101,7 +101,7 @@ async function bootstrap() {
     app.use(async (request, response, next)=>{
         const path = request.path.replace(/\/$/, '') || '/';
         const alwaysAllowed = path === '/api/health' || path === '/api/maintenance-status' || path === '/auth/super-admin/login' || path === '/auth/management/login';
-        const paymentWebhook = path === '/payments/razorpay/webhook';
+        const paymentWebhook = path === '/payments/razorpay/webhook' || path === '/wallet/razorpay/webhook';
         if (alwaysAllowed || paymentWebhook) return next();
         try {
             if (Date.now() - maintenanceCache.checkedAt > 2_000) {

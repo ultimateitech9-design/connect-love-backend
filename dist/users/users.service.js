@@ -315,39 +315,7 @@ let UsersService = class UsersService {
         };
     }
     async rechargeCoins(userId, amount) {
-        const coins = Number(amount);
-        if (!Number.isInteger(coins) || coins < 1 || coins > 100000) {
-            throw new _common.BadRequestException('Enter a valid recharge amount between 1 and 100000 coins.');
-        }
-        const user = await this.userRepo.findOne({
-            where: {
-                id: userId
-            }
-        });
-        if (!user) throw new _common.NotFoundException('User not found.');
-        await this.userRepo.increment({
-            id: userId
-        }, 'coinBalance', coins);
-        await this.coinTransactionRepo.save(this.coinTransactionRepo.create({
-            type: 'recharge',
-            status: 'completed',
-            userId,
-            senderId: null,
-            receiverId: null,
-            grossCoins: coins,
-            userCoins: coins,
-            platformCoins: 0,
-            label: 'Wallet recharge',
-            payoutAccount: null
-        }));
-        const updated = await this.userRepo.findOne({
-            where: {
-                id: userId
-            }
-        });
-        return {
-            coinBalance: updated?.coinBalance || 0
-        };
+        throw new _common.BadRequestException('Direct coin credit is disabled. Complete payment through Razorpay checkout.');
     }
     async spendCoins(userId, amount) {
         const coins = Number(amount);
@@ -439,44 +407,7 @@ let UsersService = class UsersService {
         });
     }
     async requestWithdrawal(userId, amount, payoutAccount) {
-        const coins = Number(amount);
-        const account = String(payoutAccount || '').trim();
-        if (!Number.isInteger(coins) || coins < 50) throw new _common.BadRequestException('Minimum withdrawal is 50 coins.');
-        if (account.length < 3 || account.length > 160) throw new _common.BadRequestException('Enter a valid UPI ID or payout account.');
-        return this.dataSource.transaction(async (manager)=>{
-            const user = await manager.getRepository(_userentity.User).findOne({
-                where: {
-                    id: userId
-                },
-                lock: {
-                    mode: 'pessimistic_write'
-                }
-            });
-            if (!user) throw new _common.NotFoundException('User not found.');
-            if (user.earnedCoinBalance < coins) {
-                throw new _common.BadRequestException('Only gift earnings can be withdrawn. Your available earned balance is too low.');
-            }
-            user.earnedCoinBalance -= coins;
-            await manager.getRepository(_userentity.User).save(user);
-            const transaction = await manager.getRepository(_cointransactionentity.CoinTransaction).save(manager.getRepository(_cointransactionentity.CoinTransaction).create({
-                type: 'withdrawal',
-                status: 'pending',
-                userId,
-                senderId: null,
-                receiverId: userId,
-                grossCoins: coins,
-                userCoins: coins,
-                platformCoins: 0,
-                label: 'Withdrawal request',
-                payoutAccount: account
-            }));
-            return {
-                id: transaction.id,
-                status: transaction.status,
-                coinBalance: user.coinBalance,
-                earnedCoinBalance: user.earnedCoinBalance
-            };
-        });
+        throw new _common.BadRequestException('Use the secure wallet payout endpoint for withdrawals.');
     }
     async getCoinTransactions() {
         const rows = await this.coinTransactionRepo.find({

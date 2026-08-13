@@ -103,6 +103,41 @@ _ts_decorate([
     _ts_metadata("design:type", Object)
 ], CoinTransaction.prototype, "payoutAccount", void 0);
 _ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'int',
+        unsigned: true,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], CoinTransaction.prototype, "amountPaise", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 100,
+        nullable: true,
+        unique: true
+    }),
+    _ts_metadata("design:type", Object)
+], CoinTransaction.prototype, "gatewayOrderId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 100,
+        nullable: true,
+        unique: true
+    }),
+    _ts_metadata("design:type", Object)
+], CoinTransaction.prototype, "gatewayPaymentId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 100,
+        nullable: true,
+        unique: true
+    }),
+    _ts_metadata("design:type", Object)
+], CoinTransaction.prototype, "gatewayPayoutId", void 0);
+_ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], CoinTransaction.prototype, "createdAt", void 0);

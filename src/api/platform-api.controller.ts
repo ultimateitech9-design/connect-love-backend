@@ -235,6 +235,20 @@ export class UpdatePlatformUserDto {
   isVerified?: boolean;
 }
 
+export class ActivateUserPlanDto {
+  @IsString()
+  userId: string;
+
+  @IsString()
+  plan: 'free' | 'gold' | 'platinum';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  durationDays?: number;
+}
+
 @Controller('api')
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Roles('admin', 'super_admin')
@@ -510,6 +524,51 @@ export class PlatformApiController {
     await this.audit('Users', 'Create', `Created ${role} account ${user.email}`);
     const { password: _, ...safe } = user as any;
     return { user: safe };
+  }
+
+  /** Super Admin-only manual subscription activation. This changes the same
+   * user plan and expiry fields used by the payment flow, so entitlements take
+   * effect immediately across discovery, matches, messages, and media. */
+  @Post('plan-activations')
+  @Roles('super_admin')
+  async activateUserPlan(@Body() body: ActivateUserPlanDto, @Req() request: any) {
+    const userId = String(body.userId || '').trim();
+    const plan = String(body.plan || '').toLowerCase();
+    if (!userId) throw new BadRequestException('Select a user before activating a plan.');
+    if (!['free', 'gold', 'platinum'].includes(plan)) throw new BadRequestException('Choose Free, Gold, or Diamond.');
+
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('User account was not found.');
+
+    const durationDays = Math.max(1, Math.min(365, Number(body.durationDays) || 30));
+    let expiresAt: Date | null = null;
+    if (plan !== 'free') {
+      // Manual activation replaces the current plan duration. A fresh admin
+      // decision must be predictable, rather than silently extending an old plan.
+      expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + durationDays);
+    }
+
+    user.plan = plan as User['plan'];
+    user.planExpiresAt = expiresAt as any;
+    const saved = await this.userRepo.save(user);
+    const actor = this.requestUser(request);
+    const planName = plan === 'platinum' ? 'Diamond' : plan[0].toUpperCase() + plan.slice(1);
+    await this.audit(
+      'Plan Activation',
+      'Manual Activation',
+      `${planName} manually activated for ${saved.email} by ${actor.userId || 'super admin'}${expiresAt ? ` for ${durationDays} day(s)` : ''}.`,
+    );
+
+    return {
+      success: true,
+      user: { id: saved.id, name: saved.name, email: saved.email, plan: saved.plan },
+      plan: saved.plan,
+      expiresAt,
+      message: plan === 'free'
+        ? `Free plan is now active for ${saved.name}.`
+        : `${planName} is active for ${saved.name} until ${expiresAt.toISOString()}.`,
+    };
   }
 
   @Get('users/:id')

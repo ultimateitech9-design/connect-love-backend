@@ -54,7 +54,7 @@ async function bootstrap() {
       || path === '/api/maintenance-status'
       || path === '/auth/super-admin/login'
       || path === '/auth/management/login';
-    const paymentWebhook = path === '/payments/razorpay/webhook';
+    const paymentWebhook = path === '/payments/razorpay/webhook' || path === '/wallet/razorpay/webhook';
     if (alwaysAllowed || paymentWebhook) return next();
 
     try {

@@ -5,9 +5,10 @@ import { FirstImpression } from './first-impression.entity';
 import { FirstImpressionsController } from './first-impressions.controller';
 import { FirstImpressionsService } from './first-impressions.service';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { MatchRelation } from '../matches/match.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([FirstImpression, User]), PushNotificationsModule],
+  imports: [TypeOrmModule.forFeature([FirstImpression, User, MatchRelation]), PushNotificationsModule],
   controllers: [FirstImpressionsController],
   providers: [FirstImpressionsService],
 })

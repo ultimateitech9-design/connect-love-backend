@@ -9,6 +9,9 @@ function _export(target, all) {
     });
 }
 _export(exports, {
+    get ActivateUserPlanDto () {
+        return ActivateUserPlanDto;
+    },
     get CreateNotificationDto () {
         return CreateNotificationDto;
     },
@@ -386,6 +389,23 @@ _ts_decorate([
     (0, _classvalidator.IsBoolean)(),
     _ts_metadata("design:type", Boolean)
 ], UpdatePlatformUserDto.prototype, "isVerified", void 0);
+let ActivateUserPlanDto = class ActivateUserPlanDto {
+};
+_ts_decorate([
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], ActivateUserPlanDto.prototype, "userId", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsString)(),
+    _ts_metadata("design:type", String)
+], ActivateUserPlanDto.prototype, "plan", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsInt)(),
+    (0, _classvalidator.Min)(1),
+    (0, _classvalidator.Max)(365),
+    _ts_metadata("design:type", Number)
+], ActivateUserPlanDto.prototype, "durationDays", void 0);
 let PlatformApiController = class PlatformApiController {
     dayKey(date) {
         return date.toLocaleString('en-US', {
@@ -692,6 +712,50 @@ let PlatformApiController = class PlatformApiController {
         const { password: _, ...safe } = user;
         return {
             user: safe
+        };
+    }
+    /** Super Admin-only manual subscription activation. This changes the same
+   * user plan and expiry fields used by the payment flow, so entitlements take
+   * effect immediately across discovery, matches, messages, and media. */ async activateUserPlan(body, request) {
+        const userId = String(body.userId || '').trim();
+        const plan = String(body.plan || '').toLowerCase();
+        if (!userId) throw new _common.BadRequestException('Select a user before activating a plan.');
+        if (![
+            'free',
+            'gold',
+            'platinum'
+        ].includes(plan)) throw new _common.BadRequestException('Choose Free, Gold, or Diamond.');
+        const user = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        if (!user) throw new _common.NotFoundException('User account was not found.');
+        const durationDays = Math.max(1, Math.min(365, Number(body.durationDays) || 30));
+        let expiresAt = null;
+        if (plan !== 'free') {
+            // Manual activation replaces the current plan duration. A fresh admin
+            // decision must be predictable, rather than silently extending an old plan.
+            expiresAt = new Date();
+            expiresAt.setDate(expiresAt.getDate() + durationDays);
+        }
+        user.plan = plan;
+        user.planExpiresAt = expiresAt;
+        const saved = await this.userRepo.save(user);
+        const actor = this.requestUser(request);
+        const planName = plan === 'platinum' ? 'Diamond' : plan[0].toUpperCase() + plan.slice(1);
+        await this.audit('Plan Activation', 'Manual Activation', `${planName} manually activated for ${saved.email} by ${actor.userId || 'super admin'}${expiresAt ? ` for ${durationDays} day(s)` : ''}.`);
+        return {
+            success: true,
+            user: {
+                id: saved.id,
+                name: saved.name,
+                email: saved.email,
+                plan: saved.plan
+            },
+            plan: saved.plan,
+            expiresAt,
+            message: plan === 'free' ? `Free plan is now active for ${saved.name}.` : `${planName} is active for ${saved.name} until ${expiresAt.toISOString()}.`
         };
     }
     async getUserDetails(id, request) {
@@ -2012,6 +2076,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "createUser", null);
+_ts_decorate([
+    (0, _common.Post)('plan-activations'),
+    (0, _rolesguard.Roles)('super_admin'),
+    _ts_param(0, (0, _common.Body)()),
+    _ts_param(1, (0, _common.Req)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        typeof ActivateUserPlanDto === "undefined" ? Object : ActivateUserPlanDto,
+        Object
+    ]),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "activateUserPlan", null);
 _ts_decorate([
     (0, _common.Get)('users/:id'),
     (0, _rolesguard.Roles)('admin', 'super_admin', 'sales', 'support'),
