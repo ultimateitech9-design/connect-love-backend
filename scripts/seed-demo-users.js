@@ -165,24 +165,15 @@ async function main() {
     database: process.env.DB_NAME || 'dating_web_app',
   });
 
-  console.log('Clearing existing demo profiles to prevent duplicates...');
-  for (const profile of demoProfiles) {
-    const id = env(`${profile.prefix}_ID`);
-    if (id) {
-      // Deleting messages and matches will cascade because of foreign key constraints
-      await connection.execute('DELETE FROM users WHERE id = ?', [id]);
-    }
-  }
-
-  console.log('Seeding demo user accounts...');
+  console.log('Upserting demo user accounts without deleting their likes or matches...');
   for (const profile of demoProfiles) {
     const id = env(`${profile.prefix}_ID`);
     const name = env(`${profile.prefix}_NAME`) || profile.prefix;
     const email = env(`${profile.prefix}_EMAIL`);
-    const password = env(`${profile.prefix}_PASSWORD`) || 'Password123';
+    const password = env(`${profile.prefix}_PASSWORD`);
     
-    if (!id || !email) {
-      console.warn(`Skipping ${profile.prefix} because ID or email is not configured in .env`);
+    if (!id || !email || !password) {
+      console.warn(`Skipping ${profile.prefix} because ID, email, or password is not configured in .env`);
       continue;
     }
 
@@ -192,7 +183,13 @@ async function main() {
         id, name, email, password, birthDate, gender, profession, height, city,
         interests, personalityWords, bio, photos, hobbies, plan, status, role,
         isVerified, onboardingCompleted, isOnline, showOnlineStatus, showDistance, photosVisibleToNonMatches
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'user', ?, 1, 0, 1, 1, 1)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'user', ?, 1, 0, 1, 1, 1)
+      ON DUPLICATE KEY UPDATE
+        name = VALUES(name), email = VALUES(email), password = VALUES(password),
+        birthDate = VALUES(birthDate), gender = VALUES(gender), profession = VALUES(profession),
+        height = VALUES(height), city = VALUES(city), interests = VALUES(interests),
+        personalityWords = VALUES(personalityWords), bio = VALUES(bio), photos = VALUES(photos),
+        hobbies = VALUES(hobbies), plan = VALUES(plan), isVerified = VALUES(isVerified)`,
       [
         id,
         name,

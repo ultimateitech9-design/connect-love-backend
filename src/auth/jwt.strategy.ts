@@ -7,13 +7,18 @@ import { TokenBlacklistService } from './token-blacklist.service';
 
 dotenv.config();
 
+const jwtSecret = process.env.JWT_SECRET?.trim();
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET must be configured in .env');
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly blacklist: TokenBlacklistService) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
+      secretOrKey: jwtSecret,
       passReqToCallback: true,
     });
   }

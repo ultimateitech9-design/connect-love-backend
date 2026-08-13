@@ -12,6 +12,8 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _paymententity = require("../platform/payment.entity");
 const _userentity = require("../users/user.entity");
+const _couponentity = require("./coupon.entity");
+const _couponscontroller = require("./coupons.controller");
 const _paymentscontroller = require("./payments.controller");
 const _paymentsservice = require("./payments.service");
 function _ts_decorate(decorators, target, key, desc) {
@@ -27,11 +29,13 @@ PaymentsModule = _ts_decorate([
         imports: [
             _typeorm.TypeOrmModule.forFeature([
                 _paymententity.Payment,
-                _userentity.User
+                _userentity.User,
+                _couponentity.Coupon
             ])
         ],
         controllers: [
-            _paymentscontroller.PaymentsController
+            _paymentscontroller.PaymentsController,
+            _couponscontroller.CouponsController
         ],
         providers: [
             _paymentsservice.PaymentsService

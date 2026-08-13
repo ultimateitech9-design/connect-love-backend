@@ -13,6 +13,7 @@ const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _matchentity = require("../matches/match.entity");
 const _videocallentity = require("./video-call.entity");
+const _planusageservice = require("../plans/plan-usage.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -49,6 +50,7 @@ let VideoCallsService = class VideoCallsService {
         if (!validReceiver || receiverId === callerId) {
             throw new _common.ForbiddenException('Invalid receiver for this call.');
         }
+        if (callType === 'video') await this.planUsage.assertAndRecord(callerId, 'videoCallsPerMonth', 'Video call', receiverId);
         return this.callRepo.save(this.callRepo.create({
             conversationId,
             callerId,
@@ -82,6 +84,10 @@ let VideoCallsService = class VideoCallsService {
         call.startedAt = new Date();
         return this.callRepo.save(call);
     }
+    async durationMinutesForCaller(callerId) {
+        const { limits } = await this.planUsage.get(callerId);
+        return limits.maxVideoCallMinutes;
+    }
     async finish(callId, userId, status = 'ended') {
         const call = await this.callRepo.findOne({
             where: {
@@ -96,9 +102,10 @@ let VideoCallsService = class VideoCallsService {
         call.endedAt = new Date();
         return this.callRepo.save(call);
     }
-    constructor(callRepo, matchRepo){
+    constructor(callRepo, matchRepo, planUsage){
         this.callRepo = callRepo;
         this.matchRepo = matchRepo;
+        this.planUsage = planUsage;
     }
 };
 VideoCallsService = _ts_decorate([
@@ -108,7 +115,8 @@ VideoCallsService = _ts_decorate([
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
     ])
 ], VideoCallsService);
 

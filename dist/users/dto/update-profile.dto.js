@@ -130,8 +130,8 @@ _ts_decorate([
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsArray)(),
-    (0, _classvalidator.ArrayMaxSize)(5, {
-        message: 'Maximum 5 photos allowed'
+    (0, _classvalidator.ArrayMaxSize)(10, {
+        message: 'Maximum 10 photos allowed'
     }),
     (0, _classvalidator.IsString)({
         each: true

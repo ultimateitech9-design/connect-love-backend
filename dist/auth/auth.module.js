@@ -69,6 +69,10 @@ function _ts_decorate(decorators, target, key, desc) {
     return c > 3 && r && Object.defineProperty(target, key, r), r;
 }
 _dotenv.config();
+const jwtSecret = process.env.JWT_SECRET?.trim();
+if (!jwtSecret) {
+    throw new Error('JWT_SECRET must be configured in .env');
+}
 let AuthModule = class AuthModule {
 };
 AuthModule = _ts_decorate([
@@ -81,7 +85,7 @@ AuthModule = _ts_decorate([
             ]),
             _passport.PassportModule,
             _jwt.JwtModule.register({
-                secret: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
+                secret: jwtSecret,
                 signOptions: {
                     expiresIn: process.env.JWT_EXPIRES_IN || '7d'
                 }

@@ -15,6 +15,8 @@ const _https = require("https");
 const _typeorm1 = require("typeorm");
 const _paymententity = require("../platform/payment.entity");
 const _userentity = require("../users/user.entity");
+const _planentitlements = require("../plans/plan-entitlements");
+const _couponentity = require("./coupon.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -33,15 +35,58 @@ const PAID_PLANS = {
     premium: {
         name: 'Gold',
         userPlan: 'gold',
-        amountPaise: 19900
+        amountPaise: 29900
     },
     elite: {
         name: 'Diamond',
         userPlan: 'platinum',
-        amountPaise: 39900
+        amountPaise: 49900
     }
 };
 let PaymentsService = class PaymentsService {
+    async discountFor(rawCode, userPlan, amountPaise) {
+        const code = String(rawCode || '').trim().toUpperCase();
+        if (!code) return {
+            coupon: null,
+            discountPaise: 0,
+            finalPaise: amountPaise
+        };
+        const coupon = await this.couponRepo.findOne({
+            where: {
+                code
+            }
+        });
+        if (!coupon || !coupon.active) throw new _common.BadRequestException('Invalid or inactive coupon code.');
+        if (coupon.expiresAt && coupon.expiresAt <= new Date()) throw new _common.BadRequestException('This coupon has expired.');
+        if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) throw new _common.BadRequestException('This coupon usage limit has been reached.');
+        if (coupon.applicablePlan !== 'all' && coupon.applicablePlan !== userPlan) throw new _common.BadRequestException(`This coupon is not valid for the ${userPlan === 'gold' ? 'Gold' : 'Diamond'} plan.`);
+        const discountPaise = Math.floor(amountPaise * coupon.discountPercent / 100);
+        return {
+            coupon,
+            discountPaise,
+            finalPaise: Math.max(100, amountPaise - discountPaise)
+        };
+    }
+    async validateCoupon(userId, requestedPlan, couponCode) {
+        const plan = PAID_PLANS[requestedPlan];
+        if (!plan) throw new _common.BadRequestException('Invalid paid plan.');
+        const user = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        if (!user) throw new _common.UnauthorizedException('User account not found.');
+        if ((0, _planentitlements.isWoman)(user)) throw new _common.BadRequestException('All features are already free for women. No plan purchase is required.');
+        const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
+        return {
+            code: discount.coupon?.code,
+            discountPercent: discount.coupon?.discountPercent,
+            originalAmount: plan.amountPaise / 100,
+            discountAmount: discount.discountPaise / 100,
+            finalAmount: discount.finalPaise / 100,
+            currency: 'INR'
+        };
+    }
     credentials() {
         const keyId = process.env.RAZORPAY_KEY_ID?.trim();
         const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
@@ -95,7 +140,7 @@ let PaymentsService = class PaymentsService {
             request.end();
         });
     }
-    async createOrder(userId, requestedPlan) {
+    async createOrder(userId, requestedPlan, couponCode) {
         const plan = PAID_PLANS[requestedPlan];
         if (!plan) throw new _common.BadRequestException('Invalid paid plan.');
         const user = await this.userRepo.findOne({
@@ -104,10 +149,15 @@ let PaymentsService = class PaymentsService {
             }
         });
         if (!user) throw new _common.UnauthorizedException('User account not found.');
+        if ((0, _planentitlements.isWoman)(user)) throw new _common.BadRequestException('All features are already free for women. No plan purchase is required.');
+        const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
         const payment = await this.paymentRepo.save(this.paymentRepo.create({
             userId,
             planName: plan.userPlan,
-            amount: (plan.amountPaise / 100).toFixed(2),
+            amount: (discount.finalPaise / 100).toFixed(2),
+            originalAmount: (plan.amountPaise / 100).toFixed(2),
+            discountAmount: (discount.discountPaise / 100).toFixed(2),
+            couponCode: discount.coupon?.code || null,
             currency: 'INR',
             status: 'pending',
             gateway: 'razorpay'
@@ -116,13 +166,14 @@ let PaymentsService = class PaymentsService {
             const order = await this.razorpay('/orders', {
                 method: 'POST',
                 body: JSON.stringify({
-                    amount: plan.amountPaise,
+                    amount: discount.finalPaise,
                     currency: 'INR',
                     receipt: payment.id,
                     notes: {
                         paymentId: payment.id,
                         userId,
-                        plan: plan.userPlan
+                        plan: plan.userPlan,
+                        coupon: discount.coupon?.code || ''
                     }
                 })
             });
@@ -131,9 +182,13 @@ let PaymentsService = class PaymentsService {
             return {
                 keyId: this.credentials().keyId,
                 orderId: order.id,
-                amount: plan.amountPaise,
+                amount: discount.finalPaise,
                 currency: 'INR',
                 planName: plan.name,
+                coupon: discount.coupon ? {
+                    code: discount.coupon.code,
+                    discountPercent: discount.coupon.discountPercent
+                } : null,
                 customer: {
                     name: user.name,
                     email: user.email
@@ -221,6 +276,9 @@ let PaymentsService = class PaymentsService {
         payment.status = 'successful';
         await this.userRepo.save(user);
         await this.paymentRepo.save(payment);
+        if (payment.couponCode) await this.couponRepo.increment({
+            code: payment.couponCode
+        }, 'usedCount', 1);
         return {
             success: true,
             plan: user.plan,
@@ -232,17 +290,20 @@ let PaymentsService = class PaymentsService {
         const b = Buffer.from(right);
         return a.length === b.length && (0, _crypto.timingSafeEqual)(a, b);
     }
-    constructor(paymentRepo, userRepo){
+    constructor(paymentRepo, userRepo, couponRepo){
         this.paymentRepo = paymentRepo;
         this.userRepo = userRepo;
+        this.couponRepo = couponRepo;
     }
 };
 PaymentsService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_paymententity.Payment)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_couponentity.Coupon)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
     ])

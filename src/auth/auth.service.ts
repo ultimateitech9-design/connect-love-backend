@@ -32,8 +32,9 @@ export class AuthService {
   ) {}
 
   private decryptOrUsePlainPassword(password: string): string {
+    const secret = process.env.CRYPTO_SECRET?.trim();
+    if (!secret) throw new Error('CRYPTO_SECRET must be configured in .env');
     try {
-      const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
       const bytes = CryptoJS.AES.decrypt(password, secret);
       const decrypted = bytes.toString(CryptoJS.enc.Utf8);
       return decrypted || password;
@@ -170,6 +171,9 @@ export class AuthService {
       city: dto.city,
       locationLatitude: dto.locationLatitude,
       locationLongitude: dto.locationLongitude,
+      plan: 'free',
+      planExpiresAt: null,
+      status: 'active',
       emailVerifiedAt: new Date(),
     });
     const saved = await this.userRepo.save(user);
@@ -252,6 +256,8 @@ export class AuthService {
         password,
         avatarUrl: payload.picture || undefined,
         role: 'user',
+        plan: 'free',
+        planExpiresAt: null,
         status: 'active',
         onboardingCompleted: false,
         emailVerifiedAt: new Date(),

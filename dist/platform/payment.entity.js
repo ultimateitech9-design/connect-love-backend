@@ -57,6 +57,32 @@ _ts_decorate([
 ], Payment.prototype, "amount", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'decimal',
+        precision: 10,
+        scale: 2,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Payment.prototype, "originalAmount", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'decimal',
+        precision: 10,
+        scale: 2,
+        default: 0
+    }),
+    _ts_metadata("design:type", String)
+], Payment.prototype, "discountAmount", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 32,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], Payment.prototype, "couponCode", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         length: 10,
         default: 'USD'
     }),

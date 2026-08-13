@@ -16,6 +16,7 @@ const _messageentity = require("./message.entity");
 const _matchentity = require("../matches/match.entity");
 const _userentity = require("../users/user.entity");
 const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
+const _planusageservice = require("../plans/plan-usage.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -100,6 +101,20 @@ let MessagesService = class MessagesService {
         if (match.status !== _matchentity.MatchStatus.MATCHED) {
             throw new _common.ForbiddenException('Messages are available only after both users match.');
         }
+        const { limits } = await this.planUsage.get(userId);
+        if (limits.matches !== Number.MAX_SAFE_INTEGER) {
+            const position = await this.matchRepo.createQueryBuilder('candidate').where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', {
+                userId
+            }).andWhere('candidate.status = :status', {
+                status: _matchentity.MatchStatus.MATCHED
+            }).andWhere('(candidate.updatedAt < :updatedAt OR (candidate.updatedAt = :updatedAt AND candidate.id <= :matchId))', {
+                updatedAt: match.updatedAt,
+                matchId: match.id
+            }).getCount();
+            if (position > limits.matches) {
+                throw new _common.ForbiddenException(`This match is locked. Your plan allows ${limits.matches} active matches. Upgrade your plan to unlock it.`);
+            }
+        }
         return match;
     }
     parseUserList(value) {
@@ -154,6 +169,24 @@ let MessagesService = class MessagesService {
             const replyMessage = await this.assertMessageAccess(replyToMessageId, senderId);
             if (replyMessage.conversationId !== conversationId) {
                 throw new _common.ForbiddenException('Reply message is not in this conversation.');
+            }
+        }
+        const { limits } = await this.planUsage.get(senderId);
+        if (content.startsWith('__voice_message__:') && !limits.voiceMessages) {
+            throw new _common.ForbiddenException('Voice messages are not included in the Free plan. Upgrade to continue.');
+        }
+        if (content.startsWith('__photo_message__:') || content.startsWith('__video_message__:')) {
+            await this.planUsage.assertAndRecord(senderId, 'sharedImagesPerMonth', 'Media sharing', receiverId);
+        }
+        if (limits.messagesPerUser !== null) {
+            const sent = await this.msgRepo.count({
+                where: {
+                    senderId,
+                    receiverId
+                }
+            });
+            if (sent >= limits.messagesPerUser) {
+                throw new _common.BadRequestException(`Free plan allows ${limits.messagesPerUser} messages to each match. Upgrade for unlimited messages.`);
             }
         }
         const msg = this.msgRepo.create({
@@ -339,11 +372,12 @@ let MessagesService = class MessagesService {
     async getInfo(id, userId) {
         return this.assertMessageAccess(id, userId);
     }
-    constructor(msgRepo, matchRepo, userRepo, pushNotifications){
+    constructor(msgRepo, matchRepo, userRepo, pushNotifications, planUsage){
         this.msgRepo = msgRepo;
         this.matchRepo = matchRepo;
         this.userRepo = userRepo;
         this.pushNotifications = pushNotifications;
+        this.planUsage = planUsage;
         this.logger = new _common.Logger(MessagesService.name);
     }
 };
@@ -357,7 +391,8 @@ MessagesService = _ts_decorate([
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService
+        typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService,
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
     ])
 ], MessagesService);
 

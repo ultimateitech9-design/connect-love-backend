@@ -4,6 +4,9 @@ import { Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from './match.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
+import { PlanUsageService } from '../plans/plan-usage.service';
+import { activePlan, entitlementsFor, isWoman } from '../plans/plan-entitlements';
+import { dayStart } from '../plans/plan-entitlements';
 
 @Injectable()
 export class MatchesService {
@@ -14,7 +17,19 @@ export class MatchesService {
     private msgRepo: Repository<Message>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    private readonly planUsage: PlanUsageService,
   ) {}
+
+  private async assertMatchCapacity(userId: string) {
+    const { limits } = await this.planUsage.get(userId);
+    const count = await this.matchesRepository.createQueryBuilder('match')
+      .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
+      .andWhere('match.status = :status', { status: MatchStatus.MATCHED })
+      .getCount();
+    if (count >= limits.matches) {
+      throw new BadRequestException(`Your plan allows ${limits.matches} matches. Upgrade your plan to match with more people.`);
+    }
+  }
 
   private serializeUser(user?: User): any {
     if (!user) return null;
@@ -31,6 +46,7 @@ export class MatchesService {
       interests: user.interests || [],
       personality: user.personalityWords || [],
       hobbies: user.hobbies || [],
+      planBadge: entitlementsFor(user).verifiedBadge,
     };
   }
 
@@ -42,10 +58,10 @@ export class MatchesService {
       .leftJoin('match.sender', 'sender')
       .leftJoin('match.receiver', 'receiver')
       .addSelect([
-        'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos',
-        'sender.isOnline', 'sender.showOnlineStatus', 'sender.city', 'sender.profession',
-        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos',
-        'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.city', 'receiver.profession',
+        'sender.id', 'sender.name', 'sender.birthDate', 'sender.gender', 'sender.bio', 'sender.photos',
+        'sender.isOnline', 'sender.showOnlineStatus', 'sender.city', 'sender.profession', 'sender.isVerified', 'sender.plan', 'sender.planExpiresAt',
+        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.gender', 'receiver.bio', 'receiver.photos',
+        'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.city', 'receiver.profession', 'receiver.isVerified', 'receiver.plan', 'receiver.planExpiresAt',
       ]);
   }
 
@@ -79,10 +95,27 @@ export class MatchesService {
         unreadCount: Number(summary?.unreadCount || 0),
       };
     });
+    const { limits } = await this.planUsage.get(userId);
 
-    return enriched.sort(
+    // The first matches a member unlocked remain open. Newer matches above the
+    // plan allowance are retained but locked, rather than displacing an older
+    // conversation or rejecting the match entirely.
+    const allowedMatchedIds = new Set(
+      enriched
+        .filter((match) => match.status === MatchStatus.MATCHED)
+        .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
+        .slice(0, limits.matches)
+        .map((match) => match.id),
+    );
+    const sorted = enriched.sort(
       (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime(),
     );
+    return sorted.map((match) => {
+      const locked = match.status === MatchStatus.MATCHED && !allowedMatchedIds.has(match.id);
+      if (!locked) return { ...match, locked: false };
+      const hidden = { id: null, name: 'Someone', photos: [], avatarUrl: null };
+      return { ...match, sender: match.senderId === userId ? match.sender : hidden, receiver: match.receiverId === userId ? match.receiver : hidden, locked: true, lastMessage: 'Someone matched with you. Upgrade to unlock.' };
+    });
   }
 
   private async findExisting(senderId: string, receiverId: string): Promise<MatchRelation | null> {
@@ -136,7 +169,16 @@ export class MatchesService {
     }
 
     const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
-    return this.enrichMatches(matches, userId);
+    const enriched = await this.enrichMatches(matches, userId);
+    if (filter !== 'received') return enriched;
+    const { user } = await this.planUsage.get(userId);
+    if (activePlan(user) !== 'free' || isWoman(user)) return enriched;
+    return enriched.map((match) => ({
+      ...match,
+      sender: match.senderId === userId ? match.sender : { id: null, name: 'Someone', photos: [], avatarUrl: null },
+      receiver: match.receiverId === userId ? match.receiver : { id: null, name: 'Someone', photos: [], avatarUrl: null },
+      locked: true,
+    }));
   }
 
   async create(senderId: string, receiverId: string, isSuperLike: boolean = false): Promise<MatchRelation> {
@@ -167,11 +209,25 @@ export class MatchesService {
       return this.matchesRepository.save(match);
     }
 
-    if (existing) {
-      if (existing.status === MatchStatus.MATCHED) return existing;
+    // Retrying the same outgoing like (for example after login or a double
+    // click) is idempotent and must not consume another daily like.
+    if (existing?.status === MatchStatus.MATCHED) return existing;
+    if (existing?.status === MatchStatus.PENDING && existing.senderId === senderId) return existing;
 
+    if (isSuperLike) await this.planUsage.assertAndRecord(senderId, 'superLikesPerMonth', 'Super Like', receiverId);
+    const existingLikesToday = await this.matchesRepository.createQueryBuilder('match')
+      .where('match.senderId = :senderId', { senderId })
+      .andWhere('match.createdAt >= :start', { start: dayStart() })
+      .andWhere('match.status IN (:...statuses)', { statuses: [MatchStatus.PENDING, MatchStatus.MATCHED] })
+      .getCount();
+    await this.planUsage.assertAndRecord(senderId, 'likesPerDay', 'Daily like', receiverId, true, undefined, existingLikesToday);
+
+    if (existing) {
       const isIncomingLike = existing.senderId === receiverId && existing.receiverId === senderId;
       if (existing.status === MatchStatus.PENDING && isIncomingLike) {
+        // Only the member performing the matching action must have capacity.
+        // The other member may still receive the match in a locked state.
+        await this.assertMatchCapacity(senderId);
         existing.status = MatchStatus.MATCHED;
         existing.isSuperLike = existing.isSuperLike || isSuperLike;
         return this.matchesRepository.save(existing);
@@ -220,17 +276,6 @@ export class MatchesService {
   }
 
   async respond(id: string, action: 'accept' | 'decline', userId?: string): Promise<MatchRelation> {
-    if (userId) {
-      const status = action === 'accept' ? MatchStatus.MATCHED : MatchStatus.DECLINED;
-      const result = await this.matchesRepository.update(
-        { id, receiverId: userId, status: MatchStatus.PENDING },
-        { status },
-      );
-      if (result.affected) {
-        return { id, receiverId: userId, status } as MatchRelation;
-      }
-    }
-
     const match = await this.matchesRepository.findOne({ where: { id } });
     if (!match) throw new NotFoundException('Match request not found.');
     if (userId && match.receiverId !== userId) {
@@ -238,6 +283,9 @@ export class MatchesService {
     }
 
     if (action === 'accept') {
+      // The receiver is the actor here. If the other member has exhausted
+      // their allowance, enrichMatches keeps this new match blurred for them.
+      if (userId) await this.assertMatchCapacity(userId);
       match.status = MatchStatus.MATCHED;
       return this.matchesRepository.save(match);
     }
@@ -277,6 +325,8 @@ export class MatchesService {
     if (match.status === MatchStatus.MATCHED || match.status === MatchStatus.BLOCKED) {
       throw new BadRequestException('This swipe can no longer be undone.');
     }
+
+    await this.planUsage.assertAndRecord(senderId, 'rewindsPerMonth', 'Profile rewind', receiverId);
 
     await this.matchesRepository.remove(match);
     return { deleted: true };

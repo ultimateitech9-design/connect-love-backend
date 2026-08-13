@@ -86,7 +86,7 @@ export class UpdateProfileDto {
 
   @IsOptional()
   @IsArray()
-  @ArrayMaxSize(5, { message: 'Maximum 5 photos allowed' })
+  @ArrayMaxSize(10, { message: 'Maximum 10 photos allowed' })
   @IsString({ each: true })
   photos?: string[];
 

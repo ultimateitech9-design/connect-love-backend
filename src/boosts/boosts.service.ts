@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { ProfileBoost, type BoostPlanKey } from './boost.entity';
 import { User } from '../users/user.entity';
+import { PlanUsageService } from '../plans/plan-usage.service';
+import { activePlan, isWoman } from '../plans/plan-entitlements';
 
 export const BOOST_PLANS: Record<BoostPlanKey, { name: string; durationMinutes: number; price: number }> = {
   '30_minutes': { name: '30 Minutes Boost', durationMinutes: 30, price: 29 },
@@ -13,7 +15,7 @@ export const BOOST_PLANS: Record<BoostPlanKey, { name: string; durationMinutes: 
 
 @Injectable()
 export class BoostsService {
-  constructor(@InjectRepository(ProfileBoost) private readonly boosts: Repository<ProfileBoost>) {}
+  constructor(@InjectRepository(ProfileBoost) private readonly boosts: Repository<ProfileBoost>, private readonly planUsage: PlanUsageService) {}
 
   getPlans() {
     return Object.entries(BOOST_PLANS).map(([key, plan]) => ({ key, ...plan, currency: 'INR' }));
@@ -29,6 +31,11 @@ export class BoostsService {
 
   async activate(userId: string, planKey: BoostPlanKey, requestId: string) {
     const plan = BOOST_PLANS[planKey];
+    const duplicateRequest = await this.boosts.findOne({ where: { userId, requestId } });
+    if (duplicateRequest) return duplicateRequest;
+    const { user } = await this.planUsage.get(userId);
+    const diamond = activePlan(user) === 'platinum' && !isWoman(user);
+    await this.planUsage.assertAndRecord(userId, 'boostsPerMonth', 'Profile boost', requestId, diamond ? 'week' : false, diamond ? 1 : undefined);
     return this.boosts.manager.transaction(async (manager) => {
       const repo = manager.getRepository(ProfileBoost);
       // Serialize purchases per user so simultaneous requests stack instead of overlapping.

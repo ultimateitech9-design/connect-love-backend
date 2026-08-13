@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _userentity = require("../users/user.entity");
+const _planentitlements = require("../plans/plan-entitlements");
 const _matchentity = require("../matches/match.entity");
 const _searchservice = require("../search/search.service");
 const _distance = require("../location/distance");
@@ -243,6 +244,7 @@ let DiscoveryService = class DiscoveryService {
                 zodiac: user.zodiac,
                 plan: user.plan,
                 isVerified: user.isVerified,
+                planBadge: (0, _planentitlements.entitlementsFor)(user).verifiedBadge,
                 kycMatched: user.kycMatched,
                 isOnline: user.showOnlineStatus ? user.isOnline : false,
                 lastSeen: user.showOnlineStatus ? user.lastSeen : null,

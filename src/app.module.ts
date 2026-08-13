@@ -21,6 +21,7 @@ import { DivorcedModule } from './divorced/divorced.module';
 import { PushNotificationsModule } from './push-notifications/push-notifications.module';
 import { PaymentsModule } from './payments/payments.module';
 import { FirstImpressionsModule } from './first-impressions/first-impressions.module';
+import { PlansModule } from './plans/plans.module';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ dotenv.config();
     PushNotificationsModule,
     PaymentsModule,
     FirstImpressionsModule,
+    PlansModule,
   ],
   controllers: [HealthController],
 })

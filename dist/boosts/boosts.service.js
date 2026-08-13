@@ -21,6 +21,8 @@ const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _boostentity = require("./boost.entity");
 const _userentity = require("../users/user.entity");
+const _planusageservice = require("../plans/plan-usage.service");
+const _planentitlements = require("../plans/plan-entitlements");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -83,6 +85,16 @@ let BoostsService = class BoostsService {
     }
     async activate(userId, planKey, requestId) {
         const plan = BOOST_PLANS[planKey];
+        const duplicateRequest = await this.boosts.findOne({
+            where: {
+                userId,
+                requestId
+            }
+        });
+        if (duplicateRequest) return duplicateRequest;
+        const { user } = await this.planUsage.get(userId);
+        const diamond = (0, _planentitlements.activePlan)(user) === 'platinum' && !(0, _planentitlements.isWoman)(user);
+        await this.planUsage.assertAndRecord(userId, 'boostsPerMonth', 'Profile boost', requestId, diamond ? 'week' : false, diamond ? 1 : undefined);
         return this.boosts.manager.transaction(async (manager)=>{
             const repo = manager.getRepository(_boostentity.ProfileBoost);
             // Serialize purchases per user so simultaneous requests stack instead of overlapping.
@@ -123,8 +135,9 @@ let BoostsService = class BoostsService {
             }));
         });
     }
-    constructor(boosts){
+    constructor(boosts, planUsage){
         this.boosts = boosts;
+        this.planUsage = planUsage;
     }
 };
 BoostsService = _ts_decorate([
@@ -132,7 +145,8 @@ BoostsService = _ts_decorate([
     _ts_param(0, (0, _typeorm.InjectRepository)(_boostentity.ProfileBoost)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
     ])
 ], BoostsService);
 

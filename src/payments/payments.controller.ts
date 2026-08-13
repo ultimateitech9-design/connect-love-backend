@@ -8,8 +8,14 @@ export class PaymentsController {
 
   @Post('order')
   @UseGuards(AuthGuard('jwt'))
-  createOrder(@Req() request: any, @Body('plan') plan: string) {
-    return this.paymentsService.createOrder(request.user.userId, plan);
+  createOrder(@Req() request: any, @Body('plan') plan: string, @Body('couponCode') couponCode?: string) {
+    return this.paymentsService.createOrder(request.user.userId, plan, couponCode);
+  }
+
+  @Post('coupon/validate')
+  @UseGuards(AuthGuard('jwt'))
+  validateCoupon(@Req() request: any, @Body('plan') plan: string, @Body('couponCode') couponCode: string) {
+    return this.paymentsService.validateCoupon(request.user.userId, plan, couponCode);
   }
 
   @Post('verify')

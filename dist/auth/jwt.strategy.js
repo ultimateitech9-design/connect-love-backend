@@ -64,6 +64,10 @@ function _ts_metadata(k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 }
 _dotenv.config();
+const jwtSecret = process.env.JWT_SECRET?.trim();
+if (!jwtSecret) {
+    throw new Error('JWT_SECRET must be configured in .env');
+}
 let JwtStrategy = class JwtStrategy extends (0, _passport.PassportStrategy)(_passportjwt.Strategy) {
     async validate(req, payload) {
         // Extract the raw token from the Authorization header
@@ -84,7 +88,7 @@ let JwtStrategy = class JwtStrategy extends (0, _passport.PassportStrategy)(_pas
         super({
             jwtFromRequest: _passportjwt.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
+            secretOrKey: jwtSecret,
             passReqToCallback: true
         }), this.blacklist = blacklist;
     }

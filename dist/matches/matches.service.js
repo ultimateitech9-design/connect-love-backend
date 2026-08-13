@@ -14,6 +14,8 @@ const _typeorm1 = require("typeorm");
 const _matchentity = require("./match.entity");
 const _messageentity = require("../messages/message.entity");
 const _userentity = require("../users/user.entity");
+const _planusageservice = require("../plans/plan-usage.service");
+const _planentitlements = require("../plans/plan-entitlements");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -29,6 +31,17 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let MatchesService = class MatchesService {
+    async assertMatchCapacity(userId) {
+        const { limits } = await this.planUsage.get(userId);
+        const count = await this.matchesRepository.createQueryBuilder('match').where('(match.senderId = :userId OR match.receiverId = :userId)', {
+            userId
+        }).andWhere('match.status = :status', {
+            status: _matchentity.MatchStatus.MATCHED
+        }).getCount();
+        if (count >= limits.matches) {
+            throw new _common.BadRequestException(`Your plan allows ${limits.matches} matches. Upgrade your plan to match with more people.`);
+        }
+    }
     serializeUser(user) {
         if (!user) return null;
         return {
@@ -45,7 +58,8 @@ let MatchesService = class MatchesService {
             photosVisibleToNonMatches: true,
             interests: user.interests || [],
             personality: user.personalityWords || [],
-            hobbies: user.hobbies || []
+            hobbies: user.hobbies || [],
+            planBadge: (0, _planentitlements.entitlementsFor)(user).verifiedBadge
         };
     }
     matchesWithProfilesQuery() {
@@ -55,21 +69,29 @@ let MatchesService = class MatchesService {
             'sender.id',
             'sender.name',
             'sender.birthDate',
+            'sender.gender',
             'sender.bio',
             'sender.photos',
             'sender.isOnline',
             'sender.showOnlineStatus',
             'sender.city',
             'sender.profession',
+            'sender.isVerified',
+            'sender.plan',
+            'sender.planExpiresAt',
             'receiver.id',
             'receiver.name',
             'receiver.birthDate',
+            'receiver.gender',
             'receiver.bio',
             'receiver.photos',
             'receiver.isOnline',
             'receiver.showOnlineStatus',
             'receiver.city',
-            'receiver.profession'
+            'receiver.profession',
+            'receiver.isVerified',
+            'receiver.plan',
+            'receiver.planExpiresAt'
         ]);
     }
     async enrichMatches(matches, userId) {
@@ -97,7 +119,32 @@ let MatchesService = class MatchesService {
                 unreadCount: Number(summary?.unreadCount || 0)
             };
         });
-        return enriched.sort((a, b)=>new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+        const { limits } = await this.planUsage.get(userId);
+        // The first matches a member unlocked remain open. Newer matches above the
+        // plan allowance are retained but locked, rather than displacing an older
+        // conversation or rejecting the match entirely.
+        const allowedMatchedIds = new Set(enriched.filter((match)=>match.status === _matchentity.MatchStatus.MATCHED).sort((a, b)=>new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()).slice(0, limits.matches).map((match)=>match.id));
+        const sorted = enriched.sort((a, b)=>new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+        return sorted.map((match)=>{
+            const locked = match.status === _matchentity.MatchStatus.MATCHED && !allowedMatchedIds.has(match.id);
+            if (!locked) return {
+                ...match,
+                locked: false
+            };
+            const hidden = {
+                id: null,
+                name: 'Someone',
+                photos: [],
+                avatarUrl: null
+            };
+            return {
+                ...match,
+                sender: match.senderId === userId ? match.sender : hidden,
+                receiver: match.receiverId === userId ? match.receiver : hidden,
+                locked: true,
+                lastMessage: 'Someone matched with you. Upgrade to unlock.'
+            };
+        });
     }
     async findExisting(senderId, receiverId) {
         return this.matchesRepository.findOne({
@@ -164,7 +211,26 @@ let MatchesService = class MatchesService {
             });
         }
         const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
-        return this.enrichMatches(matches, userId);
+        const enriched = await this.enrichMatches(matches, userId);
+        if (filter !== 'received') return enriched;
+        const { user } = await this.planUsage.get(userId);
+        if ((0, _planentitlements.activePlan)(user) !== 'free' || (0, _planentitlements.isWoman)(user)) return enriched;
+        return enriched.map((match)=>({
+                ...match,
+                sender: match.senderId === userId ? match.sender : {
+                    id: null,
+                    name: 'Someone',
+                    photos: [],
+                    avatarUrl: null
+                },
+                receiver: match.receiverId === userId ? match.receiver : {
+                    id: null,
+                    name: 'Someone',
+                    photos: [],
+                    avatarUrl: null
+                },
+                locked: true
+            }));
     }
     async create(senderId, receiverId, isSuperLike = false) {
         const match = this.matchesRepository.create({
@@ -200,10 +266,28 @@ let MatchesService = class MatchesService {
             match.isSuperLike = false;
             return this.matchesRepository.save(match);
         }
+        // Retrying the same outgoing like (for example after login or a double
+        // click) is idempotent and must not consume another daily like.
+        if (existing?.status === _matchentity.MatchStatus.MATCHED) return existing;
+        if (existing?.status === _matchentity.MatchStatus.PENDING && existing.senderId === senderId) return existing;
+        if (isSuperLike) await this.planUsage.assertAndRecord(senderId, 'superLikesPerMonth', 'Super Like', receiverId);
+        const existingLikesToday = await this.matchesRepository.createQueryBuilder('match').where('match.senderId = :senderId', {
+            senderId
+        }).andWhere('match.createdAt >= :start', {
+            start: (0, _planentitlements.dayStart)()
+        }).andWhere('match.status IN (:...statuses)', {
+            statuses: [
+                _matchentity.MatchStatus.PENDING,
+                _matchentity.MatchStatus.MATCHED
+            ]
+        }).getCount();
+        await this.planUsage.assertAndRecord(senderId, 'likesPerDay', 'Daily like', receiverId, true, undefined, existingLikesToday);
         if (existing) {
-            if (existing.status === _matchentity.MatchStatus.MATCHED) return existing;
             const isIncomingLike = existing.senderId === receiverId && existing.receiverId === senderId;
             if (existing.status === _matchentity.MatchStatus.PENDING && isIncomingLike) {
+                // Only the member performing the matching action must have capacity.
+                // The other member may still receive the match in a locked state.
+                await this.assertMatchCapacity(senderId);
                 existing.status = _matchentity.MatchStatus.MATCHED;
                 existing.isSuperLike = existing.isSuperLike || isSuperLike;
                 return this.matchesRepository.save(existing);
@@ -252,23 +336,6 @@ let MatchesService = class MatchesService {
         return this.matchesRepository.save(match);
     }
     async respond(id, action, userId) {
-        if (userId) {
-            const status = action === 'accept' ? _matchentity.MatchStatus.MATCHED : _matchentity.MatchStatus.DECLINED;
-            const result = await this.matchesRepository.update({
-                id,
-                receiverId: userId,
-                status: _matchentity.MatchStatus.PENDING
-            }, {
-                status
-            });
-            if (result.affected) {
-                return {
-                    id,
-                    receiverId: userId,
-                    status
-                };
-            }
-        }
         const match = await this.matchesRepository.findOne({
             where: {
                 id
@@ -279,6 +346,9 @@ let MatchesService = class MatchesService {
             throw new _common.ForbiddenException('Only the receiver can respond to this match request.');
         }
         if (action === 'accept') {
+            // The receiver is the actor here. If the other member has exhausted
+            // their allowance, enrichMatches keeps this new match blurred for them.
+            if (userId) await this.assertMatchCapacity(userId);
             match.status = _matchentity.MatchStatus.MATCHED;
             return this.matchesRepository.save(match);
         }
@@ -330,15 +400,17 @@ let MatchesService = class MatchesService {
         if (match.status === _matchentity.MatchStatus.MATCHED || match.status === _matchentity.MatchStatus.BLOCKED) {
             throw new _common.BadRequestException('This swipe can no longer be undone.');
         }
+        await this.planUsage.assertAndRecord(senderId, 'rewindsPerMonth', 'Profile rewind', receiverId);
         await this.matchesRepository.remove(match);
         return {
             deleted: true
         };
     }
-    constructor(matchesRepository, msgRepo, userRepo){
+    constructor(matchesRepository, msgRepo, userRepo, planUsage){
         this.matchesRepository = matchesRepository;
         this.msgRepo = msgRepo;
         this.userRepo = userRepo;
+        this.planUsage = planUsage;
     }
 };
 MatchesService = _ts_decorate([
@@ -350,7 +422,8 @@ MatchesService = _ts_decorate([
     _ts_metadata("design:paramtypes", [
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
     ])
 ], MatchesService);
 

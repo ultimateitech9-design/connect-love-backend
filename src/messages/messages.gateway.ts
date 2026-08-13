@@ -59,8 +59,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       if (!token) throw new Error('Missing socket token');
+      const jwtSecret = process.env.JWT_SECRET?.trim();
+      if (!jwtSecret) throw new Error('JWT_SECRET must be configured in .env');
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
+        secret: jwtSecret,
       });
       userId = payload.sub || payload.userId;
     } catch {
@@ -329,9 +331,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.accept(data.callId, receiverId);
-      const payload = { call, receiverId };
+      const maxDurationMinutes = call.callType === 'video' ? await this.videoCallsService.durationMinutesForCaller(call.callerId) : null;
+      const payload = { call, receiverId, maxDurationMinutes };
       this.emitToUser(data.callerId, 'videoCallAccepted', payload);
       this.server.to(client.id).emit('videoCallAccepted', payload);
+      if (maxDurationMinutes) {
+        setTimeout(() => {
+          void this.videoCallsService.finish(call.id, call.callerId, 'ended').then((endedCall) => {
+            const endedPayload = { call: endedCall, endedBy: 'plan_limit' };
+            this.emitToUser(call.callerId, 'videoCallEnded', endedPayload);
+            this.emitToUser(call.receiverId, 'videoCallEnded', endedPayload);
+          }).catch(() => undefined);
+        }, maxDurationMinutes * 60_000);
+      }
       return { event: 'videoCallAccepted', data: payload };
     } catch (error: any) {
       return { error: error?.message || 'Could not accept call' };

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
+import { entitlementsFor } from '../plans/plan-entitlements';
 import { MatchRelation } from '../matches/match.entity';
 import { SearchService } from '../search/search.service';
 import { distanceBetweenKm } from '../location/distance';
@@ -241,6 +242,7 @@ export class DiscoveryService {
         zodiac: user.zodiac,
         plan: user.plan,
         isVerified: user.isVerified,
+        planBadge: entitlementsFor(user).verifiedBadge,
         kycMatched: user.kycMatched,
         isOnline: user.showOnlineStatus ? user.isOnline : false,
         lastSeen: user.showOnlineStatus ? user.lastSeen : null,

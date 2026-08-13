@@ -1,11 +1,10 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThanOrEqual, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { FirstImpression } from './first-impression.entity';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
-
-const DAILY_LIMIT = 5;
+import { PlanUsageService } from '../plans/plan-usage.service';
 
 @Injectable()
 export class FirstImpressionsService {
@@ -13,6 +12,7 @@ export class FirstImpressionsService {
     @InjectRepository(FirstImpression) private readonly impressions: Repository<FirstImpression>,
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly pushNotifications: PushNotificationsService,
+    private readonly planUsage: PlanUsageService,
   ) {}
 
   async send(senderId: string, receiverId: string, rawContent: string) {
@@ -25,10 +25,7 @@ export class FirstImpressionsService {
       throw new ConflictException('You have already sent this user a First Impression.');
     }
 
-    const start = new Date();
-    start.setHours(0, 0, 0, 0);
-    const usedToday = await this.impressions.count({ where: { senderId, createdAt: MoreThanOrEqual(start) } });
-    if (usedToday >= DAILY_LIMIT) throw new BadRequestException('You have used all 5 First Impressions for today.');
+    const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId);
 
     let saved: FirstImpression;
     try {
@@ -44,7 +41,7 @@ export class FirstImpressionsService {
       body: 'Someone sent you a First Impression.',
       data: { type: 'first_impression', firstImpressionId: saved.id, url: '/user/messages' },
     }).catch(() => undefined);
-    return { id: saved.id, createdAt: saved.createdAt, remainingToday: DAILY_LIMIT - usedToday - 1 };
+    return { id: saved.id, createdAt: saved.createdAt, remainingToday: quota.remaining };
   }
 
   async received(userId: string) {

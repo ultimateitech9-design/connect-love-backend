@@ -14,12 +14,17 @@ import { RegistrationOtpService } from './registration-otp.service';
 
 dotenv.config();
 
+const jwtSecret = process.env.JWT_SECRET?.trim();
+if (!jwtSecret) {
+  throw new Error('JWT_SECRET must be configured in .env');
+}
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([User, AuditLog, EmailRegistrationOtp]),
     PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'soulmatch_super_secret_key_change_in_production',
+      secret: jwtSecret,
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
     }),
   ],

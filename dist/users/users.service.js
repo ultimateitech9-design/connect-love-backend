@@ -16,6 +16,7 @@ const _matchentity = require("../matches/match.entity");
 const _profileviewentity = require("./profile-view.entity");
 const _distance = require("../location/distance");
 const _cointransactionentity = require("./coin-transaction.entity");
+const _planentitlements = require("../plans/plan-entitlements");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -52,7 +53,8 @@ let UsersService = class UsersService {
             interests: user.interests || [],
             personalityWords: user.personalityWords || [],
             personality: user.personalityWords || [],
-            hobbies: user.hobbies || []
+            hobbies: user.hobbies || [],
+            planBadge: (0, _planentitlements.entitlementsFor)(user).verifiedBadge
         };
     }
     async findById(id) {
@@ -105,6 +107,7 @@ let UsersService = class UsersService {
             kycMatchScore: user.kycMatchScore,
             photosVisibleToNonMatches: true,
             isVerified: user.isVerified,
+            planBadge: (0, _planentitlements.entitlementsFor)(user).verifiedBadge,
             showDistance: user.showDistance,
             distanceKm
         };
@@ -130,11 +133,15 @@ let UsersService = class UsersService {
             const uniquePhotos = [
                 ...new Set(sanitizedData.photos.filter(Boolean))
             ];
-            if (uniquePhotos.length > 5) {
-                throw new _common.BadRequestException('Maximum 5 photos allowed.');
+            const maxPhotos = (0, _planentitlements.entitlementsFor)(existingUser).profilePhotos;
+            if (uniquePhotos.length > maxPhotos) {
+                throw new _common.BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
             }
-            if (uniquePhotos.length < (existingUser.photos?.length || 0)) {
-                throw new _common.BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+            const currentPhotos = existingUser.photos || [];
+            for(let index = 0; index < Math.min(2, currentPhotos.length); index += 1){
+                if (uniquePhotos[index] !== currentPhotos[index]) {
+                    throw new _common.BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
+                }
             }
             const photosChanged = JSON.stringify(existingUser.photos || []) !== JSON.stringify(uniquePhotos);
             sanitizedData.photos = uniquePhotos;

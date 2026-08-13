@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { MoreThan, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { VideoCall, VideoCallStatus, VideoCallType } from './video-call.entity';
+import { PlanUsageService } from '../plans/plan-usage.service';
 
 @Injectable()
 export class VideoCallsService {
@@ -11,6 +12,7 @@ export class VideoCallsService {
     private readonly callRepo: Repository<VideoCall>,
     @InjectRepository(MatchRelation)
     private readonly matchRepo: Repository<MatchRelation>,
+    private readonly planUsage: PlanUsageService,
   ) {}
 
   private async assertMatchedConversation(conversationId: string, userId: string): Promise<MatchRelation> {
@@ -31,6 +33,7 @@ export class VideoCallsService {
     if (!validReceiver || receiverId === callerId) {
       throw new ForbiddenException('Invalid receiver for this call.');
     }
+    if (callType === 'video') await this.planUsage.assertAndRecord(callerId, 'videoCallsPerMonth', 'Video call', receiverId);
 
     return this.callRepo.save(this.callRepo.create({
       conversationId,
@@ -56,6 +59,11 @@ export class VideoCallsService {
     call.status = 'active';
     call.startedAt = new Date();
     return this.callRepo.save(call);
+  }
+
+  async durationMinutesForCaller(callerId: string): Promise<number> {
+    const { limits } = await this.planUsage.get(callerId);
+    return limits.maxVideoCallMinutes;
   }
 
   async finish(callId: string, userId: string, status: VideoCallStatus = 'ended'): Promise<VideoCall> {

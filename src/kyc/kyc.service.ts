@@ -35,6 +35,7 @@ export class KycService {
       throw new BadRequestException('Upload at least one profile photo before video KYC.');
     }
 
+    // The API and face worker share this URL/secret pair through their local env files.
     const serviceUrl = process.env.FACE_SERVICE_URL || 'http://127.0.0.1:8001';
     const secret = process.env.FACE_SERVICE_SECRET || '';
     if (!secret) {

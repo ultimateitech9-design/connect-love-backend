@@ -19,6 +19,8 @@ import { DivorcedLead } from './divorced/divorced-lead.entity';
 import { ProfileView } from './users/profile-view.entity';
 import { UserDevice } from './push-notifications/user-device.entity';
 import { CoinTransaction } from './users/coin-transaction.entity';
+import { PlanUsage } from './plans/plan-usage.entity';
+import { Coupon } from './payments/coupon.entity';
 
 dotenv.config();
 
@@ -48,6 +50,8 @@ export default new DataSource({
     ProfileView,
     UserDevice,
     CoinTransaction,
+    PlanUsage,
+    Coupon,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

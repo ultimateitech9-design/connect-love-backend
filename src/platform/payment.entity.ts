@@ -21,6 +21,15 @@ export class Payment {
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   amount: string;
 
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  originalAmount: string | null;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  discountAmount: string;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  couponCode: string | null;
+
   @Column({ length: 10, default: 'USD' })
   currency: string;
 

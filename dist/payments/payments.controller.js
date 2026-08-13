@@ -26,8 +26,11 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let PaymentsController = class PaymentsController {
-    createOrder(request, plan) {
-        return this.paymentsService.createOrder(request.user.userId, plan);
+    createOrder(request, plan, couponCode) {
+        return this.paymentsService.createOrder(request.user.userId, plan, couponCode);
+    }
+    validateCoupon(request, plan, couponCode) {
+        return this.paymentsService.validateCoupon(request.user.userId, plan, couponCode);
     }
     verifyPayment(request, body) {
         return this.paymentsService.verifyPayment(request.user.userId, body);
@@ -44,13 +47,29 @@ _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     _ts_param(0, (0, _common.Req)()),
     _ts_param(1, (0, _common.Body)('plan')),
+    _ts_param(2, (0, _common.Body)('couponCode')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
         String
     ]),
     _ts_metadata("design:returntype", void 0)
 ], PaymentsController.prototype, "createOrder", null);
+_ts_decorate([
+    (0, _common.Post)('coupon/validate'),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_param(1, (0, _common.Body)('plan')),
+    _ts_param(2, (0, _common.Body)('couponCode')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], PaymentsController.prototype, "validateCoupon", null);
 _ts_decorate([
     (0, _common.Post)('verify'),
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),

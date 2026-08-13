@@ -14,6 +14,7 @@ const _typeorm1 = require("typeorm");
 const _userentity = require("../users/user.entity");
 const _firstimpressionentity = require("./first-impression.entity");
 const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
+const _planusageservice = require("../plans/plan-usage.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -28,7 +29,6 @@ function _ts_param(paramIndex, decorator) {
         decorator(target, key, paramIndex);
     };
 }
-const DAILY_LIMIT = 5;
 let FirstImpressionsService = class FirstImpressionsService {
     async send(senderId, receiverId, rawContent) {
         const content = String(rawContent || '').trim();
@@ -49,15 +49,7 @@ let FirstImpressionsService = class FirstImpressionsService {
         })) {
             throw new _common.ConflictException('You have already sent this user a First Impression.');
         }
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const usedToday = await this.impressions.count({
-            where: {
-                senderId,
-                createdAt: (0, _typeorm1.MoreThanOrEqual)(start)
-            }
-        });
-        if (usedToday >= DAILY_LIMIT) throw new _common.BadRequestException('You have used all 5 First Impressions for today.');
+        const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId);
         let saved;
         try {
             saved = await this.impressions.save(this.impressions.create({
@@ -83,7 +75,7 @@ let FirstImpressionsService = class FirstImpressionsService {
         return {
             id: saved.id,
             createdAt: saved.createdAt,
-            remainingToday: DAILY_LIMIT - usedToday - 1
+            remainingToday: quota.remaining
         };
     }
     async received(userId) {
@@ -131,10 +123,11 @@ let FirstImpressionsService = class FirstImpressionsService {
                 }))
         };
     }
-    constructor(impressions, users, pushNotifications){
+    constructor(impressions, users, pushNotifications, planUsage){
         this.impressions = impressions;
         this.users = users;
         this.pushNotifications = pushNotifications;
+        this.planUsage = planUsage;
     }
 };
 FirstImpressionsService = _ts_decorate([
@@ -145,7 +138,8 @@ FirstImpressionsService = _ts_decorate([
     _ts_metadata("design:paramtypes", [
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService
+        typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService,
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
     ])
 ], FirstImpressionsService);
 

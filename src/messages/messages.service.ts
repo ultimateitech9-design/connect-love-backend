@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
 import { randomUUID } from 'crypto';
@@ -6,6 +6,7 @@ import { Message } from './message.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { User } from '../users/user.entity';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
+import { PlanUsageService } from '../plans/plan-usage.service';
 
 @Injectable()
 export class MessagesService {
@@ -19,6 +20,7 @@ export class MessagesService {
     @InjectRepository(User)
     private userRepo: Repository<User>,
     private readonly pushNotifications: PushNotificationsService,
+    private readonly planUsage: PlanUsageService,
   ) {}
 
   private queueMessagePush(message: Message): void {
@@ -74,6 +76,20 @@ export class MessagesService {
     if (match.status !== MatchStatus.MATCHED) {
       throw new ForbiddenException('Messages are available only after both users match.');
     }
+    const { limits } = await this.planUsage.get(userId);
+    if (limits.matches !== Number.MAX_SAFE_INTEGER) {
+      const position = await this.matchRepo.createQueryBuilder('candidate')
+        .where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', { userId })
+        .andWhere('candidate.status = :status', { status: MatchStatus.MATCHED })
+        .andWhere('(candidate.updatedAt < :updatedAt OR (candidate.updatedAt = :updatedAt AND candidate.id <= :matchId))', {
+          updatedAt: match.updatedAt,
+          matchId: match.id,
+        })
+        .getCount();
+      if (position > limits.matches) {
+        throw new ForbiddenException(`This match is locked. Your plan allows ${limits.matches} active matches. Upgrade your plan to unlock it.`);
+      }
+    }
     return match;
   }
 
@@ -125,6 +141,19 @@ export class MessagesService {
       const replyMessage = await this.assertMessageAccess(replyToMessageId, senderId);
       if (replyMessage.conversationId !== conversationId) {
         throw new ForbiddenException('Reply message is not in this conversation.');
+      }
+    }
+    const { limits } = await this.planUsage.get(senderId);
+    if (content.startsWith('__voice_message__:') && !limits.voiceMessages) {
+      throw new ForbiddenException('Voice messages are not included in the Free plan. Upgrade to continue.');
+    }
+    if (content.startsWith('__photo_message__:') || content.startsWith('__video_message__:')) {
+      await this.planUsage.assertAndRecord(senderId, 'sharedImagesPerMonth', 'Media sharing', receiverId);
+    }
+    if (limits.messagesPerUser !== null) {
+      const sent = await this.msgRepo.count({ where: { senderId, receiverId } });
+      if (sent >= limits.messagesPerUser) {
+        throw new BadRequestException(`Free plan allows ${limits.messagesPerUser} messages to each match. Upgrade for unlimited messages.`);
       }
     }
     const msg = this.msgRepo.create({ conversationId, senderId, receiverId, content, replyToMessageId: replyToMessageId || null });

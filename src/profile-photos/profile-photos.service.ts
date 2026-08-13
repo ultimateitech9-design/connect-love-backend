@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
+import { entitlementsFor } from '../plans/plan-entitlements';
 
 @Injectable()
 export class ProfilePhotosService {
@@ -22,11 +23,16 @@ export class ProfilePhotosService {
     }
 
     const uniquePhotos = [...new Set((photos || []).filter(Boolean))];
-    if (uniquePhotos.length > 5) {
-      throw new BadRequestException('Maximum 5 photos allowed');
+    const maxPhotos = entitlementsFor(user).profilePhotos;
+    if (uniquePhotos.length > maxPhotos) {
+      throw new BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
     }
-    if (uniquePhotos.length < (user.photos?.length || 0)) {
-      throw new BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+    const existing = user.photos || [];
+    const fixedCount = Math.min(2, existing.length);
+    for (let index = 0; index < fixedCount; index += 1) {
+      if (uniquePhotos[index] !== existing[index]) {
+        throw new BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
+      }
     }
 
     const primaryPhotoChanged = user.photos?.[0] !== uniquePhotos[0];

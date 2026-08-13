@@ -7,6 +7,7 @@ import { ProfileView } from './profile-view.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { distanceBetweenKm } from '../location/distance';
 import { CoinTransaction } from './coin-transaction.entity';
+import { entitlementsFor } from '../plans/plan-entitlements';
 
 const normalizeTags = (tags: string[]) => {
   if (!tags || !Array.isArray(tags)) return tags;
@@ -45,6 +46,7 @@ export class UsersService {
       personalityWords: user.personalityWords || [],
       personality: user.personalityWords || [],
       hobbies: user.hobbies || [],
+      planBadge: entitlementsFor(user).verifiedBadge,
     };
   }
 
@@ -85,6 +87,7 @@ export class UsersService {
       kycMatchScore: user.kycMatchScore,
       photosVisibleToNonMatches: true,
       isVerified: user.isVerified,
+      planBadge: entitlementsFor(user).verifiedBadge,
       showDistance: user.showDistance,
       distanceKm,
     };
@@ -101,11 +104,15 @@ export class UsersService {
     const sanitizedData: any = { ...data };
     if (sanitizedData.photos) {
       const uniquePhotos = [...new Set(sanitizedData.photos.filter(Boolean))];
-      if (uniquePhotos.length > 5) {
-        throw new BadRequestException('Maximum 5 photos allowed.');
+      const maxPhotos = entitlementsFor(existingUser).profilePhotos;
+      if (uniquePhotos.length > maxPhotos) {
+        throw new BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
       }
-      if (uniquePhotos.length < (existingUser.photos?.length || 0)) {
-        throw new BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+      const currentPhotos = existingUser.photos || [];
+      for (let index = 0; index < Math.min(2, currentPhotos.length); index += 1) {
+        if (uniquePhotos[index] !== currentPhotos[index]) {
+          throw new BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
+        }
       }
       const photosChanged = JSON.stringify(existingUser.photos || []) !== JSON.stringify(uniquePhotos);
       sanitizedData.photos = uniquePhotos;

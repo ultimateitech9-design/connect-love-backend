@@ -76,8 +76,9 @@ function _ts_param(paramIndex, decorator) {
 }
 let AuthService = class AuthService {
     decryptOrUsePlainPassword(password) {
+        const secret = process.env.CRYPTO_SECRET?.trim();
+        if (!secret) throw new Error('CRYPTO_SECRET must be configured in .env');
         try {
-            const secret = process.env.CRYPTO_SECRET || 'fallback-secret-key';
             const bytes = _cryptojs.AES.decrypt(password, secret);
             const decrypted = bytes.toString(_cryptojs.enc.Utf8);
             return decrypted || password;
@@ -218,6 +219,9 @@ let AuthService = class AuthService {
             city: dto.city,
             locationLatitude: dto.locationLatitude,
             locationLongitude: dto.locationLongitude,
+            plan: 'free',
+            planExpiresAt: null,
+            status: 'active',
             emailVerifiedAt: new Date()
         });
         const saved = await this.userRepo.save(user);
@@ -298,6 +302,8 @@ let AuthService = class AuthService {
                 password,
                 avatarUrl: payload.picture || undefined,
                 role: 'user',
+                plan: 'free',
+                planExpiresAt: null,
                 status: 'active',
                 onboardingCompleted: false,
                 emailVerifiedAt: new Date()

@@ -12,6 +12,7 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _userentity = require("../users/user.entity");
+const _planentitlements = require("../plans/plan-entitlements");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -39,11 +40,16 @@ let ProfilePhotosService = class ProfilePhotosService {
         const uniquePhotos = [
             ...new Set((photos || []).filter(Boolean))
         ];
-        if (uniquePhotos.length > 5) {
-            throw new _common.BadRequestException('Maximum 5 photos allowed');
+        const maxPhotos = (0, _planentitlements.entitlementsFor)(user).profilePhotos;
+        if (uniquePhotos.length > maxPhotos) {
+            throw new _common.BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
         }
-        if (uniquePhotos.length < (user.photos?.length || 0)) {
-            throw new _common.BadRequestException('Profile photos cannot be deleted. Replace an existing photo instead.');
+        const existing = user.photos || [];
+        const fixedCount = Math.min(2, existing.length);
+        for(let index = 0; index < fixedCount; index += 1){
+            if (uniquePhotos[index] !== existing[index]) {
+                throw new _common.BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
+            }
         }
         const primaryPhotoChanged = user.photos?.[0] !== uniquePhotos[0];
         user.photos = uniquePhotos;

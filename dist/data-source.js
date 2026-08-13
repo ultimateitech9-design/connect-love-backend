@@ -29,6 +29,8 @@ const _divorcedleadentity = require("./divorced/divorced-lead.entity");
 const _profileviewentity = require("./users/profile-view.entity");
 const _userdeviceentity = require("./push-notifications/user-device.entity");
 const _cointransactionentity = require("./users/coin-transaction.entity");
+const _planusageentity = require("./plans/plan-usage.entity");
+const _couponentity = require("./payments/coupon.entity");
 function _getRequireWildcardCache(nodeInterop) {
     if (typeof WeakMap !== "function") return null;
     var cacheBabelInterop = new WeakMap();
@@ -96,7 +98,9 @@ const _default = new _typeorm.DataSource({
         _divorcedleadentity.DivorcedLead,
         _profileviewentity.ProfileView,
         _userdeviceentity.UserDevice,
-        _cointransactionentity.CoinTransaction
+        _cointransactionentity.CoinTransaction,
+        _planusageentity.PlanUsage,
+        _couponentity.Coupon
     ],
     migrations: [
         __dirname + '/migrations/*{.ts,.js}'
