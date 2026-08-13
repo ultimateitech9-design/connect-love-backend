@@ -213,8 +213,27 @@ let MatchesService = class MatchesService {
         const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
         const enriched = await this.enrichMatches(matches, userId);
         if (filter !== 'received') return enriched;
-        const { user } = await this.planUsage.get(userId);
+        const { user, limits } = await this.planUsage.get(userId);
         if ((0, _planentitlements.activePlan)(user) !== 'free' || (0, _planentitlements.isWoman)(user)) return enriched;
+        // Free members can still see and accept incoming likes until their two
+        // active-match allowance is actually used.  Previously every received
+        // like was blurred for a free member, which made the two included matches
+        // impossible to create. Once both slots are occupied, keep later likes
+        // visible in the count but lock their profile/action until an upgrade (or
+        // an active match is removed).
+        const activeMatchCount = await this.matchesRepository.count({
+            where: [
+                {
+                    senderId: userId,
+                    status: _matchentity.MatchStatus.MATCHED
+                },
+                {
+                    receiverId: userId,
+                    status: _matchentity.MatchStatus.MATCHED
+                }
+            ]
+        });
+        if (activeMatchCount < limits.matches) return enriched;
         return enriched.map((match)=>({
                 ...match,
                 sender: match.senderId === userId ? match.sender : {
