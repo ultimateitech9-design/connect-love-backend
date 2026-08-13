@@ -5,7 +5,7 @@ import { MatchRelation, MatchStatus } from './match.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
-import { activePlan, entitlementsFor, isWoman } from '../plans/plan-entitlements';
+import { activePlan, isWoman } from '../plans/plan-entitlements';
 import { dayStart } from '../plans/plan-entitlements';
 
 @Injectable()
@@ -34,7 +34,8 @@ export class MatchesService {
   private serializeUser(user?: User): any {
     if (!user) return null;
     return {
-      ...user,
+      id: user.id,
+      name: user.name,
       age: user.age,
       // `photos[0]` is the card image. Do not duplicate the same large base64
       // value in `avatarUrl`, which previously doubled the response payload.
@@ -42,11 +43,8 @@ export class MatchesService {
       // Match cards only display the primary photo. Returning every full-size
       // base64 photo made the response tens of MB for users with many matches.
       photos: user.photos?.length ? [user.photos[0]] : [],
-      photosVisibleToNonMatches: true,
-      interests: user.interests || [],
-      personality: user.personalityWords || [],
-      hobbies: user.hobbies || [],
-      planBadge: entitlementsFor(user).verifiedBadge,
+      bio: user.bio,
+      isOnline: user.isOnline,
     };
   }
 
@@ -58,10 +56,8 @@ export class MatchesService {
       .leftJoin('match.sender', 'sender')
       .leftJoin('match.receiver', 'receiver')
       .addSelect([
-        'sender.id', 'sender.name', 'sender.birthDate', 'sender.gender', 'sender.bio', 'sender.photos',
-        'sender.isOnline', 'sender.showOnlineStatus', 'sender.city', 'sender.profession', 'sender.isVerified', 'sender.plan', 'sender.planExpiresAt',
-        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.gender', 'receiver.bio', 'receiver.photos',
-        'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.city', 'receiver.profession', 'receiver.isVerified', 'receiver.plan', 'receiver.planExpiresAt',
+        'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos', 'sender.isOnline',
+        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos', 'receiver.isOnline',
       ]);
   }
 
@@ -150,6 +146,8 @@ export class MatchesService {
   async findForFilter(
     userId: string,
     filter?: 'active' | 'sent' | 'received' | 'blocked',
+    limit = 12,
+    offset = 0,
   ): Promise<any[]> {
     const query = this.matchesWithProfilesQuery()
       .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId });
@@ -168,7 +166,14 @@ export class MatchesService {
       });
     }
 
-    const matches = await query.orderBy('match.createdAt', 'DESC').getMany();
+    // Each dashboard tab renders a small page only. Loading every related
+    // profile (and its photo) made accounts with many requests unnecessarily
+    // slow to open.
+    const matches = await query
+      .orderBy('match.createdAt', 'DESC')
+      .take(Math.min(Math.max(limit, 1), 20))
+      .skip(Math.max(offset, 0))
+      .getMany();
     const enriched = await this.enrichMatches(matches, userId);
     if (filter !== 'received') return enriched;
     const { user, limits } = await this.planUsage.get(userId);
@@ -194,6 +199,27 @@ export class MatchesService {
       receiver: match.receiverId === userId ? match.receiver : { id: null, name: 'Someone', photos: [], avatarUrl: null },
       locked: true,
     }));
+  }
+
+  async getSummary(userId: string) {
+    const count = (status: MatchStatus, field?: 'senderId' | 'receiverId') => {
+      const where: any = { status };
+      if (field) where[field] = userId;
+      return field
+        ? this.matchesRepository.count({ where })
+        : this.matchesRepository.createQueryBuilder('match')
+          .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
+          .andWhere('match.status = :status', { status })
+          .getCount();
+    };
+
+    const [active, sent, received, blocked] = await Promise.all([
+      count(MatchStatus.MATCHED),
+      count(MatchStatus.PENDING, 'senderId'),
+      count(MatchStatus.PENDING, 'receiverId'),
+      count(MatchStatus.BLOCKED, 'senderId'),
+    ]);
+    return { active, sent, received, blocked };
   }
 
   async create(senderId: string, receiverId: string, isSuperLike: boolean = false): Promise<MatchRelation> {

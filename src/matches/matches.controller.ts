@@ -9,9 +9,14 @@ export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
   @Get()
-  async getMatches(@Query('filter') filter: 'active' | 'sent' | 'received' | 'blocked', @Request() req) {
+  async getMatches(@Query('filter') filter: 'active' | 'sent' | 'received' | 'blocked', @Query('limit') limit: string, @Query('offset') offset: string, @Request() req) {
     const userId = req.user.userId;
-    return this.matchesService.findForFilter(userId, filter);
+    return this.matchesService.findForFilter(userId, filter, Number(limit) || 12, Number(offset) || 0);
+  }
+
+  @Get('summary')
+  async getSummary(@Request() req) {
+    return this.matchesService.getSummary(req.user.userId);
   }
 
   @Post('swipe')
