@@ -16,6 +16,8 @@ const _firstimpressionentity = require("./first-impression.entity");
 const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
 const _planusageservice = require("../plans/plan-usage.service");
 const _matchentity = require("../matches/match.entity");
+const _messageentity = require("../messages/message.entity");
+const _planentitlements = require("../plans/plan-entitlements");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -117,19 +119,11 @@ let FirstImpressionsService = class FirstImpressionsService {
         if (!receiver) throw new _common.NotFoundException('User not found.');
         // First Impressions are free to reveal for women. A paid plan still
         // reveals them for every other recipient.
-        const gender = String(receiver.gender || '').trim().toLowerCase();
-        const isWoman = [
-            'female',
-            'woman',
-            'women',
-            'girl',
-            'ladies',
-            'f'
-        ].includes(gender);
-        const unlocked = isWoman || receiver.plan !== 'free' && (!receiver.planExpiresAt || receiver.planExpiresAt > new Date());
+        const unlocked = (0, _planentitlements.isWoman)(receiver) || (0, _planentitlements.activePlan)(receiver) !== 'free';
         const rows = await this.impressions.find({
             where: {
-                receiverId: userId
+                receiverId: userId,
+                replyMessageId: (0, _typeorm1.IsNull)()
             },
             relations: [
                 'sender'
@@ -159,12 +153,97 @@ let FirstImpressionsService = class FirstImpressionsService {
                 }))
         };
     }
-    constructor(impressions, users, matches, pushNotifications, planUsage){
+    async reply(userId, impressionId, rawContent) {
+        const content = String(rawContent || '').trim();
+        if (!content) throw new _common.BadRequestException('Write a reply first.');
+        if (content.length > 2000) throw new _common.BadRequestException('Reply must be 2000 characters or fewer.');
+        const result = await this.dataSource.transaction(async (manager)=>{
+            const impressions = manager.getRepository(_firstimpressionentity.FirstImpression);
+            const impression = await impressions.findOne({
+                where: {
+                    id: impressionId
+                },
+                relations: [
+                    'receiver'
+                ],
+                lock: {
+                    mode: 'pessimistic_write'
+                }
+            });
+            if (!impression) throw new _common.NotFoundException('First Impression not found.');
+            if (impression.receiverId !== userId) throw new _common.ForbiddenException('You cannot reply to this First Impression.');
+            const canReply = (0, _planentitlements.isWoman)(impression.receiver) || (0, _planentitlements.activePlan)(impression.receiver) !== 'free';
+            if (!canReply) {
+                throw new _common.ForbiddenException('Upgrade to an active paid plan to read and reply to First Impressions.');
+            }
+            if (impression.replyMessageId) throw new _common.ConflictException('You have already replied to this First Impression.');
+            const matches = manager.getRepository(_matchentity.MatchRelation);
+            const relation = await matches.findOne({
+                where: [
+                    {
+                        senderId: impression.senderId,
+                        receiverId: impression.receiverId
+                    },
+                    {
+                        senderId: impression.receiverId,
+                        receiverId: impression.senderId
+                    }
+                ],
+                lock: {
+                    mode: 'pessimistic_write'
+                }
+            });
+            if (!relation) throw new _common.NotFoundException('Conversation could not be created.');
+            if (relation.status === _matchentity.MatchStatus.BLOCKED) throw new _common.ForbiddenException('This conversation is blocked.');
+            relation.status = _matchentity.MatchStatus.MATCHED;
+            relation.hiddenFromChatForUserIds = null;
+            await matches.save(relation);
+            const messageRepo = manager.getRepository(_messageentity.Message);
+            const message = await messageRepo.save(messageRepo.create({
+                conversationId: relation.id,
+                senderId: userId,
+                receiverId: impression.senderId,
+                content,
+                reactions: null,
+                deletedForUserIds: null,
+                deletedForEveryone: false,
+                pinnedByUserIds: null,
+                starredByUserIds: null,
+                replyToMessageId: null,
+                isRead: false,
+                editedAt: null
+            }));
+            impression.replyMessageId = message.id;
+            impression.repliedAt = new Date();
+            impression.isRead = true;
+            await impressions.save(impression);
+            return {
+                matchId: relation.id,
+                message
+            };
+        });
+        void this.pushNotifications.sendToUser(result.message.receiverId, {
+            title: 'First Impression reply',
+            body: 'You received a reply to your First Impression.',
+            data: {
+                type: 'first_impression_reply',
+                conversationId: result.matchId,
+                url: '/user/messages?id=' + result.matchId
+            }
+        }).catch(()=>undefined);
+        return {
+            success: true,
+            matchId: result.matchId,
+            message: result.message
+        };
+    }
+    constructor(impressions, users, matches, pushNotifications, planUsage, dataSource){
         this.impressions = impressions;
         this.users = users;
         this.matches = matches;
         this.pushNotifications = pushNotifications;
         this.planUsage = planUsage;
+        this.dataSource = dataSource;
     }
 };
 FirstImpressionsService = _ts_decorate([
@@ -178,7 +257,8 @@ FirstImpressionsService = _ts_decorate([
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _pushnotificationsservice.PushNotificationsService === "undefined" ? Object : _pushnotificationsservice.PushNotificationsService,
-        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService
+        typeof _planusageservice.PlanUsageService === "undefined" ? Object : _planusageservice.PlanUsageService,
+        typeof _typeorm1.DataSource === "undefined" ? Object : _typeorm1.DataSource
     ])
 ], FirstImpressionsService);
 

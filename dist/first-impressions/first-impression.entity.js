@@ -68,6 +68,21 @@ _ts_decorate([
     _ts_metadata("design:type", Boolean)
 ], FirstImpression.prototype, "isRead", void 0);
 _ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 36,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], FirstImpression.prototype, "replyMessageId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'datetime',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], FirstImpression.prototype, "repliedAt", void 0);
+_ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], FirstImpression.prototype, "createdAt", void 0);

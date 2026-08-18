@@ -32,6 +32,9 @@ let FirstImpressionsController = class FirstImpressionsController {
     received(req) {
         return this.service.received(req.user.userId);
     }
+    reply(req, id, content) {
+        return this.service.reply(req.user.userId, id, content);
+    }
     constructor(service){
         this.service = service;
     }
@@ -58,6 +61,19 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], FirstImpressionsController.prototype, "received", null);
+_ts_decorate([
+    (0, _common.Post)(':id/reply'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Param)('id')),
+    _ts_param(2, (0, _common.Body)('content')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        String,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], FirstImpressionsController.prototype, "reply", null);
 FirstImpressionsController = _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Controller)('first-impressions'),

@@ -26,6 +26,12 @@ export class FirstImpression {
   @Column({ default: false })
   isRead: boolean;
 
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  replyMessageId: string | null;
+
+  @Column({ type: 'datetime', nullable: true })
+  repliedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

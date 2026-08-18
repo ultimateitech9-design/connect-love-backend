@@ -1,11 +1,13 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, IsNull, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { FirstImpression } from './first-impression.entity';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { PlanUsageService } from '../plans/plan-usage.service';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
+import { Message } from '../messages/message.entity';
+import { activePlan, isWoman } from '../plans/plan-entitlements';
 
 @Injectable()
 export class FirstImpressionsService {
@@ -15,6 +17,7 @@ export class FirstImpressionsService {
     @InjectRepository(MatchRelation) private readonly matches: Repository<MatchRelation>,
     private readonly pushNotifications: PushNotificationsService,
     private readonly planUsage: PlanUsageService,
+    private readonly dataSource: DataSource,
   ) {}
 
   async send(senderId: string, receiverId: string, rawContent: string) {
@@ -70,11 +73,9 @@ export class FirstImpressionsService {
     if (!receiver) throw new NotFoundException('User not found.');
     // First Impressions are free to reveal for women. A paid plan still
     // reveals them for every other recipient.
-    const gender = String(receiver.gender || '').trim().toLowerCase();
-    const isWoman = ['female', 'woman', 'women', 'girl', 'ladies', 'f'].includes(gender);
-    const unlocked = isWoman || (receiver.plan !== 'free' && (!receiver.planExpiresAt || receiver.planExpiresAt > new Date()));
+    const unlocked = isWoman(receiver) || activePlan(receiver) !== 'free';
     const rows = await this.impressions.find({
-      where: { receiverId: userId },
+      where: { receiverId: userId, replyMessageId: IsNull() },
       relations: ['sender'],
       order: { createdAt: 'DESC' },
       take: 50,
@@ -92,5 +93,73 @@ export class FirstImpressionsService {
         createdAt: row.createdAt,
       })),
     };
+  }
+
+  async reply(userId: string, impressionId: string, rawContent: string) {
+    const content = String(rawContent || '').trim();
+    if (!content) throw new BadRequestException('Write a reply first.');
+    if (content.length > 2000) throw new BadRequestException('Reply must be 2000 characters or fewer.');
+
+    const result = await this.dataSource.transaction(async (manager) => {
+      const impressions = manager.getRepository(FirstImpression);
+      const impression = await impressions.findOne({
+        where: { id: impressionId },
+        relations: ['receiver'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!impression) throw new NotFoundException('First Impression not found.');
+      if (impression.receiverId !== userId) throw new ForbiddenException('You cannot reply to this First Impression.');
+
+      const canReply = isWoman(impression.receiver) || activePlan(impression.receiver) !== 'free';
+      if (!canReply) {
+        throw new ForbiddenException('Upgrade to an active paid plan to read and reply to First Impressions.');
+      }
+      if (impression.replyMessageId) throw new ConflictException('You have already replied to this First Impression.');
+
+      const matches = manager.getRepository(MatchRelation);
+      const relation = await matches.findOne({
+        where: [
+          { senderId: impression.senderId, receiverId: impression.receiverId },
+          { senderId: impression.receiverId, receiverId: impression.senderId },
+        ],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!relation) throw new NotFoundException('Conversation could not be created.');
+      if (relation.status === MatchStatus.BLOCKED) throw new ForbiddenException('This conversation is blocked.');
+
+      relation.status = MatchStatus.MATCHED;
+      relation.hiddenFromChatForUserIds = null;
+      await matches.save(relation);
+
+      const messageRepo = manager.getRepository(Message);
+      const message = await messageRepo.save(messageRepo.create({
+        conversationId: relation.id,
+        senderId: userId,
+        receiverId: impression.senderId,
+        content,
+        reactions: null,
+        deletedForUserIds: null,
+        deletedForEveryone: false,
+        pinnedByUserIds: null,
+        starredByUserIds: null,
+        replyToMessageId: null,
+        isRead: false,
+        editedAt: null,
+      }));
+
+      impression.replyMessageId = message.id;
+      impression.repliedAt = new Date();
+      impression.isRead = true;
+      await impressions.save(impression);
+      return { matchId: relation.id, message };
+    });
+
+    void this.pushNotifications.sendToUser(result.message.receiverId, {
+      title: 'First Impression reply',
+      body: 'You received a reply to your First Impression.',
+      data: { type: 'first_impression_reply', conversationId: result.matchId, url: '/user/messages?id=' + result.matchId },
+    }).catch(() => undefined);
+
+    return { success: true, matchId: result.matchId, message: result.message };
   }
 }

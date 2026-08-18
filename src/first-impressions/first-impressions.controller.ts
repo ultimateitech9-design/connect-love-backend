@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FirstImpressionsService } from './first-impressions.service';
 
@@ -15,5 +15,10 @@ export class FirstImpressionsController {
   @Get('received')
   received(@Request() req: any) {
     return this.service.received(req.user.userId);
+  }
+
+  @Post(':id/reply')
+  reply(@Request() req: any, @Param('id') id: string, @Body('content') content: string) {
+    return this.service.reply(req.user.userId, id, content);
   }
 }
