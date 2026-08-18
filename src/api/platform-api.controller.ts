@@ -167,6 +167,12 @@ export class UpdatePlatformUserDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  @Matches(/^$|^\+?[0-9][0-9\s-]{6,19}$/, { message: 'Enter a valid phone number.' })
+  phone?: string;
+
+  @IsOptional()
   @IsEmail()
   email?: string;
 
@@ -465,7 +471,7 @@ export class PlatformApiController {
     const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
     const query = this.userRepo.createQueryBuilder('user')
       .select([
-        'user.id', 'user.name', 'user.email', 'user.role', 'user.plan',
+        'user.id', 'user.name', 'user.email', 'user.phone', 'user.role', 'user.plan',
         'user.city', 'user.lastSeen', 'user.updatedAt', 'user.createdAt',
         'user.isVerified', 'user.status',
       ])
@@ -491,6 +497,7 @@ export class PlatformApiController {
         id: user.id,
         name: user.name,
         email: user.email,
+        phone: user.phone || '',
         ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
         plan: user.plan,
         account: user.plan === 'platinum' ? 'Diamond' : user.plan === 'gold' ? 'Gold' : 'Free',
@@ -581,6 +588,7 @@ export class PlatformApiController {
       id: user.id,
       name: user.name,
       email: user.email,
+      phone: user.phone || '',
       city: user.city,
       isVerified: user.isVerified,
       plan: user.plan,
@@ -628,6 +636,7 @@ export class PlatformApiController {
     Object.assign(user, {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.email !== undefined ? { email: body.email } : {}),
+      ...(body.phone !== undefined ? { phone: body.phone.trim() || null } : {}),
       ...(body.birthDate !== undefined ? { birthDate: body.birthDate ? new Date(body.birthDate) : null } : {}),
       ...(body.gender !== undefined ? { gender: body.gender } : {}),
       ...(body.religion !== undefined ? { religion: body.religion } : {}),

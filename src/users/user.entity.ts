@@ -17,6 +17,9 @@ export class User {
   @Column({ unique: true, length: 255 })
   email: string;
 
+  @Column({ type: 'varchar', nullable: true, length: 30 })
+  phone: string | null;
+
   @Column({ select: false }) // Never returned in queries by default
   password: string;
 

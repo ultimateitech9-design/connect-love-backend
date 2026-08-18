@@ -8,6 +8,7 @@ import {
   IsDateString,
   IsIn,
   IsNumber,
+  Matches,
   Min,
   Max,
 } from 'class-validator';
@@ -17,6 +18,12 @@ export class UpdateProfileDto {
   @IsString()
   @MaxLength(150)
   name?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  @Matches(/^$|^\+?[0-9][0-9\s-]{6,19}$/, { message: 'Enter a valid phone number.' })
+  phone?: string;
 
   @IsOptional()
   @IsDateString()

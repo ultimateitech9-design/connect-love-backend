@@ -299,6 +299,15 @@ _ts_decorate([
 ], UpdatePlatformUserDto.prototype, "name", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(30),
+    (0, _classvalidator.Matches)(/^$|^\+?[0-9][0-9\s-]{6,19}$/, {
+        message: 'Enter a valid phone number.'
+    }),
+    _ts_metadata("design:type", String)
+], UpdatePlatformUserDto.prototype, "phone", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsEmail)(),
     _ts_metadata("design:type", String)
 ], UpdatePlatformUserDto.prototype, "email", void 0);
@@ -643,6 +652,7 @@ let PlatformApiController = class PlatformApiController {
             'user.id',
             'user.name',
             'user.email',
+            'user.phone',
             'user.role',
             'user.plan',
             'user.city',
@@ -673,6 +683,7 @@ let PlatformApiController = class PlatformApiController {
                     id: user.id,
                     name: user.name,
                     email: user.email,
+                    phone: user.phone || '',
                     ...actor.role === 'super_admin' || actor.role === 'admin' ? {
                         role: user.role
                     } : {},
@@ -770,6 +781,7 @@ let PlatformApiController = class PlatformApiController {
             id: user.id,
             name: user.name,
             email: user.email,
+            phone: user.phone || '',
             city: user.city,
             isVerified: user.isVerified,
             plan: user.plan,
@@ -842,6 +854,9 @@ let PlatformApiController = class PlatformApiController {
             } : {},
             ...body.email !== undefined ? {
                 email: body.email
+            } : {},
+            ...body.phone !== undefined ? {
+                phone: body.phone.trim() || null
             } : {},
             ...body.birthDate !== undefined ? {
                 birthDate: body.birthDate ? new Date(body.birthDate) : null

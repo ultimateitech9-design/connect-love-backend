@@ -55,6 +55,14 @@ _ts_decorate([
 ], User.prototype, "email", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'varchar',
+        nullable: true,
+        length: 30
+    }),
+    _ts_metadata("design:type", Object)
+], User.prototype, "phone", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         select: false
     }),
     _ts_metadata("design:type", String)

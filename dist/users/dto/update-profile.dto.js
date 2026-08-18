@@ -28,6 +28,15 @@ _ts_decorate([
 ], UpdateProfileDto.prototype, "name", void 0);
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
+    (0, _classvalidator.IsString)(),
+    (0, _classvalidator.MaxLength)(30),
+    (0, _classvalidator.Matches)(/^$|^\+?[0-9][0-9\s-]{6,19}$/, {
+        message: 'Enter a valid phone number.'
+    }),
+    _ts_metadata("design:type", String)
+], UpdateProfileDto.prototype, "phone", void 0);
+_ts_decorate([
+    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsDateString)(),
     _ts_metadata("design:type", String)
 ], UpdateProfileDto.prototype, "birthDate", void 0);
