@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export type CoinTransactionType = 'recharge' | 'gift' | 'theme' | 'withdrawal';
+export type CoinTransactionType = 'recharge' | 'gift' | 'theme' | 'withdrawal' | 'admin_credit';
 export type CoinTransactionStatus = 'completed' | 'pending' | 'rejected';
 
 @Entity('coin_transactions')

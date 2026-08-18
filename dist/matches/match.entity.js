@@ -81,6 +81,13 @@ _ts_decorate([
     _ts_metadata("design:type", Boolean)
 ], MatchRelation.prototype, "isSuperLike", void 0);
 _ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], MatchRelation.prototype, "hiddenFromChatForUserIds", void 0);
+_ts_decorate([
     (0, _typeorm.CreateDateColumn)(),
     _ts_metadata("design:type", typeof Date === "undefined" ? Object : Date)
 ], MatchRelation.prototype, "createdAt", void 0);

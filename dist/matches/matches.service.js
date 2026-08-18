@@ -169,7 +169,7 @@ let MatchesService = class MatchesService {
         if (filter === 'active') {
             query.andWhere('match.status = :status', {
                 status: _matchentity.MatchStatus.MATCHED
-            });
+            }).andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
         } else if (filter === 'sent') {
             query.andWhere('match.status = :status AND match.senderId = :userId', {
                 status: _matchentity.MatchStatus.PENDING,

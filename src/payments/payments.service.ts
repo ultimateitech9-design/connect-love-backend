@@ -7,6 +7,8 @@ import { Payment } from '../platform/payment.entity';
 import { User, UserPlan } from '../users/user.entity';
 import { isWoman } from '../plans/plan-entitlements';
 import { Coupon } from './coupon.entity';
+import { ProfileBoost, type BoostPlanKey } from '../boosts/boost.entity';
+import { BOOST_PLANS } from '../boosts/boosts.service';
 
 const PAID_PLANS: Record<string, { name: string; userPlan: UserPlan; amountPaise: number }> = {
   premium: { name: 'Gold', userPlan: 'gold', amountPaise: 29900 },
@@ -19,6 +21,7 @@ export class PaymentsService {
     @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Coupon) private readonly couponRepo: Repository<Coupon>,
+    @InjectRepository(ProfileBoost) private readonly boostRepo: Repository<ProfileBoost>,
   ) {}
 
   private async discountFor(rawCode: string | undefined, userPlan: UserPlan, amountPaise: number) {
@@ -33,6 +36,19 @@ export class PaymentsService {
     return { coupon, discountPaise, finalPaise: Math.max(100, amountPaise - discountPaise) };
   }
 
+  async createBoostOrder(userId: string, requestedPlan: string) {
+    const planKey = requestedPlan as BoostPlanKey;
+    const plan = BOOST_PLANS[planKey];
+    if (!plan) throw new BadRequestException('Invalid boost plan.');
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    if (!user) throw new UnauthorizedException('User account not found.');
+    const payment = await this.paymentRepo.save(this.paymentRepo.create({ userId, planName: `boost:${planKey}`, amount: plan.price.toFixed(2), originalAmount: plan.price.toFixed(2), discountAmount: '0.00', couponCode: null, currency: 'INR', status: 'pending', gateway: 'razorpay' }));
+    try {
+      const order = await this.razorpay('/orders', { method: 'POST', body: JSON.stringify({ amount: plan.price * 100, currency: 'INR', receipt: payment.id, notes: { paymentId: payment.id, userId, product: 'profile_boost', boostPlan: planKey } }) });
+      payment.gatewayOrderId = order.id; await this.paymentRepo.save(payment);
+      return { keyId: this.credentials().keyId, orderId: order.id, amount: plan.price * 100, currency: 'INR', planName: plan.name, customer: { name: user.name, email: user.email } };
+    } catch (error) { payment.status = 'failed'; await this.paymentRepo.save(payment); throw error; }
+  }
   async validateCoupon(userId: string, requestedPlan: string, couponCode: string) {
     const plan = PAID_PLANS[requestedPlan];
     if (!plan) throw new BadRequestException('Invalid paid plan.');
@@ -191,9 +207,28 @@ export class PaymentsService {
   }
 
   private async activatePlan(payment: Payment, gatewayPaymentId: string) {
-    if (payment.status === 'successful') return { success: true, plan: payment.planName };
+    if (payment.status === 'successful') {
+      if (payment.planName.startsWith('boost:')) {
+        const boost = await this.boostRepo.findOne({ where: { userId: payment.userId, requestId: payment.id } });
+        return { success: true, product: 'profile_boost', plan: payment.planName.slice('boost:'.length), startsAt: boost?.startsAt, endsAt: boost?.endsAt };
+      }
+      return { success: true, plan: payment.planName };
+    }
     const user = await this.userRepo.findOne({ where: { id: payment.userId } });
     if (!user) throw new BadRequestException('Payment user no longer exists.');
+    if (payment.planName.startsWith('boost:')) {
+      const planKey = payment.planName.slice('boost:'.length) as BoostPlanKey;
+      const plan = BOOST_PLANS[planKey];
+      if (!plan) throw new BadRequestException('Boost plan no longer exists.');
+      let boost = await this.boostRepo.findOne({ where: { userId: payment.userId, requestId: payment.id } });
+      if (!boost) {
+        const latest = await this.boostRepo.findOne({ where: { userId: payment.userId }, order: { endsAt: 'DESC' } });
+        const now = new Date(); const startsAt = latest?.endsAt && latest.endsAt > now ? latest.endsAt : now;
+        boost = await this.boostRepo.save(this.boostRepo.create({ userId: payment.userId, requestId: payment.id, planKey, amount: plan.price, currency: 'INR', startsAt, endsAt: new Date(startsAt.getTime() + plan.durationMinutes * 60_000) }));
+      }
+      payment.gatewayPaymentId = gatewayPaymentId; payment.status = 'successful'; await this.paymentRepo.save(payment);
+      return { success: true, product: 'profile_boost', plan: planKey, startsAt: boost.startsAt, endsAt: boost.endsAt };
+    }
     const base = user.planExpiresAt && user.planExpiresAt > new Date() ? user.planExpiresAt : new Date();
     const expiresAt = new Date(base);
     expiresAt.setDate(expiresAt.getDate() + 30);

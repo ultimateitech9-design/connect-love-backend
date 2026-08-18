@@ -17,6 +17,8 @@ const _paymententity = require("../platform/payment.entity");
 const _userentity = require("../users/user.entity");
 const _planentitlements = require("../plans/plan-entitlements");
 const _couponentity = require("./coupon.entity");
+const _boostentity = require("../boosts/boost.entity");
+const _boostsservice = require("../boosts/boosts.service");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -66,6 +68,61 @@ let PaymentsService = class PaymentsService {
             discountPaise,
             finalPaise: Math.max(100, amountPaise - discountPaise)
         };
+    }
+    async createBoostOrder(userId, requestedPlan) {
+        const planKey = requestedPlan;
+        const plan = _boostsservice.BOOST_PLANS[planKey];
+        if (!plan) throw new _common.BadRequestException('Invalid boost plan.');
+        const user = await this.userRepo.findOne({
+            where: {
+                id: userId
+            }
+        });
+        if (!user) throw new _common.UnauthorizedException('User account not found.');
+        const payment = await this.paymentRepo.save(this.paymentRepo.create({
+            userId,
+            planName: `boost:${planKey}`,
+            amount: plan.price.toFixed(2),
+            originalAmount: plan.price.toFixed(2),
+            discountAmount: '0.00',
+            couponCode: null,
+            currency: 'INR',
+            status: 'pending',
+            gateway: 'razorpay'
+        }));
+        try {
+            const order = await this.razorpay('/orders', {
+                method: 'POST',
+                body: JSON.stringify({
+                    amount: plan.price * 100,
+                    currency: 'INR',
+                    receipt: payment.id,
+                    notes: {
+                        paymentId: payment.id,
+                        userId,
+                        product: 'profile_boost',
+                        boostPlan: planKey
+                    }
+                })
+            });
+            payment.gatewayOrderId = order.id;
+            await this.paymentRepo.save(payment);
+            return {
+                keyId: this.credentials().keyId,
+                orderId: order.id,
+                amount: plan.price * 100,
+                currency: 'INR',
+                planName: plan.name,
+                customer: {
+                    name: user.name,
+                    email: user.email
+                }
+            };
+        } catch (error) {
+            payment.status = 'failed';
+            await this.paymentRepo.save(payment);
+            throw error;
+        }
     }
     async validateCoupon(userId, requestedPlan, couponCode) {
         const plan = PAID_PLANS[requestedPlan];
@@ -257,16 +314,75 @@ let PaymentsService = class PaymentsService {
         };
     }
     async activatePlan(payment, gatewayPaymentId) {
-        if (payment.status === 'successful') return {
-            success: true,
-            plan: payment.planName
-        };
+        if (payment.status === 'successful') {
+            if (payment.planName.startsWith('boost:')) {
+                const boost = await this.boostRepo.findOne({
+                    where: {
+                        userId: payment.userId,
+                        requestId: payment.id
+                    }
+                });
+                return {
+                    success: true,
+                    product: 'profile_boost',
+                    plan: payment.planName.slice('boost:'.length),
+                    startsAt: boost?.startsAt,
+                    endsAt: boost?.endsAt
+                };
+            }
+            return {
+                success: true,
+                plan: payment.planName
+            };
+        }
         const user = await this.userRepo.findOne({
             where: {
                 id: payment.userId
             }
         });
         if (!user) throw new _common.BadRequestException('Payment user no longer exists.');
+        if (payment.planName.startsWith('boost:')) {
+            const planKey = payment.planName.slice('boost:'.length);
+            const plan = _boostsservice.BOOST_PLANS[planKey];
+            if (!plan) throw new _common.BadRequestException('Boost plan no longer exists.');
+            let boost = await this.boostRepo.findOne({
+                where: {
+                    userId: payment.userId,
+                    requestId: payment.id
+                }
+            });
+            if (!boost) {
+                const latest = await this.boostRepo.findOne({
+                    where: {
+                        userId: payment.userId
+                    },
+                    order: {
+                        endsAt: 'DESC'
+                    }
+                });
+                const now = new Date();
+                const startsAt = latest?.endsAt && latest.endsAt > now ? latest.endsAt : now;
+                boost = await this.boostRepo.save(this.boostRepo.create({
+                    userId: payment.userId,
+                    requestId: payment.id,
+                    planKey,
+                    amount: plan.price,
+                    currency: 'INR',
+                    startsAt,
+                    endsAt: new Date(startsAt.getTime() + plan.durationMinutes * 60_000)
+                }));
+            }
+            payment.gatewayPaymentId = gatewayPaymentId;
+            payment.status = 'successful';
+            await this.paymentRepo.save(payment);
+            return {
+                success: true,
+                product: 'profile_boost',
+                plan: planKey,
+                startsAt: boost.startsAt,
+                endsAt: boost.endsAt
+            };
+        }
         const base = user.planExpiresAt && user.planExpiresAt > new Date() ? user.planExpiresAt : new Date();
         const expiresAt = new Date(base);
         expiresAt.setDate(expiresAt.getDate() + 30);
@@ -290,10 +406,11 @@ let PaymentsService = class PaymentsService {
         const b = Buffer.from(right);
         return a.length === b.length && (0, _crypto.timingSafeEqual)(a, b);
     }
-    constructor(paymentRepo, userRepo, couponRepo){
+    constructor(paymentRepo, userRepo, couponRepo, boostRepo){
         this.paymentRepo = paymentRepo;
         this.userRepo = userRepo;
         this.couponRepo = couponRepo;
+        this.boostRepo = boostRepo;
     }
 };
 PaymentsService = _ts_decorate([
@@ -301,8 +418,10 @@ PaymentsService = _ts_decorate([
     _ts_param(0, (0, _typeorm.InjectRepository)(_paymententity.Payment)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_userentity.User)),
     _ts_param(2, (0, _typeorm.InjectRepository)(_couponentity.Coupon)),
+    _ts_param(3, (0, _typeorm.InjectRepository)(_boostentity.ProfileBoost)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository

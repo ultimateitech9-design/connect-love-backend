@@ -1067,7 +1067,7 @@ let PlatformApiController = class PlatformApiController {
             transactions: transactions.map((payment)=>({
                     id: payment.id,
                     user: payment.user?.name || 'Deleted user',
-                    plan: payment.planName,
+                    plan: payment.planName.startsWith('boost:') ? `Profile Boost - ${payment.planName.slice(6).replace(/_/g, ' ')}` : payment.planName,
                     amount: Number(payment.amount),
                     status: payment.status,
                     date: payment.createdAt.toISOString().split('T')[0]
@@ -1707,6 +1707,45 @@ let PlatformApiController = class PlatformApiController {
                     amt: `${this.currencySymbol(p.currency)}${Number(p.amount).toFixed(2)}`,
                     t: p.createdAt.toLocaleString()
                 }))
+        };
+    }
+    async salesRetention() {
+        const users = await this.userRepo.find({
+            select: [
+                'plan',
+                'status',
+                'isVerified'
+            ]
+        });
+        const plans = [
+            {
+                key: 'free',
+                label: 'Free'
+            },
+            {
+                key: 'gold',
+                label: 'Gold'
+            },
+            {
+                key: 'platinum',
+                label: 'Diamond'
+            }
+        ].map((plan)=>{
+            const members = users.filter((user)=>String(user.plan || 'free').toLowerCase() === plan.key);
+            return {
+                ...plan,
+                total: members.length,
+                active: members.filter((user)=>String(user.status || '').toLowerCase() === 'active').length,
+                verified: members.filter((user)=>Boolean(user.isVerified)).length
+            };
+        });
+        const premiumUsers = plans.filter((plan)=>plan.key !== 'free').reduce((sum, plan)=>sum + plan.total, 0);
+        const activePremium = plans.filter((plan)=>plan.key !== 'free').reduce((sum, plan)=>sum + plan.active, 0);
+        return {
+            totalUsers: users.length,
+            premiumUsers,
+            activePremium,
+            plans
         };
     }
     async salesTrends() {
@@ -2390,6 +2429,13 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "salesOverview", null);
+_ts_decorate([
+    (0, _common.Get)('sales/retention'),
+    (0, _rolesguard.Roles)('sales', 'admin', 'super_admin'),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", []),
+    _ts_metadata("design:returntype", Promise)
+], PlatformApiController.prototype, "salesRetention", null);
 _ts_decorate([
     (0, _common.Get)('sales/trends'),
     (0, _rolesguard.Roles)('sales', 'admin', 'super_admin'),

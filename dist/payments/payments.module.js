@@ -16,6 +16,7 @@ const _couponentity = require("./coupon.entity");
 const _couponscontroller = require("./coupons.controller");
 const _paymentscontroller = require("./payments.controller");
 const _paymentsservice = require("./payments.service");
+const _boostentity = require("../boosts/boost.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -30,7 +31,8 @@ PaymentsModule = _ts_decorate([
             _typeorm.TypeOrmModule.forFeature([
                 _paymententity.Payment,
                 _userentity.User,
-                _couponentity.Coupon
+                _couponentity.Coupon,
+                _boostentity.ProfileBoost
             ])
         ],
         controllers: [

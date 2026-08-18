@@ -52,6 +52,9 @@ let UsersController = class UsersController {
     getCoinTransactions() {
         return this.usersService.getCoinTransactions();
     }
+    creditGiftCoins(req, body) {
+        return this.usersService.creditGiftCoins(String(body.userId || ''), Number(body.amount), String(body.note || ''), String(req.user.userId || ''));
+    }
     updateWithdrawalStatus(id, status) {
         return this.usersService.updateWithdrawalStatus(id, status);
     }
@@ -168,6 +171,19 @@ _ts_decorate([
     _ts_metadata("design:paramtypes", []),
     _ts_metadata("design:returntype", void 0)
 ], UsersController.prototype, "getCoinTransactions", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('super_admin'),
+    (0, _common.Post)('admin/coins/credit'),
+    _ts_param(0, (0, _common.Request)()),
+    _ts_param(1, (0, _common.Body)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "creditGiftCoins", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
     (0, _rolesguard.Roles)('super_admin'),

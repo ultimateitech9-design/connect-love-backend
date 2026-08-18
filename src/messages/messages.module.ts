@@ -13,10 +13,11 @@ import { MatchesModule } from '../matches/matches.module';
 import { AuthModule } from '../auth/auth.module';
 import { User } from '../users/user.entity';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
+import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Message, MatchRelation, VideoCall, User]),
+    TypeOrmModule.forFeature([Message, MatchRelation, VideoCall, User, FirstImpression]),
     UsersModule,
     MatchesModule,
     AuthModule,

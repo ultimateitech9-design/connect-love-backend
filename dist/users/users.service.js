@@ -447,6 +447,50 @@ let UsersService = class UsersService {
                 receiver: row.receiverId ? names.get(row.receiverId) || null : null
             }));
     }
+    async creditGiftCoins(userId, amount, note, adminId) {
+        const targetId = userId.trim();
+        const coins = Number(amount);
+        if (!targetId) throw new _common.BadRequestException('Select a user to receive coins.');
+        if (!Number.isInteger(coins) || coins < 1 || coins > 1000000) {
+            throw new _common.BadRequestException('Enter a whole coin amount between 1 and 1,000,000.');
+        }
+        return this.dataSource.transaction(async (manager)=>{
+            const userRepository = manager.getRepository(_userentity.User);
+            const user = await userRepository.findOne({
+                where: {
+                    id: targetId
+                },
+                lock: {
+                    mode: 'pessimistic_write'
+                }
+            });
+            if (!user || user.role !== 'user') throw new _common.NotFoundException('Member account was not found.');
+            user.coinBalance = Number(user.coinBalance || 0) + coins;
+            await userRepository.save(user);
+            await manager.getRepository(_cointransactionentity.CoinTransaction).save(manager.getRepository(_cointransactionentity.CoinTransaction).create({
+                type: 'admin_credit',
+                status: 'completed',
+                userId: user.id,
+                senderId: adminId || null,
+                receiverId: user.id,
+                grossCoins: coins,
+                userCoins: coins,
+                platformCoins: 0,
+                label: (note.trim() ? `Super Admin credit: ${note.trim()}` : 'Super Admin gift coin credit').slice(0, 120),
+                payoutAccount: null
+            }));
+            return {
+                success: true,
+                coinsAdded: coins,
+                coinBalance: user.coinBalance,
+                user: {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email
+                }
+            };
+        });
+    }
     async updateWithdrawalStatus(id, status) {
         if (status !== 'completed' && status !== 'rejected') throw new _common.BadRequestException('Invalid withdrawal status.');
         return this.dataSource.transaction(async (manager)=>{

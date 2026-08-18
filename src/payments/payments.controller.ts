@@ -12,6 +12,11 @@ export class PaymentsController {
     return this.paymentsService.createOrder(request.user.userId, plan, couponCode);
   }
 
+  @Post('boost/order')
+  @UseGuards(AuthGuard('jwt'))
+  createBoostOrder(@Req() request: any, @Body('planKey') planKey: string) {
+    return this.paymentsService.createBoostOrder(request.user.userId, planKey);
+  }
   @Post('coupon/validate')
   @UseGuards(AuthGuard('jwt'))
   validateCoupon(@Req() request: any, @Body('plan') plan: string, @Body('couponCode') couponCode: string) {

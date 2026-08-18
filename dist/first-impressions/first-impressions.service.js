@@ -109,12 +109,24 @@ let FirstImpressionsService = class FirstImpressionsService {
             },
             select: [
                 'id',
+                'gender',
                 'plan',
                 'planExpiresAt'
             ]
         });
         if (!receiver) throw new _common.NotFoundException('User not found.');
-        const unlocked = receiver.plan !== 'free' && (!receiver.planExpiresAt || receiver.planExpiresAt > new Date());
+        // First Impressions are free to reveal for women. A paid plan still
+        // reveals them for every other recipient.
+        const gender = String(receiver.gender || '').trim().toLowerCase();
+        const isWoman = [
+            'female',
+            'woman',
+            'women',
+            'girl',
+            'ladies',
+            'f'
+        ].includes(gender);
+        const unlocked = isWoman || receiver.plan !== 'free' && (!receiver.planExpiresAt || receiver.planExpiresAt > new Date());
         const rows = await this.impressions.find({
             where: {
                 receiverId: userId

@@ -129,7 +129,7 @@ let MessagesGateway = class MessagesGateway {
             deliveryStatus: this.isUserOnline(data.receiverId) ? 'delivered' : 'sent'
         };
         // Emit to recipient if online
-        this.emitToUser(data.receiverId, 'receiveMessage', savedMessage);
+        this.emitToUser(data.receiverId, 'receiveMessage', await this.messagesService.forViewer(savedMessage, data.receiverId));
         // Emit back to sender (optional, can be optimistic on client)
         this.server.to(client.id).emit('receiveMessage', messageForSender);
         return {

@@ -37,6 +37,10 @@ export class MatchRelation {
   @Column({ default: false })
   isSuperLike: boolean;
 
+  // Members who cleared this chat; this only hides the conversation for them.
+  @Column({ type: 'text', nullable: true })
+  hiddenFromChatForUserIds: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

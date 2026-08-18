@@ -23,6 +23,7 @@ const _matchesmodule = require("../matches/matches.module");
 const _authmodule = require("../auth/auth.module");
 const _userentity = require("../users/user.entity");
 const _pushnotificationsmodule = require("../push-notifications/push-notifications.module");
+const _firstimpressionentity = require("../first-impressions/first-impression.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -38,7 +39,8 @@ MessagesModule = _ts_decorate([
                 _messageentity.Message,
                 _matchentity.MatchRelation,
                 _videocallentity.VideoCall,
-                _userentity.User
+                _userentity.User,
+                _firstimpressionentity.FirstImpression
             ]),
             _usersmodule.UsersModule,
             _matchesmodule.MatchesModule,

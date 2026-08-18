@@ -7,6 +7,7 @@ import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { User } from '../users/user.entity';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { PlanUsageService } from '../plans/plan-usage.service';
+import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 @Injectable()
 export class MessagesService {
@@ -19,6 +20,8 @@ export class MessagesService {
     private matchRepo: Repository<MatchRelation>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(FirstImpression)
+    private firstImpressionRepo: Repository<FirstImpression>,
     private readonly pushNotifications: PushNotificationsService,
     private readonly planUsage: PlanUsageService,
   ) {}
@@ -32,7 +35,7 @@ export class MessagesService {
       if (!receiver?.notifyMessages) return;
 
       const cleanContent = String(message.content || '').replace(/\s+/g, ' ').trim();
-      const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}…` : cleanContent;
+      const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}â€¦` : cleanContent;
       await this.pushNotifications.sendToUser(message.receiverId, {
         title: sender?.name ? `New message from ${sender.name}` : 'New message',
         body: preview || 'You received a new message.',
@@ -103,6 +106,26 @@ export class MessagesService {
     }
   }
 
+  private isMan(gender: string | null | undefined): boolean {
+    return ['male', 'man', 'men', 'boy', 'm'].includes(String(gender || '').trim().toLowerCase());
+  }
+
+  /** The original First Impression sender needs an active paid plan to read a woman's reply. */
+  private async shouldLockFirstImpressionReply(viewerId: string, senderId: string): Promise<boolean> {
+    if (senderId === viewerId) return false;
+    const [viewer, impression] = await Promise.all([
+      this.userRepo.findOne({ where: { id: viewerId }, select: ['id', 'gender', 'plan', 'planExpiresAt'] }),
+      this.firstImpressionRepo.findOne({ where: { senderId: viewerId, receiverId: senderId } }),
+    ]);
+    if (!viewer || !impression || !this.isMan(viewer.gender)) return false;
+    const hasActivePlan = viewer.plan !== 'free' && (!viewer.planExpiresAt || viewer.planExpiresAt > new Date());
+    return !hasActivePlan;
+  }
+
+  async forViewer(message: Message, viewerId: string): Promise<Message & { lockedForPlan?: boolean }> {
+    if (!(await this.shouldLockFirstImpressionReply(viewerId, message.senderId))) return message;
+    return { ...message, content: 'Unlock your plan to read her reply.', lockedForPlan: true };
+  }
   private async assertMessageAccess(messageId: string, userId: string): Promise<Message> {
     const msg = await this.msgRepo.findOne({ where: { id: messageId } });
     if (!msg) throw new NotFoundException('Message not found.');
@@ -120,14 +143,15 @@ export class MessagesService {
         where: { conversationId },
         order: { createdAt: 'ASC' }
       });
-      return messages.filter((message) => !this.parseUserList(message.deletedForUserIds).includes(userId));
+      const visible = messages.filter((message) => !this.parseUserList(message.deletedForUserIds).includes(userId));
+      return Promise.all(visible.map((message) => this.forViewer(message, userId)));
     } catch (error) {
       if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
       const rows = await this.msgRepo.query(
         'SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? ORDER BY createdAt ASC',
         [conversationId],
       );
-      return rows.map((row: any) => this.normalizeCoreMessage(row));
+      return Promise.all(rows.map((row: any) => this.forViewer(this.normalizeCoreMessage(row), userId))); 
     }
   }
 
@@ -238,19 +262,15 @@ export class MessagesService {
       }
     }
 
-    if (!reactionsMap[emoji]) {
-      reactionsMap[emoji] = [];
+    // A user can keep exactly one reaction on a message. Selecting another
+    // emoji replaces the previous one instead of creating multiple reactions.
+    for (const [reactionEmoji, userIds] of Object.entries(reactionsMap)) {
+      reactionsMap[reactionEmoji] = Array.isArray(userIds)
+        ? userIds.map(String).filter((id) => id !== userId)
+        : [];
+      if (reactionsMap[reactionEmoji].length === 0) delete reactionsMap[reactionEmoji];
     }
-
-    const index = reactionsMap[emoji].indexOf(userId);
-    if (index > -1) {
-      reactionsMap[emoji].splice(index, 1);
-      if (reactionsMap[emoji].length === 0) {
-        delete reactionsMap[emoji];
-      }
-    } else {
-      reactionsMap[emoji].push(userId);
-    }
+    reactionsMap[emoji] = [...new Set([...(reactionsMap[emoji] || []).map(String), userId])];
 
     msg.reactions = JSON.stringify(reactionsMap);
     await this.msgRepo.save(msg);
@@ -258,7 +278,7 @@ export class MessagesService {
   }
 
   async clearConversation(conversationId: string, userId: string): Promise<void> {
-    await this.assertConversationAccess(conversationId, userId);
+    const match = await this.assertConversationAccess(conversationId, userId);
     const messages = await this.msgRepo.find({ where: { conversationId } });
     await Promise.all(messages.map((message) => {
       const deletedFor = new Set(this.parseUserList(message.deletedForUserIds));
@@ -266,6 +286,11 @@ export class MessagesService {
       message.deletedForUserIds = JSON.stringify([...deletedFor]);
       return this.msgRepo.save(message);
     }));
+
+    const hiddenFor = new Set(this.parseUserList(match.hiddenFromChatForUserIds));
+    hiddenFor.add(userId);
+    match.hiddenFromChatForUserIds = JSON.stringify([...hiddenFor]);
+    await this.matchRepo.save(match);
   }
 
   async removeMany(ids: string[], userId: string): Promise<void> {

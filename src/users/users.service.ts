@@ -353,6 +353,46 @@ export class UsersService {
     }));
   }
 
+  async creditGiftCoins(userId: string, amount: number, note: string, adminId: string) {
+    const targetId = userId.trim();
+    const coins = Number(amount);
+    if (!targetId) throw new BadRequestException('Select a user to receive coins.');
+    if (!Number.isInteger(coins) || coins < 1 || coins > 1000000) {
+      throw new BadRequestException('Enter a whole coin amount between 1 and 1,000,000.');
+    }
+
+    return this.dataSource.transaction(async (manager) => {
+      const userRepository = manager.getRepository(User);
+      const user = await userRepository.findOne({
+        where: { id: targetId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!user || user.role !== 'user') throw new NotFoundException('Member account was not found.');
+
+      user.coinBalance = Number(user.coinBalance || 0) + coins;
+      await userRepository.save(user);
+      await manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({
+        type: 'admin_credit',
+        status: 'completed',
+        userId: user.id,
+        senderId: adminId || null,
+        receiverId: user.id,
+        grossCoins: coins,
+        userCoins: coins,
+        platformCoins: 0,
+        label: (note.trim() ? `Super Admin credit: ${note.trim()}` : 'Super Admin gift coin credit').slice(0, 120),
+        payoutAccount: null,
+      }));
+
+      return {
+        success: true,
+        coinsAdded: coins,
+        coinBalance: user.coinBalance,
+        user: { id: user.id, name: user.name, email: user.email },
+      };
+    });
+  }
+
   async updateWithdrawalStatus(id: string, status: 'completed' | 'rejected') {
     if (status !== 'completed' && status !== 'rejected') throw new BadRequestException('Invalid withdrawal status.');
     return this.dataSource.transaction(async (manager) => {

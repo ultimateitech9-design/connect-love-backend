@@ -153,7 +153,9 @@ export class MatchesService {
       .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId });
 
     if (filter === 'active') {
-      query.andWhere('match.status = :status', { status: MatchStatus.MATCHED });
+      query
+        .andWhere('match.status = :status', { status: MatchStatus.MATCHED })
+        .andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
     } else if (filter === 'sent') {
       query.andWhere('match.status = :status AND match.senderId = :userId', { status: MatchStatus.PENDING, userId });
     } else if (filter === 'received') {

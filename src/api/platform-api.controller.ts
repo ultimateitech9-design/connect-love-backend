@@ -793,7 +793,7 @@ export class PlatformApiController {
       transactions: transactions.map((payment) => ({
         id: payment.id,
         user: payment.user?.name || 'Deleted user',
-        plan: payment.planName,
+        plan: payment.planName.startsWith('boost:') ? `Profile Boost - ${payment.planName.slice(6).replace(/_/g, ' ')}` : payment.planName,
         amount: Number(payment.amount),
         status: payment.status,
         date: payment.createdAt.toISOString().split('T')[0],
@@ -1291,6 +1291,27 @@ export class PlatformApiController {
     };
   }
 
+  @Get('sales/retention')
+  @Roles('sales', 'admin', 'super_admin')
+  async salesRetention() {
+    const users = await this.userRepo.find({ select: ['plan', 'status', 'isVerified'] });
+    const plans = [
+      { key: 'free', label: 'Free' },
+      { key: 'gold', label: 'Gold' },
+      { key: 'platinum', label: 'Diamond' },
+    ].map((plan) => {
+      const members = users.filter((user) => String(user.plan || 'free').toLowerCase() === plan.key);
+      return {
+        ...plan,
+        total: members.length,
+        active: members.filter((user) => String(user.status || '').toLowerCase() === 'active').length,
+        verified: members.filter((user) => Boolean(user.isVerified)).length,
+      };
+    });
+    const premiumUsers = plans.filter((plan) => plan.key !== 'free').reduce((sum, plan) => sum + plan.total, 0);
+    const activePremium = plans.filter((plan) => plan.key !== 'free').reduce((sum, plan) => sum + plan.active, 0);
+    return { totalUsers: users.length, premiumUsers, activePremium, plans };
+  }
   @Get('sales/trends')
   @Roles('sales', 'admin', 'super_admin')
   async salesTrends() {

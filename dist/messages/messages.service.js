@@ -17,6 +17,7 @@ const _matchentity = require("../matches/match.entity");
 const _userentity = require("../users/user.entity");
 const _pushnotificationsservice = require("../push-notifications/push-notifications.service");
 const _planusageservice = require("../plans/plan-usage.service");
+const _firstimpressionentity = require("../first-impressions/first-impression.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -56,7 +57,7 @@ let MessagesService = class MessagesService {
             ]);
             if (!receiver?.notifyMessages) return;
             const cleanContent = String(message.content || '').replace(/\s+/g, ' ').trim();
-            const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}…` : cleanContent;
+            const preview = cleanContent.length > 120 ? `${cleanContent.slice(0, 117)}â€¦` : cleanContent;
             await this.pushNotifications.sendToUser(message.receiverId, {
                 title: sender?.name ? `New message from ${sender.name}` : 'New message',
                 body: preview || 'You received a new message.',
@@ -126,6 +127,48 @@ let MessagesService = class MessagesService {
             return [];
         }
     }
+    isMan(gender) {
+        return [
+            'male',
+            'man',
+            'men',
+            'boy',
+            'm'
+        ].includes(String(gender || '').trim().toLowerCase());
+    }
+    /** The original First Impression sender needs an active paid plan to read a woman's reply. */ async shouldLockFirstImpressionReply(viewerId, senderId) {
+        if (senderId === viewerId) return false;
+        const [viewer, impression] = await Promise.all([
+            this.userRepo.findOne({
+                where: {
+                    id: viewerId
+                },
+                select: [
+                    'id',
+                    'gender',
+                    'plan',
+                    'planExpiresAt'
+                ]
+            }),
+            this.firstImpressionRepo.findOne({
+                where: {
+                    senderId: viewerId,
+                    receiverId: senderId
+                }
+            })
+        ]);
+        if (!viewer || !impression || !this.isMan(viewer.gender)) return false;
+        const hasActivePlan = viewer.plan !== 'free' && (!viewer.planExpiresAt || viewer.planExpiresAt > new Date());
+        return !hasActivePlan;
+    }
+    async forViewer(message, viewerId) {
+        if (!await this.shouldLockFirstImpressionReply(viewerId, message.senderId)) return message;
+        return {
+            ...message,
+            content: 'Unlock your plan to read her reply.',
+            lockedForPlan: true
+        };
+    }
     async assertMessageAccess(messageId, userId) {
         const msg = await this.msgRepo.findOne({
             where: {
@@ -150,13 +193,14 @@ let MessagesService = class MessagesService {
                     createdAt: 'ASC'
                 }
             });
-            return messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId));
+            const visible = messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId));
+            return Promise.all(visible.map((message)=>this.forViewer(message, userId)));
         } catch (error) {
             if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
             const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? ORDER BY createdAt ASC', [
                 conversationId
             ]);
-            return rows.map((row)=>this.normalizeCoreMessage(row));
+            return Promise.all(rows.map((row)=>this.forViewer(this.normalizeCoreMessage(row), userId)));
         }
     }
     async create(conversationId, senderId, receiverId, content, replyToMessageId) {
@@ -283,24 +327,24 @@ let MessagesService = class MessagesService {
                 reactionsMap = {};
             }
         }
-        if (!reactionsMap[emoji]) {
-            reactionsMap[emoji] = [];
+        // A user can keep exactly one reaction on a message. Selecting another
+        // emoji replaces the previous one instead of creating multiple reactions.
+        for (const [reactionEmoji, userIds] of Object.entries(reactionsMap)){
+            reactionsMap[reactionEmoji] = Array.isArray(userIds) ? userIds.map(String).filter((id)=>id !== userId) : [];
+            if (reactionsMap[reactionEmoji].length === 0) delete reactionsMap[reactionEmoji];
         }
-        const index = reactionsMap[emoji].indexOf(userId);
-        if (index > -1) {
-            reactionsMap[emoji].splice(index, 1);
-            if (reactionsMap[emoji].length === 0) {
-                delete reactionsMap[emoji];
-            }
-        } else {
-            reactionsMap[emoji].push(userId);
-        }
+        reactionsMap[emoji] = [
+            ...new Set([
+                ...(reactionsMap[emoji] || []).map(String),
+                userId
+            ])
+        ];
         msg.reactions = JSON.stringify(reactionsMap);
         await this.msgRepo.save(msg);
         return reactionsMap;
     }
     async clearConversation(conversationId, userId) {
-        await this.assertConversationAccess(conversationId, userId);
+        const match = await this.assertConversationAccess(conversationId, userId);
         const messages = await this.msgRepo.find({
             where: {
                 conversationId
@@ -314,6 +358,12 @@ let MessagesService = class MessagesService {
             ]);
             return this.msgRepo.save(message);
         }));
+        const hiddenFor = new Set(this.parseUserList(match.hiddenFromChatForUserIds));
+        hiddenFor.add(userId);
+        match.hiddenFromChatForUserIds = JSON.stringify([
+            ...hiddenFor
+        ]);
+        await this.matchRepo.save(match);
     }
     async removeMany(ids, userId) {
         const messages = await this.msgRepo.find({
@@ -372,10 +422,11 @@ let MessagesService = class MessagesService {
     async getInfo(id, userId) {
         return this.assertMessageAccess(id, userId);
     }
-    constructor(msgRepo, matchRepo, userRepo, pushNotifications, planUsage){
+    constructor(msgRepo, matchRepo, userRepo, firstImpressionRepo, pushNotifications, planUsage){
         this.msgRepo = msgRepo;
         this.matchRepo = matchRepo;
         this.userRepo = userRepo;
+        this.firstImpressionRepo = firstImpressionRepo;
         this.pushNotifications = pushNotifications;
         this.planUsage = planUsage;
         this.logger = new _common.Logger(MessagesService.name);
@@ -386,8 +437,10 @@ MessagesService = _ts_decorate([
     _ts_param(0, (0, _typeorm.InjectRepository)(_messageentity.Message)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
     _ts_param(2, (0, _typeorm.InjectRepository)(_userentity.User)),
+    _ts_param(3, (0, _typeorm.InjectRepository)(_firstimpressionentity.FirstImpression)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,

@@ -29,6 +29,9 @@ let PaymentsController = class PaymentsController {
     createOrder(request, plan, couponCode) {
         return this.paymentsService.createOrder(request.user.userId, plan, couponCode);
     }
+    createBoostOrder(request, planKey) {
+        return this.paymentsService.createBoostOrder(request.user.userId, planKey);
+    }
     validateCoupon(request, plan, couponCode) {
         return this.paymentsService.validateCoupon(request.user.userId, plan, couponCode);
     }
@@ -56,6 +59,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], PaymentsController.prototype, "createOrder", null);
+_ts_decorate([
+    (0, _common.Post)('boost/order'),
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    _ts_param(0, (0, _common.Req)()),
+    _ts_param(1, (0, _common.Body)('planKey')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        Object,
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], PaymentsController.prototype, "createBoostOrder", null);
 _ts_decorate([
     (0, _common.Post)('coupon/validate'),
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
