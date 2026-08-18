@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { entitlementsFor } from '../plans/plan-entitlements';
-import { MatchRelation, MatchStatus } from '../matches/match.entity';
+import { MatchRelation } from '../matches/match.entity';
 import { SearchService } from '../search/search.service';
 import { distanceBetweenKm } from '../location/distance';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
@@ -60,10 +60,6 @@ export class DiscoveryService {
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    @InjectRepository(MatchRelation)
-    private readonly matchRepo: Repository<MatchRelation>,
-    @InjectRepository(FirstImpression)
-    private readonly firstImpressionRepo: Repository<FirstImpression>,
     private readonly searchService: SearchService,
   ) {}
 
@@ -245,43 +241,6 @@ export class DiscoveryService {
       (users[index] as any).__primaryPhoto = row.primaryPhoto || null;
       (users[index] as any).__photoCount = Number(row.profilePhotoCount) || 0;
     });
-
-    // Only after every fresh profile is exhausted, recycle profiles this user
-    // personally passed. Keep this as a separate simple query for compatibility
-    // with production MySQL versions and schemas.
-    if (users.length === 0 && !(filters.search && filters.search.trim())) {
-      const passed = await this.matchRepo.find({
-        where: { senderId: currentUserId, status: MatchStatus.DECLINED },
-        order: { updatedAt: 'ASC' },
-        take: 250,
-      });
-      const sentImpressions = await this.firstImpressionRepo.find({
-        where: { senderId: currentUserId },
-        select: ['receiverId'],
-      });
-      const firstImpressionReceiverIds = new Set(sentImpressions.map((item) => item.receiverId));
-      const genderRank = new Map(genderGroups.flatMap((group, index) => group.map((gender) => [gender, index] as const)));
-      const passedOrder = new Map(passed.map((match, index) => [match.receiverId, index]));
-      const candidates = passed.length ? await this.userRepo.find({
-        where: { id: In(passed.map((match) => match.receiverId)), status: 'active', role: 'user' },
-      }) : [];
-      users = candidates.filter((candidate) => {
-        if (firstImpressionReceiverIds.has(candidate.id)) return false;
-        const candidateGender = String(candidate.gender || '').trim().toLowerCase();
-        if (!visibleGenders.includes(candidateGender)) return false;
-        if (!candidate.birthDate || candidate.age === null || candidate.age < ageMin || candidate.age > ageMax) return false;
-        if (currentUser?.onlyShowVerifiedProfiles && !candidate.isVerified) return false;
-        if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
-          const distance = distanceBetweenKm(currentLatitude, currentLongitude, candidate.locationLatitude, candidate.locationLongitude);
-          if (distance === null || distance > requestedDistance) return false;
-        }
-        return true;
-      }).sort((a, b) => {
-        const genderDifference = (genderRank.get(String(a.gender || '').trim().toLowerCase()) ?? genderGroups.length)
-          - (genderRank.get(String(b.gender || '').trim().toLowerCase()) ?? genderGroups.length);
-        return genderDifference || (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0);
-      }).slice(0, limit);
-    }
 
     return users.map(user => {
       const primaryPhoto = (user as any).__primaryPhoto ?? user.avatarUrl;

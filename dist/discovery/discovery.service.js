@@ -257,60 +257,6 @@ let DiscoveryService = class DiscoveryService {
             users[index].__primaryPhoto = row.primaryPhoto || null;
             users[index].__photoCount = Number(row.profilePhotoCount) || 0;
         });
-        // Only after every fresh profile is exhausted, recycle profiles this user
-        // personally passed. Keep this as a separate simple query for compatibility
-        // with production MySQL versions and schemas.
-        if (users.length === 0 && !(filters.search && filters.search.trim())) {
-            const passed = await this.matchRepo.find({
-                where: {
-                    senderId: currentUserId,
-                    status: _matchentity.MatchStatus.DECLINED
-                },
-                order: {
-                    updatedAt: 'ASC'
-                },
-                take: 250
-            });
-            const sentImpressions = await this.firstImpressionRepo.find({
-                where: {
-                    senderId: currentUserId
-                },
-                select: [
-                    'receiverId'
-                ]
-            });
-            const firstImpressionReceiverIds = new Set(sentImpressions.map((item)=>item.receiverId));
-            const genderRank = new Map(genderGroups.flatMap((group, index)=>group.map((gender)=>[
-                        gender,
-                        index
-                    ])));
-            const passedOrder = new Map(passed.map((match, index)=>[
-                    match.receiverId,
-                    index
-                ]));
-            const candidates = passed.length ? await this.userRepo.find({
-                where: {
-                    id: (0, _typeorm1.In)(passed.map((match)=>match.receiverId)),
-                    status: 'active',
-                    role: 'user'
-                }
-            }) : [];
-            users = candidates.filter((candidate)=>{
-                if (firstImpressionReceiverIds.has(candidate.id)) return false;
-                const candidateGender = String(candidate.gender || '').trim().toLowerCase();
-                if (!visibleGenders.includes(candidateGender)) return false;
-                if (!candidate.birthDate || candidate.age === null || candidate.age < ageMin || candidate.age > ageMax) return false;
-                if (currentUser?.onlyShowVerifiedProfiles && !candidate.isVerified) return false;
-                if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
-                    const distance = (0, _distance.distanceBetweenKm)(currentLatitude, currentLongitude, candidate.locationLatitude, candidate.locationLongitude);
-                    if (distance === null || distance > requestedDistance) return false;
-                }
-                return true;
-            }).sort((a, b)=>{
-                const genderDifference = (genderRank.get(String(a.gender || '').trim().toLowerCase()) ?? genderGroups.length) - (genderRank.get(String(b.gender || '').trim().toLowerCase()) ?? genderGroups.length);
-                return genderDifference || (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0);
-            }).slice(0, limit);
-        }
         return users.map((user)=>{
             const primaryPhoto = user.__primaryPhoto ?? user.avatarUrl;
             const visiblePhotos = primaryPhoto ? [
@@ -369,22 +315,16 @@ let DiscoveryService = class DiscoveryService {
             interests: sortedInterests.slice(0, 50)
         };
     }
-    constructor(userRepo, matchRepo, firstImpressionRepo, searchService){
+    constructor(userRepo, searchService){
         this.userRepo = userRepo;
-        this.matchRepo = matchRepo;
-        this.firstImpressionRepo = firstImpressionRepo;
         this.searchService = searchService;
     }
 };
 DiscoveryService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
-    _ts_param(1, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
-    _ts_param(2, (0, _typeorm.InjectRepository)(_firstimpressionentity.FirstImpression)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
-        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _searchservice.SearchService === "undefined" ? Object : _searchservice.SearchService
     ])
