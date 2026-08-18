@@ -111,6 +111,8 @@ export class DiscoveryService {
         'user.interests',
         'user.createdAt',
       ])
+      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(user.photos, '$[0]'))", 'primaryPhoto')
+      .addSelect('COALESCE(JSON_LENGTH(user.photos), 0)', 'profilePhotoCount')
       .where('user.id != :currentUserId', { currentUserId })
       // Only show active and verified users
       .andWhere('user.status = :status', { status: 'active' })
@@ -237,7 +239,12 @@ export class DiscoveryService {
         .addOrderBy('user.createdAt', 'DESC')
         .skip(offset);
     }
-    let users = await query.take(limit).getMany();
+    const rankedResult = await query.take(limit).getRawAndEntities();
+    let users = rankedResult.entities;
+    rankedResult.raw.forEach((row, index) => {
+      (users[index] as any).__primaryPhoto = row.primaryPhoto || null;
+      (users[index] as any).__photoCount = Number(row.profilePhotoCount) || 0;
+    });
 
     // Only after every fresh profile is exhausted, recycle profiles this user
     // personally passed. Keep this as a separate simple query for compatibility
@@ -276,23 +283,8 @@ export class DiscoveryService {
       }).slice(0, limit);
     }
 
-    // Photos can contain large base64 payloads. Selecting them in the ranked
-    // query makes MySQL carry those payloads through its sort buffer and can
-    // fail with ER_OUT_OF_SORTMEMORY. Fetch photos only for the small, final
-    // page after ranking has completed.
-    if (users.length > 0) {
-      const photoRows = await this.userRepo.find({
-        select: ['id', 'photos'],
-        where: { id: In(users.map((user) => user.id)) },
-      });
-      const photosByUserId = new Map(photoRows.map((user) => [user.id, user.photos]));
-      users.forEach((user) => {
-        user.photos = photosByUserId.get(user.id) || [];
-      });
-    }
-
     return users.map(user => {
-      const primaryPhoto = user.avatarUrl;
+      const primaryPhoto = (user as any).__primaryPhoto ?? user.avatarUrl;
       const visiblePhotos = primaryPhoto ? [primaryPhoto] : [];
       return {
         id: user.id,
@@ -316,7 +308,7 @@ export class DiscoveryService {
         avatarUrl: primaryPhoto,
         photo: primaryPhoto,
         photos: visiblePhotos,
-        photoCount: user.photos?.length || 0,
+        photoCount: (user as any).__photoCount ?? user.photos?.length ?? 0,
         photosVisibleToNonMatches: user.photosVisibleToNonMatches,
         verified: user.isVerified,
         personality: user.personalityWords || [],
