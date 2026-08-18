@@ -15,6 +15,7 @@ const _discoverycontroller = require("./discovery.controller");
 const _userentity = require("../users/user.entity");
 const _matchentity = require("../matches/match.entity");
 const _searchmodule = require("../search/search.module");
+const _firstimpressionentity = require("../first-impressions/first-impression.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -28,7 +29,8 @@ DiscoveryModule = _ts_decorate([
         imports: [
             _typeorm.TypeOrmModule.forFeature([
                 _userentity.User,
-                _matchentity.MatchRelation
+                _matchentity.MatchRelation,
+                _firstimpressionentity.FirstImpression
             ]),
             _searchmodule.SearchModule
         ],

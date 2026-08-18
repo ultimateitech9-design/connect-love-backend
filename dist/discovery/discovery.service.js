@@ -16,6 +16,7 @@ const _planentitlements = require("../plans/plan-entitlements");
 const _matchentity = require("../matches/match.entity");
 const _searchservice = require("../search/search.service");
 const _distance = require("../location/distance");
+const _firstimpressionentity = require("../first-impressions/first-impression.entity");
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -66,21 +67,31 @@ const GENDER_ALIASES = {
         'prefer not to say'
     ]
 };
-function preferredGendersFor(gender) {
+function canonicalGender(value) {
+    const gender = String(value || '').trim().toLowerCase();
+    return Object.entries(GENDER_ALIASES).find(([, aliases])=>aliases.includes(gender))?.[0] || gender;
+}
+function defaultGenderGroups(gender) {
     if (gender === 'male') return [
-        'female',
-        'non-binary'
+        GENDER_ALIASES.female,
+        GENDER_ALIASES['non-binary']
     ];
     if (gender === 'female') return [
-        'male',
-        'non-binary'
+        GENDER_ALIASES.male,
+        GENDER_ALIASES['non-binary']
     ];
     if (gender === 'non-binary') return [
-        'female',
-        'male'
+        [
+            ...GENDER_ALIASES.female,
+            ...GENDER_ALIASES.male
+        ]
     ];
     return [
-        ...DISCOVERABLE_GENDERS
+        [
+            ...GENDER_ALIASES.female,
+            ...GENDER_ALIASES.male,
+            ...GENDER_ALIASES['non-binary']
+        ]
     ];
 }
 function clampAge(value, fallback) {
@@ -151,17 +162,32 @@ let DiscoveryService = class DiscoveryService {
             minBirthDate: toDateOnly(minBirthDate),
             maxBirthDate
         });
-        const currentGender = String(currentUser?.gender || '').trim().toLowerCase();
-        const allowedGenders = preferredGendersFor(currentGender);
-        const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
-        query.addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore').setParameter('allowedGenders', allowedGenders);
-        if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
-            query.andWhere('LOWER(TRIM(user.gender)) IN (:...interestedIn)', {
-                interestedIn: GENDER_ALIASES[requestedGender] || [
-                    requestedGender
-                ]
-            });
-        }
+        // A First Impression is a like. Once sent, that profile must never be
+        // offered to the sender again, including search and recycled-pass results.
+        query.andWhere((qb)=>{
+            const sentImpression = qb.subQuery().select('sentImpression.id').from(_firstimpressionentity.FirstImpression, 'sentImpression').where('sentImpression.senderId = :currentUserId').andWhere('sentImpression.receiverId = user.id').getQuery();
+            return 'NOT EXISTS ' + sentImpression;
+        });
+        const currentGender = canonicalGender(currentUser?.gender);
+        const rawRequestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
+        const requestedGender = rawRequestedGender === 'everyone' ? 'everyone' : canonicalGender(rawRequestedGender);
+        const genderGroups = requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender) ? [
+            GENDER_ALIASES[requestedGender] || [
+                requestedGender
+            ]
+        ] : defaultGenderGroups(currentGender);
+        const visibleGenders = [
+            ...new Set(genderGroups.flat())
+        ];
+        const genderRankParts = genderGroups.map((_, index)=>'WHEN LOWER(TRIM(user.gender)) IN (:...genderRank' + index + ') THEN ' + index);
+        query.andWhere('LOWER(TRIM(user.gender)) IN (:...visibleGenders)', {
+            visibleGenders
+        }).addSelect('CASE ' + genderRankParts.join(' ') + ' ELSE ' + genderGroups.length + ' END', 'genderPreferenceScore');
+        genderGroups.forEach((group, index)=>query.setParameter('genderRank' + index, group));
+        query.andWhere((qb)=>{
+            const relationship = qb.subQuery().select('relationship.id').from(_matchentity.MatchRelation, 'relationship').where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)').orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)').getQuery();
+            return 'NOT EXISTS ' + relationship;
+        });
         if (filters.search && filters.search.trim()) {
             const term = filters.search.trim();
             const searchIds = await this.searchService.searchUserIds(term, {
@@ -177,18 +203,12 @@ let DiscoveryService = class DiscoveryService {
                 });
                 const rankSql = searchIds.map((_, index)=>`WHEN :rank${index} THEN ${index}`).join(' ');
                 searchIds.forEach((id, index)=>query.setParameter(`rank${index}`, id));
-                query.orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC').addOrderBy('genderPreferenceScore', 'ASC');
+                query.orderBy('genderPreferenceScore', 'ASC').addOrderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC');
             } else {
                 query.andWhere('(LOWER(user.name) LIKE :search OR LOWER(user.city) LIKE :search OR LOWER(user.profession) LIKE :search)', {
                     search: `%${term.toLowerCase()}%`
                 }).skip(offset);
             }
-        } else {
-            // Stable primary query: fresh profiles have no relationship with this user.
-            query.andWhere((qb)=>{
-                const relationship = qb.subQuery().select('relationship.id').from(_matchentity.MatchRelation, 'relationship').where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)').orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)').getQuery();
-                return `NOT EXISTS ${relationship}`;
-            });
         }
         if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
             query.andWhere('user.isVerified = :verified', {
@@ -246,6 +266,19 @@ let DiscoveryService = class DiscoveryService {
                 },
                 take: 250
             });
+            const sentImpressions = await this.firstImpressionRepo.find({
+                where: {
+                    senderId: currentUserId
+                },
+                select: [
+                    'receiverId'
+                ]
+            });
+            const firstImpressionReceiverIds = new Set(sentImpressions.map((item)=>item.receiverId));
+            const genderRank = new Map(genderGroups.flatMap((group, index)=>group.map((gender)=>[
+                        gender,
+                        index
+                    ])));
             const passedOrder = new Map(passed.map((match, index)=>[
                     match.receiverId,
                     index
@@ -258,10 +291,9 @@ let DiscoveryService = class DiscoveryService {
                 }
             }) : [];
             users = candidates.filter((candidate)=>{
+                if (firstImpressionReceiverIds.has(candidate.id)) return false;
                 const candidateGender = String(candidate.gender || '').trim().toLowerCase();
-                if (requestedGender !== 'everyone' && !(GENDER_ALIASES[requestedGender] || [
-                    requestedGender
-                ]).includes(candidateGender)) return false;
+                if (!visibleGenders.includes(candidateGender)) return false;
                 if (!candidate.birthDate || candidate.age === null || candidate.age < ageMin || candidate.age > ageMax) return false;
                 if (currentUser?.onlyShowVerifiedProfiles && !candidate.isVerified) return false;
                 if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
@@ -269,7 +301,10 @@ let DiscoveryService = class DiscoveryService {
                     if (distance === null || distance > requestedDistance) return false;
                 }
                 return true;
-            }).sort((a, b)=>(passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0)).slice(0, limit);
+            }).sort((a, b)=>{
+                const genderDifference = (genderRank.get(String(a.gender || '').trim().toLowerCase()) ?? genderGroups.length) - (genderRank.get(String(b.gender || '').trim().toLowerCase()) ?? genderGroups.length);
+                return genderDifference || (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0);
+            }).slice(0, limit);
         }
         // Photos can contain large base64 payloads. Selecting them in the ranked
         // query makes MySQL carry those payloads through its sort buffer and can
@@ -351,9 +386,10 @@ let DiscoveryService = class DiscoveryService {
             interests: sortedInterests.slice(0, 50)
         };
     }
-    constructor(userRepo, matchRepo, searchService){
+    constructor(userRepo, matchRepo, firstImpressionRepo, searchService){
         this.userRepo = userRepo;
         this.matchRepo = matchRepo;
+        this.firstImpressionRepo = firstImpressionRepo;
         this.searchService = searchService;
     }
 };
@@ -361,8 +397,10 @@ DiscoveryService = _ts_decorate([
     (0, _common.Injectable)(),
     _ts_param(0, (0, _typeorm.InjectRepository)(_userentity.User)),
     _ts_param(1, (0, _typeorm.InjectRepository)(_matchentity.MatchRelation)),
+    _ts_param(2, (0, _typeorm.InjectRepository)(_firstimpressionentity.FirstImpression)),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
+        typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _typeorm1.Repository === "undefined" ? Object : _typeorm1.Repository,
         typeof _searchservice.SearchService === "undefined" ? Object : _searchservice.SearchService

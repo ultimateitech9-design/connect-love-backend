@@ -52,6 +52,21 @@ let FirstImpressionsService = class FirstImpressionsService {
         })) {
             throw new _common.ConflictException('You have already sent this user a First Impression.');
         }
+        const relation = await this.matches.findOne({
+            where: [
+                {
+                    senderId,
+                    receiverId
+                },
+                {
+                    senderId: receiverId,
+                    receiverId: senderId
+                }
+            ]
+        });
+        if (relation?.status === _matchentity.MatchStatus.BLOCKED) {
+            throw new _common.ForbiddenException('You cannot send a First Impression to a blocked profile.');
+        }
         const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId);
         let saved;
         try {
@@ -69,18 +84,6 @@ let FirstImpressionsService = class FirstImpressionsService {
         // A First Impression is also a normal profile like. This makes the profile
         // appear in Sent Likes for the sender and Likes Received for the receiver.
         // Do not replace or duplicate an existing relation between the same users.
-        const relation = await this.matches.findOne({
-            where: [
-                {
-                    senderId,
-                    receiverId
-                },
-                {
-                    senderId: receiverId,
-                    receiverId: senderId
-                }
-            ]
-        });
         if (!relation) {
             await this.matches.save(this.matches.create({
                 senderId,
@@ -88,6 +91,12 @@ let FirstImpressionsService = class FirstImpressionsService {
                 status: _matchentity.MatchStatus.PENDING,
                 isSuperLike: false
             }));
+        } else if (relation.status === _matchentity.MatchStatus.DECLINED) {
+            relation.senderId = senderId;
+            relation.receiverId = receiverId;
+            relation.status = _matchentity.MatchStatus.PENDING;
+            relation.isSuperLike = false;
+            await this.matches.save(relation);
         }
         void this.pushNotifications.sendToUser(receiverId, {
             title: 'New First Impression',

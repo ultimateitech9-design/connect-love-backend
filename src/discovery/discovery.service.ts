@@ -6,6 +6,7 @@ import { entitlementsFor } from '../plans/plan-entitlements';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { SearchService } from '../search/search.service';
 import { distanceBetweenKm } from '../location/distance';
+import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 interface DiscoveryFilters {
   interestedIn?: string;
@@ -28,11 +29,16 @@ const GENDER_ALIASES: Record<string, string[]> = {
   'prefer-not': ['prefer-not', 'prefer not', 'prefer not to say'],
 };
 
-function preferredGendersFor(gender: string): string[] {
-  if (gender === 'male') return ['female', 'non-binary'];
-  if (gender === 'female') return ['male', 'non-binary'];
-  if (gender === 'non-binary') return ['female', 'male'];
-  return [...DISCOVERABLE_GENDERS];
+function canonicalGender(value: string | null | undefined): string {
+  const gender = String(value || '').trim().toLowerCase();
+  return Object.entries(GENDER_ALIASES).find(([, aliases]) => aliases.includes(gender))?.[0] || gender;
+}
+
+function defaultGenderGroups(gender: string): string[][] {
+  if (gender === 'male') return [GENDER_ALIASES.female, GENDER_ALIASES['non-binary']];
+  if (gender === 'female') return [GENDER_ALIASES.male, GENDER_ALIASES['non-binary']];
+  if (gender === 'non-binary') return [[...GENDER_ALIASES.female, ...GENDER_ALIASES.male]];
+  return [[...GENDER_ALIASES.female, ...GENDER_ALIASES.male, ...GENDER_ALIASES['non-binary']]];
 }
 
 function clampAge(value: number | undefined, fallback: number): number {
@@ -56,6 +62,8 @@ export class DiscoveryService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(MatchRelation)
     private readonly matchRepo: Repository<MatchRelation>,
+    @InjectRepository(FirstImpression)
+    private readonly firstImpressionRepo: Repository<FirstImpression>,
     private readonly searchService: SearchService,
   ) {}
 
@@ -113,17 +121,42 @@ export class DiscoveryService {
         maxBirthDate,
       });
 
-    const currentGender = String(currentUser?.gender || '').trim().toLowerCase();
-    const allowedGenders = preferredGendersFor(currentGender);
-    const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
+    // A First Impression is a like. Once sent, that profile must never be
+    // offered to the sender again, including search and recycled-pass results.
+    query.andWhere((qb) => {
+      const sentImpression = qb.subQuery()
+        .select('sentImpression.id')
+        .from(FirstImpression, 'sentImpression')
+        .where('sentImpression.senderId = :currentUserId')
+        .andWhere('sentImpression.receiverId = user.id')
+        .getQuery();
+      return 'NOT EXISTS ' + sentImpression;
+    });
+
+    const currentGender = canonicalGender(currentUser?.gender);
+    const rawRequestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
+    const requestedGender = rawRequestedGender === 'everyone' ? 'everyone' : canonicalGender(rawRequestedGender);
+    const genderGroups = requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)
+      ? [GENDER_ALIASES[requestedGender] || [requestedGender]]
+      : defaultGenderGroups(currentGender);
+    const visibleGenders = [...new Set(genderGroups.flat())];
+    const genderRankParts = genderGroups.map((_, index) =>
+      'WHEN LOWER(TRIM(user.gender)) IN (:...genderRank' + index + ') THEN ' + index,
+    );
     query
-      .addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore')
-      .setParameter('allowedGenders', allowedGenders);
-    if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
-      query.andWhere('LOWER(TRIM(user.gender)) IN (:...interestedIn)', {
-        interestedIn: GENDER_ALIASES[requestedGender] || [requestedGender],
-      });
-    }
+      .andWhere('LOWER(TRIM(user.gender)) IN (:...visibleGenders)', { visibleGenders })
+      .addSelect('CASE ' + genderRankParts.join(' ') + ' ELSE ' + genderGroups.length + ' END', 'genderPreferenceScore');
+    genderGroups.forEach((group, index) => query.setParameter('genderRank' + index, group));
+
+    query.andWhere((qb) => {
+      const relationship = qb.subQuery()
+        .select('relationship.id')
+        .from(MatchRelation, 'relationship')
+        .where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
+        .orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)')
+        .getQuery();
+      return 'NOT EXISTS ' + relationship;
+    });
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
@@ -134,24 +167,13 @@ export class DiscoveryService {
         const rankSql = searchIds.map((_, index) => `WHEN :rank${index} THEN ${index}`).join(' ');
         searchIds.forEach((id, index) => query.setParameter(`rank${index}`, id));
         query
-          .orderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC')
-          .addOrderBy('genderPreferenceScore', 'ASC');
+          .orderBy('genderPreferenceScore', 'ASC')
+          .addOrderBy(`CASE user.id ${rankSql} ELSE ${searchIds.length} END`, 'ASC');
       } else {
         query.andWhere('(LOWER(user.name) LIKE :search OR LOWER(user.city) LIKE :search OR LOWER(user.profession) LIKE :search)', {
           search: `%${term.toLowerCase()}%`,
         }).skip(offset);
       }
-    } else {
-      // Stable primary query: fresh profiles have no relationship with this user.
-      query.andWhere((qb) => {
-        const relationship = qb.subQuery()
-          .select('relationship.id')
-          .from(MatchRelation, 'relationship')
-          .where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
-          .orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)')
-          .getQuery();
-        return `NOT EXISTS ${relationship}`;
-      });
     }
 
     if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
@@ -226,13 +248,20 @@ export class DiscoveryService {
         order: { updatedAt: 'ASC' },
         take: 250,
       });
+      const sentImpressions = await this.firstImpressionRepo.find({
+        where: { senderId: currentUserId },
+        select: ['receiverId'],
+      });
+      const firstImpressionReceiverIds = new Set(sentImpressions.map((item) => item.receiverId));
+      const genderRank = new Map(genderGroups.flatMap((group, index) => group.map((gender) => [gender, index] as const)));
       const passedOrder = new Map(passed.map((match, index) => [match.receiverId, index]));
       const candidates = passed.length ? await this.userRepo.find({
         where: { id: In(passed.map((match) => match.receiverId)), status: 'active', role: 'user' },
       }) : [];
       users = candidates.filter((candidate) => {
+        if (firstImpressionReceiverIds.has(candidate.id)) return false;
         const candidateGender = String(candidate.gender || '').trim().toLowerCase();
-        if (requestedGender !== 'everyone' && !(GENDER_ALIASES[requestedGender] || [requestedGender]).includes(candidateGender)) return false;
+        if (!visibleGenders.includes(candidateGender)) return false;
         if (!candidate.birthDate || candidate.age === null || candidate.age < ageMin || candidate.age > ageMax) return false;
         if (currentUser?.onlyShowVerifiedProfiles && !candidate.isVerified) return false;
         if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
@@ -240,7 +269,11 @@ export class DiscoveryService {
           if (distance === null || distance > requestedDistance) return false;
         }
         return true;
-      }).sort((a, b) => (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0)).slice(0, limit);
+      }).sort((a, b) => {
+        const genderDifference = (genderRank.get(String(a.gender || '').trim().toLowerCase()) ?? genderGroups.length)
+          - (genderRank.get(String(b.gender || '').trim().toLowerCase()) ?? genderGroups.length);
+        return genderDifference || (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0);
+      }).slice(0, limit);
     }
 
     // Photos can contain large base64 payloads. Selecting them in the ranked

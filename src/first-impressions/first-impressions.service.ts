@@ -30,6 +30,16 @@ export class FirstImpressionsService {
       throw new ConflictException('You have already sent this user a First Impression.');
     }
 
+    const relation = await this.matches.findOne({
+      where: [
+        { senderId, receiverId },
+        { senderId: receiverId, receiverId: senderId },
+      ],
+    });
+    if (relation?.status === MatchStatus.BLOCKED) {
+      throw new ForbiddenException('You cannot send a First Impression to a blocked profile.');
+    }
+
     const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId);
 
     let saved: FirstImpression;
@@ -45,12 +55,6 @@ export class FirstImpressionsService {
     // A First Impression is also a normal profile like. This makes the profile
     // appear in Sent Likes for the sender and Likes Received for the receiver.
     // Do not replace or duplicate an existing relation between the same users.
-    const relation = await this.matches.findOne({
-      where: [
-        { senderId, receiverId },
-        { senderId: receiverId, receiverId: senderId },
-      ],
-    });
     if (!relation) {
       await this.matches.save(this.matches.create({
         senderId,
@@ -58,6 +62,12 @@ export class FirstImpressionsService {
         status: MatchStatus.PENDING,
         isSuperLike: false,
       }));
+    } else if (relation.status === MatchStatus.DECLINED) {
+      relation.senderId = senderId;
+      relation.receiverId = receiverId;
+      relation.status = MatchStatus.PENDING;
+      relation.isSuperLike = false;
+      await this.matches.save(relation);
     }
 
     void this.pushNotifications.sendToUser(receiverId, {

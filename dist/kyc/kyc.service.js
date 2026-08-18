@@ -27,6 +27,18 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 const MATCH_THRESHOLD = 60;
+function readableDetail(value) {
+    if (typeof value === 'string') return value.trim() || null;
+    if (Array.isArray(value)) {
+        const messages = value.map(readableDetail).filter((item)=>Boolean(item));
+        return messages.length ? messages.join(' ') : null;
+    }
+    if (value && typeof value === 'object') {
+        const detail = value;
+        return readableDetail(detail.msg) || readableDetail(detail.message) || readableDetail(detail.detail);
+    }
+    return null;
+}
 let KycService = class KycService {
     async verify(userId, liveFrames) {
         const user = await this.userRepo.findOne({
@@ -55,7 +67,9 @@ let KycService = class KycService {
                     'X-Internal-Secret': secret
                 },
                 body: JSON.stringify({
-                    reference_images: user.photos,
+                    // The face worker accepts at most five reference photos while paid
+                    // and women profiles may contain up to ten.
+                    reference_images: user.photos.slice(0, 5),
                     live_frames: liveFrames
                 }),
                 signal: controller.signal
@@ -67,8 +81,11 @@ let KycService = class KycService {
         }
         const result = await response.json().catch(()=>null);
         if (!response.ok) {
-            const detail = result && 'detail' in result ? result.detail : null;
-            throw new _common.BadGatewayException(detail || 'Face verification could not be completed.');
+            const detail = readableDetail(result && 'detail' in result ? result.detail : result);
+            if (response.status >= 400 && response.status < 500) {
+                throw new _common.BadRequestException(detail || 'Use a clear solo profile photo and keep your face visible during recording.');
+            }
+            throw new _common.BadGatewayException(detail || 'Face verification could not be completed. Please try again.');
         }
         const verified = result;
         const matched = Boolean(verified.matched && verified.motionDetected && Number(verified.score) >= MATCH_THRESHOLD);

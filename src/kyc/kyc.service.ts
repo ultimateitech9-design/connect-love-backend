@@ -21,6 +21,19 @@ type FaceVerificationResult = {
   motionDetected: boolean;
 };
 
+function readableDetail(value: unknown): string | null {
+  if (typeof value === 'string') return value.trim() || null;
+  if (Array.isArray(value)) {
+    const messages = value.map(readableDetail).filter((item): item is string => Boolean(item));
+    return messages.length ? messages.join(' ') : null;
+  }
+  if (value && typeof value === 'object') {
+    const detail = value as Record<string, unknown>;
+    return readableDetail(detail.msg) || readableDetail(detail.message) || readableDetail(detail.detail);
+  }
+  return null;
+}
+
 @Injectable()
 export class KycService {
   constructor(
@@ -53,7 +66,9 @@ export class KycService {
           'X-Internal-Secret': secret,
         },
         body: JSON.stringify({
-          reference_images: user.photos,
+          // The face worker accepts at most five reference photos while paid
+          // and women profiles may contain up to ten.
+          reference_images: user.photos.slice(0, 5),
           live_frames: liveFrames,
         }),
         signal: controller.signal,
@@ -64,10 +79,13 @@ export class KycService {
       clearTimeout(timeout);
     }
 
-    const result = await response.json().catch(() => null) as FaceVerificationResult | { detail?: string } | null;
+    const result = await response.json().catch(() => null) as FaceVerificationResult | { detail?: unknown } | null;
     if (!response.ok) {
-      const detail = result && 'detail' in result ? result.detail : null;
-      throw new BadGatewayException(detail || 'Face verification could not be completed.');
+      const detail = readableDetail(result && 'detail' in result ? result.detail : result);
+      if (response.status >= 400 && response.status < 500) {
+        throw new BadRequestException(detail || 'Use a clear solo profile photo and keep your face visible during recording.');
+      }
+      throw new BadGatewayException(detail || 'Face verification could not be completed. Please try again.');
     }
 
     const verified = result as FaceVerificationResult;

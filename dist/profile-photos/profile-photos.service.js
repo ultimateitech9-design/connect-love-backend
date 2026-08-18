@@ -40,16 +40,12 @@ let ProfilePhotosService = class ProfilePhotosService {
         const uniquePhotos = [
             ...new Set((photos || []).filter(Boolean))
         ];
+        if (uniquePhotos.length === 0) {
+            throw new _common.BadRequestException('Keep at least one profile photo.');
+        }
         const maxPhotos = (0, _planentitlements.entitlementsFor)(user).profilePhotos;
         if (uniquePhotos.length > maxPhotos) {
             throw new _common.BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
-        }
-        const existing = user.photos || [];
-        const fixedCount = Math.min(2, existing.length);
-        for(let index = 0; index < fixedCount; index += 1){
-            if (uniquePhotos[index] !== existing[index]) {
-                throw new _common.BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
-            }
         }
         const primaryPhotoChanged = user.photos?.[0] !== uniquePhotos[0];
         user.photos = uniquePhotos;

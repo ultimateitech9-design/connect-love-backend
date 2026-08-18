@@ -108,12 +108,6 @@ export class UsersService {
       if (uniquePhotos.length > maxPhotos) {
         throw new BadRequestException(`Your plan allows a maximum of ${maxPhotos} profile photos. Upgrade to add more.`);
       }
-      const currentPhotos = existingUser.photos || [];
-      for (let index = 0; index < Math.min(2, currentPhotos.length); index += 1) {
-        if (uniquePhotos[index] !== currentPhotos[index]) {
-          throw new BadRequestException('Your first 2 profile photos are fixed and cannot be deleted or replaced.');
-        }
-      }
       const photosChanged = JSON.stringify(existingUser.photos || []) !== JSON.stringify(uniquePhotos);
       sanitizedData.photos = uniquePhotos;
       if (photosChanged) {
