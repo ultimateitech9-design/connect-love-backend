@@ -125,18 +125,6 @@ export class DiscoveryService {
       });
     }
 
-    // Keep active relationships and another member's rejection out of Discover.
-    // The current user's own pass is intentionally eligible for recycling later.
-    query.andWhere((qb) => {
-      const relationship = qb.subQuery()
-        .select('relationship.id')
-        .from(MatchRelation, 'relationship')
-        .where('((relationship.senderId = :currentUserId AND relationship.receiverId = user.id) OR (relationship.receiverId = :currentUserId AND relationship.senderId = user.id))')
-        .andWhere('NOT (relationship.status = :declinedStatus AND relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
-        .getQuery();
-      return `NOT EXISTS ${relationship}`;
-    }).setParameter('declinedStatus', MatchStatus.DECLINED);
-
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
       const searchIds = await this.searchService.searchUserIds(term, { ageMin, ageMax, limit, offset });
@@ -153,6 +141,17 @@ export class DiscoveryService {
           search: `%${term.toLowerCase()}%`,
         }).skip(offset);
       }
+    } else {
+      // Stable primary query: fresh profiles have no relationship with this user.
+      query.andWhere((qb) => {
+        const relationship = qb.subQuery()
+          .select('relationship.id')
+          .from(MatchRelation, 'relationship')
+          .where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
+          .orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)')
+          .getQuery();
+        return `NOT EXISTS ${relationship}`;
+      });
     }
 
     if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
@@ -173,17 +172,6 @@ export class DiscoveryService {
 
     if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
       query
-        .addSelect(`CASE WHEN EXISTS (
-          SELECT 1 FROM matches passed
-          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
-            AND passed.status = :declinedStatus
-        ) THEN 1 ELSE 0 END`, 'recycledSwipeScore')
-        .addSelect(`COALESCE((
-          SELECT UNIX_TIMESTAMP(passed.updatedAt) FROM matches passed
-          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
-            AND passed.status = :declinedStatus
-          LIMIT 1
-        ), 0)`, 'recycledSwipeTime')
         .andWhere('user.locationLatitude IS NOT NULL')
         .andWhere('user.locationLongitude IS NOT NULL')
         .andWhere(`${distanceSql} <= :maxDistance`, { maxDistance: requestedDistance });
@@ -217,9 +205,7 @@ export class DiscoveryService {
           currentReligion: currentUser?.religion || '',
           ...(filters.goals?.length ? { preferredGoals: filters.goals } : {}),
         })
-        .orderBy('recycledSwipeScore', 'ASC')
-        .addOrderBy('recycledSwipeTime', 'ASC')
-        .addOrderBy('genderPreferenceScore', 'ASC')
+        .orderBy('genderPreferenceScore', 'ASC')
         .addOrderBy('relationshipGoalScore', 'ASC')
         .addOrderBy('locationMissingScore', 'ASC')
         .addOrderBy('distanceScore', 'ASC')
@@ -229,7 +215,33 @@ export class DiscoveryService {
         .addOrderBy('user.createdAt', 'DESC')
         .skip(offset);
     }
-    const users = await query.take(limit).getMany();
+    let users = await query.take(limit).getMany();
+
+    // Only after every fresh profile is exhausted, recycle profiles this user
+    // personally passed. Keep this as a separate simple query for compatibility
+    // with production MySQL versions and schemas.
+    if (users.length === 0 && !(filters.search && filters.search.trim())) {
+      const passed = await this.matchRepo.find({
+        where: { senderId: currentUserId, status: MatchStatus.DECLINED },
+        order: { updatedAt: 'ASC' },
+        take: 250,
+      });
+      const passedOrder = new Map(passed.map((match, index) => [match.receiverId, index]));
+      const candidates = passed.length ? await this.userRepo.find({
+        where: { id: In(passed.map((match) => match.receiverId)), status: 'active', role: 'user' },
+      }) : [];
+      users = candidates.filter((candidate) => {
+        const candidateGender = String(candidate.gender || '').trim().toLowerCase();
+        if (requestedGender !== 'everyone' && !(GENDER_ALIASES[requestedGender] || [requestedGender]).includes(candidateGender)) return false;
+        if (!candidate.birthDate || candidate.age === null || candidate.age < ageMin || candidate.age > ageMax) return false;
+        if (currentUser?.onlyShowVerifiedProfiles && !candidate.isVerified) return false;
+        if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
+          const distance = distanceBetweenKm(currentLatitude, currentLongitude, candidate.locationLatitude, candidate.locationLongitude);
+          if (distance === null || distance > requestedDistance) return false;
+        }
+        return true;
+      }).sort((a, b) => (passedOrder.get(a.id) ?? 0) - (passedOrder.get(b.id) ?? 0)).slice(0, limit);
+    }
 
     // Photos can contain large base64 payloads. Selecting them in the ranked
     // query makes MySQL carry those payloads through its sort buffer and can
