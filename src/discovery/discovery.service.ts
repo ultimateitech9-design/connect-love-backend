@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { entitlementsFor } from '../plans/plan-entitlements';
-import { MatchRelation } from '../matches/match.entity';
+import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { SearchService } from '../search/search.service';
 import { distanceBetweenKm } from '../location/distance';
 
@@ -21,6 +21,12 @@ interface DiscoveryFilters {
 const DEFAULT_MIN_AGE = 18;
 const DEFAULT_MAX_AGE = 90;
 const DISCOVERABLE_GENDERS = new Set(['female', 'male', 'non-binary', 'prefer-not']);
+const GENDER_ALIASES: Record<string, string[]> = {
+  female: ['female', 'woman', 'women', 'girl', 'ladies', 'f'],
+  male: ['male', 'man', 'men', 'boy', 'm'],
+  'non-binary': ['non-binary', 'nonbinary', 'non binary', 'nb'],
+  'prefer-not': ['prefer-not', 'prefer not', 'prefer not to say'],
+};
 
 function preferredGendersFor(gender: string): string[] {
   if (gender === 'male') return ['female', 'non-binary'];
@@ -114,8 +120,22 @@ export class DiscoveryService {
       .addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore')
       .setParameter('allowedGenders', allowedGenders);
     if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
-      query.andWhere('LOWER(user.gender) = :interestedIn', { interestedIn: requestedGender });
+      query.andWhere('LOWER(TRIM(user.gender)) IN (:...interestedIn)', {
+        interestedIn: GENDER_ALIASES[requestedGender] || [requestedGender],
+      });
     }
+
+    // Keep active relationships and another member's rejection out of Discover.
+    // The current user's own pass is intentionally eligible for recycling later.
+    query.andWhere((qb) => {
+      const relationship = qb.subQuery()
+        .select('relationship.id')
+        .from(MatchRelation, 'relationship')
+        .where('((relationship.senderId = :currentUserId AND relationship.receiverId = user.id) OR (relationship.receiverId = :currentUserId AND relationship.senderId = user.id))')
+        .andWhere('NOT (relationship.status = :declinedStatus AND relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
+        .getQuery();
+      return `NOT EXISTS ${relationship}`;
+    }).setParameter('declinedStatus', MatchStatus.DECLINED);
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
@@ -133,17 +153,6 @@ export class DiscoveryService {
           search: `%${term.toLowerCase()}%`,
         }).skip(offset);
       }
-    } else {
-      // Default: exclude users already swiped/matched
-      query.andWhere((qb) => {
-        const subQuery = qb.subQuery()
-          .select('match.id')
-          .from(MatchRelation, 'match')
-          .where('(match.senderId = :currentUserId AND match.receiverId = user.id)')
-          .orWhere('(match.receiverId = :currentUserId AND match.senderId = user.id)')
-          .getQuery();
-        return `NOT EXISTS ${subQuery}`;
-      });
     }
 
     if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
@@ -164,6 +173,17 @@ export class DiscoveryService {
 
     if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
       query
+        .addSelect(`CASE WHEN EXISTS (
+          SELECT 1 FROM matches passed
+          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
+            AND passed.status = :declinedStatus
+        ) THEN 1 ELSE 0 END`, 'recycledSwipeScore')
+        .addSelect(`COALESCE((
+          SELECT UNIX_TIMESTAMP(passed.updatedAt) FROM matches passed
+          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
+            AND passed.status = :declinedStatus
+          LIMIT 1
+        ), 0)`, 'recycledSwipeTime')
         .andWhere('user.locationLatitude IS NOT NULL')
         .andWhere('user.locationLongitude IS NOT NULL')
         .andWhere(`${distanceSql} <= :maxDistance`, { maxDistance: requestedDistance });
@@ -197,7 +217,9 @@ export class DiscoveryService {
           currentReligion: currentUser?.religion || '',
           ...(filters.goals?.length ? { preferredGoals: filters.goals } : {}),
         })
-        .orderBy('genderPreferenceScore', 'ASC')
+        .orderBy('recycledSwipeScore', 'ASC')
+        .addOrderBy('recycledSwipeTime', 'ASC')
+        .addOrderBy('genderPreferenceScore', 'ASC')
         .addOrderBy('relationshipGoalScore', 'ASC')
         .addOrderBy('locationMissingScore', 'ASC')
         .addOrderBy('distanceScore', 'ASC')

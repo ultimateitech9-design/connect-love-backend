@@ -38,6 +38,34 @@ const DISCOVERABLE_GENDERS = new Set([
     'non-binary',
     'prefer-not'
 ]);
+const GENDER_ALIASES = {
+    female: [
+        'female',
+        'woman',
+        'women',
+        'girl',
+        'ladies',
+        'f'
+    ],
+    male: [
+        'male',
+        'man',
+        'men',
+        'boy',
+        'm'
+    ],
+    'non-binary': [
+        'non-binary',
+        'nonbinary',
+        'non binary',
+        'nb'
+    ],
+    'prefer-not': [
+        'prefer-not',
+        'prefer not',
+        'prefer not to say'
+    ]
+};
 function preferredGendersFor(gender) {
     if (gender === 'male') return [
         'female',
@@ -128,10 +156,18 @@ let DiscoveryService = class DiscoveryService {
         const requestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
         query.addSelect('CASE WHEN LOWER(user.gender) IN (:...allowedGenders) THEN 0 ELSE 1 END', 'genderPreferenceScore').setParameter('allowedGenders', allowedGenders);
         if (requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)) {
-            query.andWhere('LOWER(user.gender) = :interestedIn', {
-                interestedIn: requestedGender
+            query.andWhere('LOWER(TRIM(user.gender)) IN (:...interestedIn)', {
+                interestedIn: GENDER_ALIASES[requestedGender] || [
+                    requestedGender
+                ]
             });
         }
+        // Keep active relationships and another member's rejection out of Discover.
+        // The current user's own pass is intentionally eligible for recycling later.
+        query.andWhere((qb)=>{
+            const relationship = qb.subQuery().select('relationship.id').from(_matchentity.MatchRelation, 'relationship').where('((relationship.senderId = :currentUserId AND relationship.receiverId = user.id) OR (relationship.receiverId = :currentUserId AND relationship.senderId = user.id))').andWhere('NOT (relationship.status = :declinedStatus AND relationship.senderId = :currentUserId AND relationship.receiverId = user.id)').getQuery();
+            return `NOT EXISTS ${relationship}`;
+        }).setParameter('declinedStatus', _matchentity.MatchStatus.DECLINED);
         if (filters.search && filters.search.trim()) {
             const term = filters.search.trim();
             const searchIds = await this.searchService.searchUserIds(term, {
@@ -153,12 +189,6 @@ let DiscoveryService = class DiscoveryService {
                     search: `%${term.toLowerCase()}%`
                 }).skip(offset);
             }
-        } else {
-            // Default: exclude users already swiped/matched
-            query.andWhere((qb)=>{
-                const subQuery = qb.subQuery().select('match.id').from(_matchentity.MatchRelation, 'match').where('(match.senderId = :currentUserId AND match.receiverId = user.id)').orWhere('(match.receiverId = :currentUserId AND match.senderId = user.id)').getQuery();
-                return `NOT EXISTS ${subQuery}`;
-            });
         }
         if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
             query.andWhere('user.isVerified = :verified', {
@@ -178,7 +208,16 @@ let DiscoveryService = class DiscoveryService {
             currentLongitude
         });
         if (requestedDistance < 10000 && currentLatitude !== null && currentLongitude !== null) {
-            query.andWhere('user.locationLatitude IS NOT NULL').andWhere('user.locationLongitude IS NOT NULL').andWhere(`${distanceSql} <= :maxDistance`, {
+            query.addSelect(`CASE WHEN EXISTS (
+          SELECT 1 FROM matches passed
+          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
+            AND passed.status = :declinedStatus
+        ) THEN 1 ELSE 0 END`, 'recycledSwipeScore').addSelect(`COALESCE((
+          SELECT UNIX_TIMESTAMP(passed.updatedAt) FROM matches passed
+          WHERE passed.senderId = :currentUserId AND passed.receiverId = user.id
+            AND passed.status = :declinedStatus
+          LIMIT 1
+        ), 0)`, 'recycledSwipeTime').andWhere('user.locationLatitude IS NOT NULL').andWhere('user.locationLongitude IS NOT NULL').andWhere(`${distanceSql} <= :maxDistance`, {
                 maxDistance: requestedDistance
             });
         }
@@ -199,7 +238,7 @@ let DiscoveryService = class DiscoveryService {
                 ...filters.goals?.length ? {
                     preferredGoals: filters.goals
                 } : {}
-            }).orderBy('genderPreferenceScore', 'ASC').addOrderBy('relationshipGoalScore', 'ASC').addOrderBy('locationMissingScore', 'ASC').addOrderBy('distanceScore', 'ASC').addOrderBy('boostScore', 'DESC').addOrderBy('cityScore', 'DESC').addOrderBy('religionScore', 'DESC').addOrderBy('user.createdAt', 'DESC').skip(offset);
+            }).orderBy('recycledSwipeScore', 'ASC').addOrderBy('recycledSwipeTime', 'ASC').addOrderBy('genderPreferenceScore', 'ASC').addOrderBy('relationshipGoalScore', 'ASC').addOrderBy('locationMissingScore', 'ASC').addOrderBy('distanceScore', 'ASC').addOrderBy('boostScore', 'DESC').addOrderBy('cityScore', 'DESC').addOrderBy('religionScore', 'DESC').addOrderBy('user.createdAt', 'DESC').skip(offset);
         }
         const users = await query.take(limit).getMany();
         // Photos can contain large base64 payloads. Selecting them in the ranked
