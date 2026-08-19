@@ -18,8 +18,8 @@ export type PlanEntitlements = {
 
 export const PLAN_ENTITLEMENTS: Record<UserPlan, PlanEntitlements> = {
   free: { likesPerDay: 10, messagesPerUser: 10, matches: 2, profilePhotos: 2, videoCallsPerMonth: 0, sharedImagesPerMonth: 0, superLikesPerMonth: 0, rewindsPerMonth: 0, firstImpressionsPerMonth: 0, boostsPerMonth: 0, voiceMessages: false, verifiedBadge: false, maxVideoCallMinutes: 0 },
-  gold: { likesPerDay: 20, messagesPerUser: null, matches: 10, profilePhotos: 5, videoCallsPerMonth: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 60 },
-  platinum: { likesPerDay: 40, messagesPerUser: null, matches: 20, profilePhotos: 10, videoCallsPerMonth: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 120 },
+  gold: { likesPerDay: 20, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 5, videoCallsPerMonth: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 60 },
+  platinum: { likesPerDay: 40, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 10, videoCallsPerMonth: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 120 },
 };
 
 const WOMEN_ENTITLEMENTS: PlanEntitlements = {
