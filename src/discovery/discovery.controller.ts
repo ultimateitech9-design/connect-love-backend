@@ -18,6 +18,7 @@ export class DiscoveryController {
     @Query('maxDistance') maxDistance?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('excludeIds') excludeIds?: string,
   ) {
     return this.discoveryService.getSuggestions(req.user.userId, {
       search,
@@ -28,6 +29,7 @@ export class DiscoveryController {
       maxDistance: maxDistance ? Number(maxDistance) : undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
+      excludeIds: excludeIds ? excludeIds.split(',').map((id) => id.trim()).filter(Boolean).slice(0, 24) : undefined,
     });
   }
 

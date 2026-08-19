@@ -17,6 +17,7 @@ interface DiscoveryFilters {
   maxDistance?: number;
   page?: number;
   limit?: number;
+  excludeIds?: string[];
 }
 
 const DEFAULT_MIN_AGE = 18;
@@ -35,9 +36,9 @@ function canonicalGender(value: string | null | undefined): string {
 }
 
 function defaultGenderGroups(gender: string): string[][] {
-  if (gender === 'male') return [GENDER_ALIASES.female, GENDER_ALIASES['non-binary']];
-  if (gender === 'female') return [GENDER_ALIASES.male, GENDER_ALIASES['non-binary']];
-  if (gender === 'non-binary') return [[...GENDER_ALIASES.female, ...GENDER_ALIASES.male]];
+  if (gender === 'male') return [GENDER_ALIASES.female, GENDER_ALIASES.male, GENDER_ALIASES['non-binary']];
+  if (gender === 'female') return [GENDER_ALIASES.male, GENDER_ALIASES.female, GENDER_ALIASES['non-binary']];
+  if (gender === 'non-binary') return [GENDER_ALIASES.female, GENDER_ALIASES.male, GENDER_ALIASES['non-binary']];
   return [[...GENDER_ALIASES.female, ...GENDER_ALIASES.male, ...GENDER_ALIASES['non-binary']]];
 }
 
@@ -64,7 +65,20 @@ export class DiscoveryService {
   ) {}
 
   async getSuggestions(currentUserId: string, filters: DiscoveryFilters = {}): Promise<User[]> {
-    const currentUser = await this.userRepo.findOne({ where: { id: currentUserId } });
+    // Do not hydrate the current user's complete base64 photo gallery before
+    // discovery can start. Only ranking/privacy fields are needed here.
+    const currentUser = await this.userRepo.findOne({
+      where: { id: currentUserId },
+      select: [
+        'id',
+        'gender',
+        'city',
+        'religion',
+        'onlyShowVerifiedProfiles',
+        'locationLatitude',
+        'locationLongitude',
+      ],
+    });
     const ageMin = clampAge(filters.ageMin, DEFAULT_MIN_AGE);
     const ageMax = Math.max(ageMin, clampAge(filters.ageMax, DEFAULT_MAX_AGE));
     const page = Math.max(1, Math.trunc(filters.page || 1));
@@ -118,6 +132,11 @@ export class DiscoveryService {
         minBirthDate: toDateOnly(minBirthDate),
         maxBirthDate,
       });
+
+    const excludedQueueIds = [...new Set((filters.excludeIds || []).filter((id) => id && id !== currentUserId))].slice(0, 24);
+    if (excludedQueueIds.length > 0) {
+      query.andWhere('user.id NOT IN (:...excludedQueueIds)', { excludedQueueIds });
+    }
 
     // A First Impression is a like. Once sent, that profile must never be
     // offered to the sender again, including search and recycled-pass results.
