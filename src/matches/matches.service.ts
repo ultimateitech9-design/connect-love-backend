@@ -96,13 +96,20 @@ export class MatchesService {
     // The first matches a member unlocked remain open. Newer matches above the
     // plan allowance are retained but locked, rather than displacing an older
     // conversation or rejecting the match entirely.
-    const allowedMatchedIds = new Set(
-      enriched
-        .filter((match) => match.status === MatchStatus.MATCHED)
-        .sort((a, b) => new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime())
-        .slice(0, limits.matches)
-        .map((match) => match.id),
-    );
+    // Use the complete active-match set so Matches and Messages unlock the
+    // exact same conversations even when the dashboard response is paginated.
+    const unlockedRows = limits.matches === Number.MAX_SAFE_INTEGER
+      ? enriched.filter((match) => match.status === MatchStatus.MATCHED).map((match) => ({ id: match.id }))
+      : await this.matchesRepository.createQueryBuilder('candidate')
+        .select('candidate.id', 'id')
+        .where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', { userId })
+        .andWhere('candidate.status = :status', { status: MatchStatus.MATCHED })
+        .andWhere(`COALESCE(candidate.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`)
+        .orderBy('candidate.updatedAt', 'ASC')
+        .addOrderBy('candidate.id', 'ASC')
+        .take(limits.matches)
+        .getRawMany<{ id: string }>();
+    const allowedMatchedIds = new Set(unlockedRows.map((match) => match.id));
     const sorted = enriched.sort(
       (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime(),
     );
@@ -173,7 +180,7 @@ export class MatchesService {
     // slow to open.
     const matches = await query
       .orderBy('match.createdAt', 'DESC')
-      .take(Math.min(Math.max(limit, 1), 20))
+      .take(Math.min(Math.max(limit, 1), 100))
       .skip(Math.max(offset, 0))
       .getMany();
     const enriched = await this.enrichMatches(matches, userId);

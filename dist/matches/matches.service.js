@@ -107,7 +107,16 @@ let MatchesService = class MatchesService {
         // The first matches a member unlocked remain open. Newer matches above the
         // plan allowance are retained but locked, rather than displacing an older
         // conversation or rejecting the match entirely.
-        const allowedMatchedIds = new Set(enriched.filter((match)=>match.status === _matchentity.MatchStatus.MATCHED).sort((a, b)=>new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime()).slice(0, limits.matches).map((match)=>match.id));
+        // Use the complete active-match set so Matches and Messages unlock the
+        // exact same conversations even when the dashboard response is paginated.
+        const unlockedRows = limits.matches === Number.MAX_SAFE_INTEGER ? enriched.filter((match)=>match.status === _matchentity.MatchStatus.MATCHED).map((match)=>({
+                id: match.id
+            })) : await this.matchesRepository.createQueryBuilder('candidate').select('candidate.id', 'id').where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', {
+            userId
+        }).andWhere('candidate.status = :status', {
+            status: _matchentity.MatchStatus.MATCHED
+        }).andWhere(`COALESCE(candidate.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`).orderBy('candidate.updatedAt', 'ASC').addOrderBy('candidate.id', 'ASC').take(limits.matches).getRawMany();
+        const allowedMatchedIds = new Set(unlockedRows.map((match)=>match.id));
         const sorted = enriched.sort((a, b)=>new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
         return sorted.map((match)=>{
             const locked = match.status === _matchentity.MatchStatus.MATCHED && !allowedMatchedIds.has(match.id);
@@ -197,7 +206,7 @@ let MatchesService = class MatchesService {
         // Each dashboard tab renders a small page only. Loading every related
         // profile (and its photo) made accounts with many requests unnecessarily
         // slow to open.
-        const matches = await query.orderBy('match.createdAt', 'DESC').take(Math.min(Math.max(limit, 1), 20)).skip(Math.max(offset, 0)).getMany();
+        const matches = await query.orderBy('match.createdAt', 'DESC').take(Math.min(Math.max(limit, 1), 100)).skip(Math.max(offset, 0)).getMany();
         const enriched = await this.enrichMatches(matches, userId);
         if (filter !== 'received') return enriched;
         const { user, limits } = await this.planUsage.get(userId);
