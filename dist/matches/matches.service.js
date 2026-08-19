@@ -111,11 +111,13 @@ let MatchesService = class MatchesService {
         // exact same conversations even when the dashboard response is paginated.
         const unlockedRows = limits.matches === Number.MAX_SAFE_INTEGER ? enriched.filter((match)=>match.status === _matchentity.MatchStatus.MATCHED).map((match)=>({
                 id: match.id
-            })) : await this.matchesRepository.createQueryBuilder('candidate').select('candidate.id', 'id').where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', {
+            })) : await this.matchesRepository.createQueryBuilder('candidate').select([
+            'candidate.id'
+        ]).where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', {
             userId
         }).andWhere('candidate.status = :status', {
             status: _matchentity.MatchStatus.MATCHED
-        }).andWhere(`COALESCE(candidate.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`).orderBy('candidate.updatedAt', 'ASC').addOrderBy('candidate.id', 'ASC').take(limits.matches).getRawMany();
+        }).andWhere(`COALESCE(candidate.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`).orderBy('candidate.updatedAt', 'ASC').addOrderBy('candidate.id', 'ASC').take(limits.matches).getMany();
         const allowedMatchedIds = new Set(unlockedRows.map((match)=>match.id));
         const sorted = enriched.sort((a, b)=>new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
         return sorted.map((match)=>{

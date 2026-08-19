@@ -101,14 +101,14 @@ export class MatchesService {
     const unlockedRows = limits.matches === Number.MAX_SAFE_INTEGER
       ? enriched.filter((match) => match.status === MatchStatus.MATCHED).map((match) => ({ id: match.id }))
       : await this.matchesRepository.createQueryBuilder('candidate')
-        .select('candidate.id', 'id')
+        .select(['candidate.id'])
         .where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', { userId })
         .andWhere('candidate.status = :status', { status: MatchStatus.MATCHED })
         .andWhere(`COALESCE(candidate.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`)
         .orderBy('candidate.updatedAt', 'ASC')
         .addOrderBy('candidate.id', 'ASC')
         .take(limits.matches)
-        .getRawMany<{ id: string }>();
+        .getMany();
     const allowedMatchedIds = new Set(unlockedRows.map((match) => match.id));
     const sorted = enriched.sort(
       (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime(),
