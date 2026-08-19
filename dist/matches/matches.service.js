@@ -255,13 +255,18 @@ let MatchesService = class MatchesService {
                 status
             };
             if (field) where[field] = userId;
-            return field ? this.matchesRepository.count({
+            if (field) return this.matchesRepository.count({
                 where
-            }) : this.matchesRepository.createQueryBuilder('match').where('(match.senderId = :userId OR match.receiverId = :userId)', {
+            });
+            const query = this.matchesRepository.createQueryBuilder('match').where('(match.senderId = :userId OR match.receiverId = :userId)', {
                 userId
             }).andWhere('match.status = :status', {
                 status
-            }).getCount();
+            });
+            if (status === _matchentity.MatchStatus.MATCHED) {
+                query.andWhere(`COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`);
+            }
+            return query.getCount();
         };
         const [active, sent, received, blocked] = await Promise.all([
             count(_matchentity.MatchStatus.MATCHED),
