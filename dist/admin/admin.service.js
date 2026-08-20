@@ -144,8 +144,8 @@ let AdminService = class AdminService {
         };
     }
     async createManagementUser(body, creatorRole) {
-        if (body.role === 'admin' && creatorRole !== 'super_admin') {
-            throw new _common.ForbiddenException('Only a Super Admin can create an Admin ID.');
+        if ((body.role === 'admin' || body.role === 'user') && creatorRole !== 'super_admin') {
+            throw new _common.ForbiddenException('Only a Super Admin can create Admin or User accounts.');
         }
         const email = body.email.trim().toLowerCase();
         const existing = await this.userRepo.findOne({
@@ -154,19 +154,20 @@ let AdminService = class AdminService {
             }
         });
         if (existing) throw new _common.ConflictException('An ID with this email already exists.');
+        const isRegularUser = body.role === 'user';
         const user = await this.userRepo.save(this.userRepo.create({
             name: body.name.trim(),
             email,
             password: await _bcryptjs.hash(body.password, 12),
             role: body.role,
-            plan: 'platinum',
+            plan: isRegularUser ? 'free' : 'platinum',
             status: 'active',
-            isVerified: true,
-            onboardingCompleted: true
+            isVerified: !isRegularUser,
+            onboardingCompleted: !isRegularUser
         }));
         const { password: _, ...safeUser } = user;
         return {
-            message: 'Management ID created successfully.',
+            message: isRegularUser ? 'User account created successfully.' : 'Management ID created successfully.',
             user: safeUser
         };
     }

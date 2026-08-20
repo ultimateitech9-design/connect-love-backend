@@ -36,6 +36,7 @@ _ts_decorate([
 ], CreateManagementUserDto.prototype, "password", void 0);
 _ts_decorate([
     (0, _classvalidator.IsIn)([
+        'user',
         'admin',
         'sales',
         'support'

@@ -12,6 +12,6 @@ export class CreateManagementUserDto {
   @MinLength(8)
   password: string;
 
-  @IsIn(['admin', 'sales', 'support'])
-  role: 'admin' | 'sales' | 'support';
+  @IsIn(['user', 'admin', 'sales', 'support'])
+  role: 'user' | 'admin' | 'sales' | 'support';
 }

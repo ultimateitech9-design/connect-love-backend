@@ -12,6 +12,48 @@ const _common = require("@nestjs/common");
 const _typeorm = require("@nestjs/typeorm");
 const _typeorm1 = require("typeorm");
 const _contactentity = require("./contact.entity");
+const _nodemailer = /*#__PURE__*/ _interop_require_wildcard(require("nodemailer"));
+function _getRequireWildcardCache(nodeInterop) {
+    if (typeof WeakMap !== "function") return null;
+    var cacheBabelInterop = new WeakMap();
+    var cacheNodeInterop = new WeakMap();
+    return (_getRequireWildcardCache = function(nodeInterop) {
+        return nodeInterop ? cacheNodeInterop : cacheBabelInterop;
+    })(nodeInterop);
+}
+function _interop_require_wildcard(obj, nodeInterop) {
+    if (!nodeInterop && obj && obj.__esModule) {
+        return obj;
+    }
+    if (obj === null || typeof obj !== "object" && typeof obj !== "function") {
+        return {
+            default: obj
+        };
+    }
+    var cache = _getRequireWildcardCache(nodeInterop);
+    if (cache && cache.has(obj)) {
+        return cache.get(obj);
+    }
+    var newObj = {
+        __proto__: null
+    };
+    var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor;
+    for(var key in obj){
+        if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) {
+            var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null;
+            if (desc && (desc.get || desc.set)) {
+                Object.defineProperty(newObj, key, desc);
+            } else {
+                newObj[key] = obj[key];
+            }
+        }
+    }
+    newObj.default = obj;
+    if (cache) {
+        cache.set(obj, newObj);
+    }
+    return newObj;
+}
 function _ts_decorate(decorators, target, key, desc) {
     var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
     if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
@@ -27,6 +69,67 @@ function _ts_param(paramIndex, decorator) {
     };
 }
 let SupportService = class SupportService {
+    mailer() {
+        if (this.transporter) return this.transporter;
+        const host = process.env.SMTP_HOST?.trim();
+        const user = process.env.SMTP_USER?.trim();
+        const pass = process.env.SMTP_PASSWORD;
+        if (!host || !user || !pass) throw new _common.ServiceUnavailableException('Email delivery is not configured.');
+        const port = Number(process.env.SMTP_PORT || 465);
+        const secure = (process.env.SMTP_SECURE || String(port === 465)).toLowerCase() === 'true';
+        this.transporter = _nodemailer.createTransport({
+            host,
+            port,
+            secure,
+            auth: {
+                user,
+                pass
+            },
+            connectionTimeout: 15_000,
+            greetingTimeout: 15_000,
+            socketTimeout: 20_000
+        });
+        return this.transporter;
+    }
+    escapeHtml(value) {
+        return value.replace(/[&<>"']/g, (character)=>({
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            })[character] || character);
+    }
+    async sendResolutionEmail(ticket) {
+        const recipient = ticket.email.trim().toLowerCase();
+        const name = this.escapeHtml(ticket.name.trim() || 'Customer');
+        const subject = this.escapeHtml(ticket.subject.trim());
+        const fromAddress = process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim();
+        try {
+            await this.mailer().sendMail({
+                from: fromAddress,
+                to: recipient,
+                subject: `Your Connect Love support request #${ticket.id} has been resolved`,
+                text: `Hello ${ticket.name.trim() || 'Customer'},\n\nYour support request #${ticket.id} (${ticket.subject}) has been resolved by the Connect Love support team.\n\nIf you still need help, please submit a new request through Contact Us.\n\nRegards,\nConnect Love Support`,
+                html: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:28px;color:#172033">
+            <h1 style="font-size:24px;margin:0 0 18px;color:#e11d48">Connect Love Support</h1>
+            <p style="font-size:16px;line-height:1.6">Hello ${name},</p>
+            <p style="font-size:16px;line-height:1.6">Your support request has been resolved by our team.</p>
+            <div style="margin:22px 0;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
+              <div style="font-size:13px;color:#64748b">Ticket #${ticket.id}</div>
+              <div style="font-size:16px;font-weight:700;margin-top:6px">${subject}</div>
+              <div style="font-size:14px;color:#059669;margin-top:8px">Status: Resolved</div>
+            </div>
+            <p style="font-size:14px;line-height:1.6;color:#596273">If you still need help, please submit a new request through the Contact Us form.</p>
+            <p style="font-size:14px;line-height:1.6">Regards,<br><strong>Connect Love Support</strong></p>
+          </div>
+        `
+            });
+        } catch  {
+            throw new _common.ServiceUnavailableException('The resolution email could not be sent. Please check the email service and try again.');
+        }
+    }
     async createContact(dto) {
         const contact = this.contactRepo.create(dto);
         const saved = await this.contactRepo.save(contact);
@@ -125,11 +228,15 @@ let SupportService = class SupportService {
             }
         });
         if (!ticket) throw new _common.NotFoundException('Ticket not found.');
+        const wasResolved = ticket.status === 'resolved' || ticket.status === 'closed';
+        const willBeResolved = status === 'resolved' || status === 'closed';
+        if (willBeResolved && !wasResolved) await this.sendResolutionEmail(ticket);
         ticket.status = status;
         return this.contactRepo.save(ticket);
     }
     constructor(contactRepo){
         this.contactRepo = contactRepo;
+        this.transporter = null;
     }
 };
 SupportService = _ts_decorate([
