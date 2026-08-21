@@ -151,4 +151,11 @@ export class SupportService {
     ticket.status = status;
     return this.contactRepo.save(ticket);
   }
+
+  async deleteTicket(id: number): Promise<{ success: true; id: number }> {
+    const ticket = await this.contactRepo.findOne({ where: { id } });
+    if (!ticket) throw new NotFoundException('Ticket not found.');
+    await this.contactRepo.remove(ticket);
+    return { success: true, id };
+  }
 }

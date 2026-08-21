@@ -234,6 +234,19 @@ let SupportService = class SupportService {
         ticket.status = status;
         return this.contactRepo.save(ticket);
     }
+    async deleteTicket(id) {
+        const ticket = await this.contactRepo.findOne({
+            where: {
+                id
+            }
+        });
+        if (!ticket) throw new _common.NotFoundException('Ticket not found.');
+        await this.contactRepo.remove(ticket);
+        return {
+            success: true,
+            id
+        };
+    }
     constructor(contactRepo){
         this.contactRepo = contactRepo;
         this.transporter = null;

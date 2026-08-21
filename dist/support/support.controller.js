@@ -49,6 +49,9 @@ let SupportController = class SupportController {
     updateTicket(id, status) {
         return this.supportService.updateStatus(Number(id), status);
     }
+    deleteTicket(id) {
+        return this.supportService.deleteTicket(Number(id));
+    }
     constructor(supportService){
         this.supportService = supportService;
     }
@@ -111,6 +114,17 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", void 0)
 ], SupportController.prototype, "updateTicket", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt'), _rolesguard.RolesGuard),
+    (0, _rolesguard.Roles)('super_admin'),
+    (0, _common.Delete)('tickets/:id'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], SupportController.prototype, "deleteTicket", null);
 SupportController = _ts_decorate([
     (0, _common.Controller)('support'),
     _ts_metadata("design:type", Function),

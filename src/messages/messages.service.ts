@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, LessThan } from 'typeorm';
 import { randomUUID } from 'crypto';
 import { Message } from './message.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
@@ -137,22 +137,30 @@ export class MessagesService {
     return msg;
   }
 
-  async findAll(conversationId: string, userId: string): Promise<Message[]> {
+  async findAll(conversationId: string, userId: string, requestedLimit = 50, before?: string): Promise<Message[]> {
     await this.assertConversationAccess(conversationId, userId);
+    const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
+    const beforeDate = before ? new Date(before) : null;
+    const hasValidCursor = !!beforeDate && !Number.isNaN(beforeDate.getTime());
     try {
       const messages = await this.msgRepo.find({
-        where: { conversationId },
-        order: { createdAt: 'ASC' }
+        where: hasValidCursor ? { conversationId, createdAt: LessThan(beforeDate!) } : { conversationId },
+        order: { createdAt: 'DESC' },
+        take: limit,
       });
-      const visible = messages.filter((message) => !this.parseUserList(message.deletedForUserIds).includes(userId));
+      const visible = messages
+        .filter((message) => !this.parseUserList(message.deletedForUserIds).includes(userId))
+        .reverse();
       return Promise.all(visible.map((message) => this.forViewer(message, userId)));
     } catch (error) {
       if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
+      const cursorSql = hasValidCursor ? ' AND createdAt < ?' : '';
+      const params: Array<string | number | Date> = hasValidCursor ? [conversationId, beforeDate!, limit] : [conversationId, limit];
       const rows = await this.msgRepo.query(
-        'SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? ORDER BY createdAt ASC',
-        [conversationId],
+        `SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ?${cursorSql} ORDER BY createdAt DESC LIMIT ?`,
+        params,
       );
-      return Promise.all(rows.map((row: any) => this.forViewer(this.normalizeCoreMessage(row), userId))); 
+      return Promise.all(rows.reverse().map((row: any) => this.forViewer(this.normalizeCoreMessage(row), userId)));
     }
   }
 

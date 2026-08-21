@@ -35,8 +35,8 @@ let MessagesController = class MessagesController {
     async messageInfo(req, id) {
         return this.messagesService.getInfo(id, req.user.userId);
     }
-    async getConversationMessages(req, conversationId) {
-        return this.messagesService.findAll(conversationId, req.user.userId);
+    async getConversationMessages(req, conversationId, limit, before) {
+        return this.messagesService.findAll(conversationId, req.user.userId, Number(limit) || 50, before);
     }
     async createMessage(req, conversationId, receiverId, text, content, replyToMessageId) {
         return this.messagesService.create(conversationId, req.user.userId, receiverId, content || text, replyToMessageId);
@@ -101,9 +101,13 @@ _ts_decorate([
     (0, _common.Get)(':conversationId'),
     _ts_param(0, (0, _common.Request)()),
     _ts_param(1, (0, _common.Param)('conversationId')),
+    _ts_param(2, (0, _common.Query)('limit')),
+    _ts_param(3, (0, _common.Query)('before')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         void 0,
+        String,
+        String,
         String
     ]),
     _ts_metadata("design:returntype", Promise)

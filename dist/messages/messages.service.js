@@ -181,25 +181,39 @@ let MessagesService = class MessagesService {
         }
         return msg;
     }
-    async findAll(conversationId, userId) {
+    async findAll(conversationId, userId, requestedLimit = 50, before) {
         await this.assertConversationAccess(conversationId, userId);
+        const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
+        const beforeDate = before ? new Date(before) : null;
+        const hasValidCursor = !!beforeDate && !Number.isNaN(beforeDate.getTime());
         try {
             const messages = await this.msgRepo.find({
-                where: {
+                where: hasValidCursor ? {
+                    conversationId,
+                    createdAt: (0, _typeorm1.LessThan)(beforeDate)
+                } : {
                     conversationId
                 },
                 order: {
-                    createdAt: 'ASC'
-                }
+                    createdAt: 'DESC'
+                },
+                take: limit
             });
-            const visible = messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId));
+            const visible = messages.filter((message)=>!this.parseUserList(message.deletedForUserIds).includes(userId)).reverse();
             return Promise.all(visible.map((message)=>this.forViewer(message, userId)));
         } catch (error) {
             if (!this.isOptionalMessageSchemaMismatch(error)) throw error;
-            const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ? ORDER BY createdAt ASC', [
-                conversationId
-            ]);
-            return Promise.all(rows.map((row)=>this.forViewer(this.normalizeCoreMessage(row), userId)));
+            const cursorSql = hasValidCursor ? ' AND createdAt < ?' : '';
+            const params = hasValidCursor ? [
+                conversationId,
+                beforeDate,
+                limit
+            ] : [
+                conversationId,
+                limit
+            ];
+            const rows = await this.msgRepo.query(`SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE conversationId = ?${cursorSql} ORDER BY createdAt DESC LIMIT ?`, params);
+            return Promise.all(rows.reverse().map((row)=>this.forViewer(this.normalizeCoreMessage(row), userId)));
         }
     }
     async create(conversationId, senderId, receiverId, content, replyToMessageId) {

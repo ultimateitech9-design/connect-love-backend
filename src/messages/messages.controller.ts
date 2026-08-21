@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Delete, Patch, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch, Query, UseGuards, Request } from '@nestjs/common';
 import { MessagesService } from './messages.service';
 import { AuthGuard } from '@nestjs/passport';
 
@@ -19,8 +19,13 @@ export class MessagesController {
   }
 
   @Get(':conversationId')
-  async getConversationMessages(@Request() req, @Param('conversationId') conversationId: string) {
-    return this.messagesService.findAll(conversationId, req.user.userId);
+  async getConversationMessages(
+    @Request() req,
+    @Param('conversationId') conversationId: string,
+    @Query('limit') limit?: string,
+    @Query('before') before?: string,
+  ) {
+    return this.messagesService.findAll(conversationId, req.user.userId, Number(limit) || 50, before);
   }
 
   @Post(':conversationId')
