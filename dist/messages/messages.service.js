@@ -32,6 +32,7 @@ function _ts_param(paramIndex, decorator) {
         decorator(target, key, paramIndex);
     };
 }
+const CALL_LOG_PREFIX = '__call_log__:';
 let MessagesService = class MessagesService {
     queueMessagePush(message) {
         void (async ()=>{
@@ -161,12 +162,42 @@ let MessagesService = class MessagesService {
         return !hasActivePlan;
     }
     async forViewer(message, viewerId) {
+        if (message.content.startsWith(CALL_LOG_PREFIX)) return message;
         if (!await this.shouldLockFirstImpressionReply(viewerId, message.senderId)) return message;
         return {
             ...message,
             content: 'Unlock your plan to read her reply.',
             lockedForPlan: true
         };
+    }
+    async upsertCallLog(call) {
+        const content = CALL_LOG_PREFIX + JSON.stringify({
+            callId: call.id,
+            callType: call.callType,
+            status: call.status,
+            callerId: call.callerId,
+            receiverId: call.receiverId,
+            placedAt: call.createdAt,
+            startedAt: call.startedAt,
+            endedAt: call.endedAt
+        });
+        const existing = await this.msgRepo.findOne({
+            where: {
+                id: call.id
+            }
+        });
+        if (existing) {
+            existing.content = content;
+            return this.msgRepo.save(existing);
+        }
+        return this.msgRepo.save(this.msgRepo.create({
+            id: call.id,
+            conversationId: call.conversationId,
+            senderId: call.callerId,
+            receiverId: call.receiverId,
+            content,
+            createdAt: call.createdAt
+        }));
     }
     async assertMessageAccess(messageId, userId) {
         const msg = await this.msgRepo.findOne({

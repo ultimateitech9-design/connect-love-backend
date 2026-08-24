@@ -312,6 +312,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     try {
       const callType = data.callType === 'audio' ? 'audio' : 'video';
       const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId, callType);
+      const callMessage = await this.messagesService.upsertCallLog(call);
+      this.emitToUser(call.callerId, 'receiveMessage', callMessage);
+      this.emitToUser(call.receiverId, 'receiveMessage', callMessage);
       const payload = { call, callerId, conversationId: data.conversationId, callType };
       this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
       this.server.to(client.id).emit('videoCallStarted', payload);
@@ -331,13 +334,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.accept(data.callId, receiverId);
+      const callMessage = await this.messagesService.upsertCallLog(call);
+      this.emitToUser(call.callerId, 'messageUpdated', callMessage);
+      this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
       const maxDurationMinutes = call.callType === 'video' ? await this.videoCallsService.durationMinutesForCaller(call.callerId) : null;
       const payload = { call, receiverId, maxDurationMinutes };
       this.emitToUser(data.callerId, 'videoCallAccepted', payload);
       this.server.to(client.id).emit('videoCallAccepted', payload);
       if (maxDurationMinutes) {
         setTimeout(() => {
-          void this.videoCallsService.finish(call.id, call.callerId, 'ended').then((endedCall) => {
+          void this.videoCallsService.finish(call.id, call.callerId, 'ended').then(async (endedCall) => {
+            const endedMessage = await this.messagesService.upsertCallLog(endedCall);
+            this.emitToUser(endedCall.callerId, 'messageUpdated', endedMessage);
+            this.emitToUser(endedCall.receiverId, 'messageUpdated', endedMessage);
             const endedPayload = { call: endedCall, endedBy: 'plan_limit' };
             this.emitToUser(call.callerId, 'videoCallEnded', endedPayload);
             this.emitToUser(call.receiverId, 'videoCallEnded', endedPayload);
@@ -360,6 +369,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.finish(data.callId, userId, data.status || 'ended');
+      const callMessage = await this.messagesService.upsertCallLog(call);
+      this.emitToUser(call.callerId, 'messageUpdated', callMessage);
+      this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
       const payload = { call, endedBy: userId };
       this.emitToUser(data.otherUserId, 'videoCallEnded', payload);
       this.server.to(client.id).emit('videoCallEnded', payload);

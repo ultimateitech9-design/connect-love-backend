@@ -8,6 +8,9 @@ import { User } from '../users/user.entity';
 import { PushNotificationsService } from '../push-notifications/push-notifications.service';
 import { PlanUsageService } from '../plans/plan-usage.service';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
+import { VideoCall } from './video-call.entity';
+
+const CALL_LOG_PREFIX = '__call_log__:';
 
 @Injectable()
 export class MessagesService {
@@ -124,8 +127,37 @@ export class MessagesService {
   }
 
   async forViewer(message: Message, viewerId: string): Promise<Message & { lockedForPlan?: boolean }> {
+    if (message.content.startsWith(CALL_LOG_PREFIX)) return message;
     if (!(await this.shouldLockFirstImpressionReply(viewerId, message.senderId))) return message;
     return { ...message, content: 'Unlock your plan to read her reply.', lockedForPlan: true };
+  }
+
+  async upsertCallLog(call: VideoCall): Promise<Message> {
+    const content = CALL_LOG_PREFIX + JSON.stringify({
+      callId: call.id,
+      callType: call.callType,
+      status: call.status,
+      callerId: call.callerId,
+      receiverId: call.receiverId,
+      placedAt: call.createdAt,
+      startedAt: call.startedAt,
+      endedAt: call.endedAt,
+    });
+
+    const existing = await this.msgRepo.findOne({ where: { id: call.id } });
+    if (existing) {
+      existing.content = content;
+      return this.msgRepo.save(existing);
+    }
+
+    return this.msgRepo.save(this.msgRepo.create({
+      id: call.id,
+      conversationId: call.conversationId,
+      senderId: call.callerId,
+      receiverId: call.receiverId,
+      content,
+      createdAt: call.createdAt,
+    }));
   }
   private async assertMessageAccess(messageId: string, userId: string): Promise<Message> {
     const msg = await this.msgRepo.findOne({ where: { id: messageId } });
