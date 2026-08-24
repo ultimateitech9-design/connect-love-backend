@@ -74,10 +74,16 @@ export class MatchesService {
         'SUM(CASE WHEN message.receiverId = :userId AND message.isRead = :isRead THEN 1 ELSE 0 END)',
         'unreadCount',
       )
+      .addSelect((subQuery) => subQuery
+        .select('latest.content')
+        .from(Message, 'latest')
+        .where('latest.conversationId = message.conversationId')
+        .orderBy('latest.createdAt', 'DESC')
+        .limit(1), 'lastMessage')
       .where('message.conversationId IN (:...matchIds)', { matchIds: matches.map((match) => match.id) })
       .setParameters({ userId, isRead: false })
       .groupBy('message.conversationId')
-      .getRawMany<{ conversationId: string; lastMessageTime: string | Date | null; unreadCount: string }>();
+      .getRawMany<{ conversationId: string; lastMessageTime: string | Date | null; unreadCount: string; lastMessage: string | null }>();
 
     const summaries = new Map(messageSummary.map((row) => [row.conversationId, row]));
     const enriched = matches.map((match) => {
@@ -86,7 +92,7 @@ export class MatchesService {
         ...match,
         sender: this.serializeUser(match.sender),
         receiver: this.serializeUser(match.receiver),
-        lastMessage: 'No messages yet.',
+        lastMessage: summary?.lastMessage || 'No messages yet.',
         lastMessageTime: summary?.lastMessageTime || match.createdAt,
         unreadCount: Number(summary?.unreadCount || 0),
       };

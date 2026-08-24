@@ -82,7 +82,7 @@ let MatchesService = class MatchesService {
         if (matches.length === 0) return [];
         // Fetch message metadata for every conversation in one query. The old code
         // executed two queries per match, which made this endpoint increasingly slow.
-        const messageSummary = await this.msgRepo.createQueryBuilder('message').select('message.conversationId', 'conversationId').addSelect('MAX(message.createdAt)', 'lastMessageTime').addSelect('SUM(CASE WHEN message.receiverId = :userId AND message.isRead = :isRead THEN 1 ELSE 0 END)', 'unreadCount').where('message.conversationId IN (:...matchIds)', {
+        const messageSummary = await this.msgRepo.createQueryBuilder('message').select('message.conversationId', 'conversationId').addSelect('MAX(message.createdAt)', 'lastMessageTime').addSelect('SUM(CASE WHEN message.receiverId = :userId AND message.isRead = :isRead THEN 1 ELSE 0 END)', 'unreadCount').addSelect((subQuery)=>subQuery.select('latest.content').from(_messageentity.Message, 'latest').where('latest.conversationId = message.conversationId').orderBy('latest.createdAt', 'DESC').limit(1), 'lastMessage').where('message.conversationId IN (:...matchIds)', {
             matchIds: matches.map((match)=>match.id)
         }).setParameters({
             userId,
@@ -98,7 +98,7 @@ let MatchesService = class MatchesService {
                 ...match,
                 sender: this.serializeUser(match.sender),
                 receiver: this.serializeUser(match.receiver),
-                lastMessage: 'No messages yet.',
+                lastMessage: summary?.lastMessage || 'No messages yet.',
                 lastMessageTime: summary?.lastMessageTime || match.createdAt,
                 unreadCount: Number(summary?.unreadCount || 0)
             };
