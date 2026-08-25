@@ -411,7 +411,10 @@ export class PlatformApiController {
   async dashboard() {
     const totalUsers = await this.userRepo.count();
     const activeUsers = await this.userRepo.count({ where: { status: 'active' } });
-    const premiumUsers = await this.userRepo.count({ where: [{ plan: 'gold' }, { plan: 'platinum' }] });
+    const premiumUsers = await this.userRepo.createQueryBuilder('user')
+      .where('user.plan IN (:...paidPlans)', { paidPlans: ['gold', 'platinum'] })
+      .andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :now)', { now: new Date() })
+      .getCount();
     const matchesDone = await this.matchRepo.count({ where: { status: MatchStatus.MATCHED } });
     const pendingReports = await this.contactRepo.count({ where: { status: 'open' } });
     const revenue = await this.paymentRepo
@@ -420,7 +423,7 @@ export class PlatformApiController {
       .where('payment.status = :status', { status: 'successful' })
       .getRawOne();
     const totalRevenue = Number(revenue?.total || 0);
-    const users = await this.userRepo.find({ select: ['createdAt', 'plan', 'status'] });
+    const users = await this.userRepo.find({ select: ['createdAt', 'plan', 'planExpiresAt', 'status'] });
     const matches = await this.matchRepo.find({ select: ['createdAt'] });
     const payments = await this.paymentRepo.find({ where: { status: 'successful' }, select: ['amount', 'createdAt'] });
     const reports = await this.contactRepo.find({ select: ['createdAt', 'status'] });
@@ -453,7 +456,7 @@ export class PlatformApiController {
         { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
         { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
         { label: 'Pending Reports', value: String(pendingReports), delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart)) },
-        { label: 'Premium Users', value: String(premiumUsers), delta: this.periodDelta(countPeriod(users.filter((user) => user.plan !== 'free'), currentStart, now), countPeriod(users.filter((user) => user.plan !== 'free'), previousStart, currentStart)) },
+        { label: 'Premium Users', value: String(premiumUsers), delta: this.periodDelta(countPeriod(users.filter((user) => user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), currentStart, now), countPeriod(users.filter((user) => user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), previousStart, currentStart)) },
       ],
       growth,
     };
@@ -466,6 +469,7 @@ export class PlatformApiController {
     @Query('search') search?: string,
     @Query('page') pageValue?: string,
     @Query('limit') limitValue?: string,
+    @Query('filter') filter?: string,
   ) {
     const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
@@ -476,6 +480,12 @@ export class PlatformApiController {
         'user.isVerified', 'user.status',
       ])
       .orderBy('user.createdAt', 'DESC');
+
+    if (filter?.trim().toLowerCase() === 'premium') {
+      query
+        .andWhere('user.plan IN (:...paidPlans)', { paidPlans: ['gold', 'platinum'] })
+        .andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :premiumNow)', { premiumNow: new Date() });
+    }
 
     const term = search?.trim().toLowerCase();
     if (term) {
