@@ -534,16 +534,14 @@ let PlatformApiController = class PlatformApiController {
                 status: 'active'
             }
         });
-        const premiumUsers = await this.userRepo.count({
-            where: [
-                {
-                    plan: 'gold'
-                },
-                {
-                    plan: 'platinum'
-                }
+        const premiumUsers = await this.userRepo.createQueryBuilder('user').where('user.plan IN (:...paidPlans)', {
+            paidPlans: [
+                'gold',
+                'platinum'
             ]
-        });
+        }).andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :now)', {
+            now: new Date()
+        }).getCount();
         const matchesDone = await this.matchRepo.count({
             where: {
                 status: _matchentity.MatchStatus.MATCHED
@@ -562,6 +560,7 @@ let PlatformApiController = class PlatformApiController {
             select: [
                 'createdAt',
                 'plan',
+                'planExpiresAt',
                 'status'
             ]
         });
@@ -639,13 +638,13 @@ let PlatformApiController = class PlatformApiController {
                 {
                     label: 'Premium Users',
                     value: String(premiumUsers),
-                    delta: this.periodDelta(countPeriod(users.filter((user)=>user.plan !== 'free'), currentStart, now), countPeriod(users.filter((user)=>user.plan !== 'free'), previousStart, currentStart))
+                    delta: this.periodDelta(countPeriod(users.filter((user)=>user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), currentStart, now), countPeriod(users.filter((user)=>user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), previousStart, currentStart))
                 }
             ],
             growth
         };
     }
-    async users(request, search, pageValue, limitValue) {
+    async users(request, search, pageValue, limitValue, filter) {
         const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
         const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
         const query = this.userRepo.createQueryBuilder('user').select([
@@ -662,6 +661,16 @@ let PlatformApiController = class PlatformApiController {
             'user.isVerified',
             'user.status'
         ]).orderBy('user.createdAt', 'DESC');
+        if (filter?.trim().toLowerCase() === 'premium') {
+            query.andWhere('user.plan IN (:...paidPlans)', {
+                paidPlans: [
+                    'gold',
+                    'platinum'
+                ]
+            }).andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :premiumNow)', {
+                premiumNow: new Date()
+            });
+        }
         const term = search?.trim().toLowerCase();
         if (term) {
             query.andWhere(`(
@@ -2111,9 +2120,11 @@ _ts_decorate([
     _ts_param(1, (0, _common.Query)('search')),
     _ts_param(2, (0, _common.Query)('page')),
     _ts_param(3, (0, _common.Query)('limit')),
+    _ts_param(4, (0, _common.Query)('filter')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
         String,
         String,
         String

@@ -34,6 +34,23 @@ function _ts_param(paramIndex, decorator) {
 }
 const CALL_LOG_PREFIX = '__call_log__:';
 let MessagesService = class MessagesService {
+    maskPhoneNumbers(content) {
+        if (!content) return content;
+        const protectedPrefixes = [
+            CALL_LOG_PREFIX,
+            '__voice_message__:',
+            '__photo_message__:',
+            '__video_message__:',
+            '__gift_message__:',
+            '__gif_message__:',
+            '__chat_theme__:',
+            '[CONTROL:'
+        ];
+        if (protectedPrefixes.some((prefix)=>content.startsWith(prefix))) return content;
+        // Replace phone-like runs containing seven or more digits, including
+        // country codes and common separators such as spaces, dashes or brackets.
+        return content.replace(/(?:\+?\d[\s().-]*){6,}\d/g, '###');
+    }
     queueMessagePush(message) {
         void (async ()=>{
             const [sender, receiver] = await Promise.all([
@@ -163,9 +180,13 @@ let MessagesService = class MessagesService {
     }
     async forViewer(message, viewerId) {
         if (message.content.startsWith(CALL_LOG_PREFIX)) return message;
-        if (!await this.shouldLockFirstImpressionReply(viewerId, message.senderId)) return message;
-        return {
+        const safeMessage = {
             ...message,
+            content: this.maskPhoneNumbers(message.content)
+        };
+        if (!await this.shouldLockFirstImpressionReply(viewerId, message.senderId)) return safeMessage;
+        return {
+            ...safeMessage,
             content: 'Unlock your plan to read her reply.',
             lockedForPlan: true
         };
@@ -277,11 +298,12 @@ let MessagesService = class MessagesService {
                 throw new _common.BadRequestException(`Free plan allows ${limits.messagesPerUser} messages to each match. Upgrade for unlimited messages.`);
             }
         }
+        const safeContent = this.maskPhoneNumbers(content);
         const msg = this.msgRepo.create({
             conversationId,
             senderId,
             receiverId,
-            content,
+            content: safeContent,
             replyToMessageId: replyToMessageId || null
         });
         try {
@@ -296,7 +318,7 @@ let MessagesService = class MessagesService {
                 conversationId,
                 senderId,
                 receiverId,
-                content
+                safeContent
             ]);
             const rows = await this.msgRepo.query('SELECT id, conversationId, senderId, receiverId, content, isRead, createdAt FROM messages WHERE id = ? LIMIT 1', [
                 id
@@ -439,7 +461,7 @@ let MessagesService = class MessagesService {
             throw new _common.ForbiddenException('You can only edit your own messages.');
         }
         if (msg.deletedForEveryone) throw new _common.ForbiddenException('Cannot edit a deleted message.');
-        msg.content = newContent;
+        msg.content = this.maskPhoneNumbers(newContent);
         msg.editedAt = new Date();
         return this.msgRepo.save(msg);
     }
@@ -464,7 +486,11 @@ let MessagesService = class MessagesService {
         return this.msgRepo.save(msg);
     }
     async getInfo(id, userId) {
-        return this.assertMessageAccess(id, userId);
+        const message = await this.assertMessageAccess(id, userId);
+        return {
+            ...message,
+            content: this.maskPhoneNumbers(message.content)
+        };
     }
     constructor(msgRepo, matchRepo, userRepo, firstImpressionRepo, pushNotifications, planUsage){
         this.msgRepo = msgRepo;
