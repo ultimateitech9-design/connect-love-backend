@@ -4,7 +4,7 @@ import {
 
 export type UserPlan = 'free' | 'gold' | 'platinum';
 export type UserRole = 'user' | 'admin' | 'super_admin' | 'marketing' | 'sales' | 'support';
-export type UserStatus = 'active' | 'suspended' | 'banned' | 'pending_verification';
+export type UserStatus = 'active' | 'deactivated' | 'suspended' | 'banned' | 'pending_verification';
 
 @Entity('users')
 export class User {
@@ -108,7 +108,7 @@ export class User {
   @Column({ nullable: true, type: 'datetime' })
   planExpiresAt: Date;
 
-  @Column({ type: 'enum', enum: ['active', 'suspended', 'banned', 'pending_verification'], default: 'active' })
+  @Column({ type: 'enum', enum: ['active', 'deactivated', 'suspended', 'banned', 'pending_verification'], default: 'active' })
   status: UserStatus;
 
   @Column({

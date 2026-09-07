@@ -201,12 +201,12 @@ let UsersService = class UsersService {
         });
         if (!user) throw new _common.NotFoundException('User not found.');
         await this.userRepo.update(id, {
-            status: 'suspended',
+            status: 'deactivated',
             isOnline: false,
             lastSeen: new Date()
         });
         return {
-            message: 'Your account has been deactivated. Contact support when you want to reactivate it.'
+            message: 'Your account has been deactivated. Sign in again whenever you want to reactivate it.'
         };
     }
     async updatePresence(userId, isOnline) {

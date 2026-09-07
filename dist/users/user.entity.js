@@ -223,6 +223,7 @@ _ts_decorate([
         type: 'enum',
         enum: [
             'active',
+            'deactivated',
             'suspended',
             'banned',
             'pending_verification'

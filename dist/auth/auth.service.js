@@ -232,22 +232,28 @@ let AuthService = class AuthService {
         };
     }
     async login(dto, context = {}) {
+        const email = dto.email.trim().toLowerCase();
         const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', {
-            email: dto.email
+            email
         }).getOne();
-        if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
+        if (!user) return this.rejectLogin(email, context, 'Invalid email or password.');
         if (user.role !== 'user') {
-            return this.rejectLogin(dto.email, context, 'Please use the management login for this account.');
-        }
-        if (user.status !== 'active') {
-            return this.rejectLogin(dto.email, context, 'This account is not active. Please contact support.');
+            return this.rejectLogin(email, context, 'Please use the management login for this account.');
         }
         const match = await _bcryptjs.compare(dto.password, user.password);
-        if (!match) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
+        if (!match) return this.rejectLogin(email, context, 'Invalid email or password.');
+        const reactivated = user.status === 'deactivated';
+        if (reactivated) {
+            user.status = 'active';
+            await this.userRepo.save(user);
+        } else if (user.status !== 'active') {
+            return this.rejectLogin(email, context, 'This account is not active. Please contact support.');
+        }
         const session = await this.startSession(user, context);
         const token = this.signUserToken(user, session.sessionId);
         return {
             access_token: token,
+            reactivated,
             user: {
                 id: user.id,
                 name: user.name,
