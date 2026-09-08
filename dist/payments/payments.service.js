@@ -15,7 +15,6 @@ const _https = require("https");
 const _typeorm1 = require("typeorm");
 const _paymententity = require("../platform/payment.entity");
 const _userentity = require("../users/user.entity");
-const _planentitlements = require("../plans/plan-entitlements");
 const _couponentity = require("./coupon.entity");
 const _boostentity = require("../boosts/boost.entity");
 const _boostsservice = require("../boosts/boosts.service");
@@ -133,7 +132,6 @@ let PaymentsService = class PaymentsService {
             }
         });
         if (!user) throw new _common.UnauthorizedException('User account not found.');
-        if ((0, _planentitlements.isWoman)(user)) throw new _common.BadRequestException('All features are already free for women. No plan purchase is required.');
         const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
         return {
             code: discount.coupon?.code,
@@ -206,7 +204,6 @@ let PaymentsService = class PaymentsService {
             }
         });
         if (!user) throw new _common.UnauthorizedException('User account not found.');
-        if ((0, _planentitlements.isWoman)(user)) throw new _common.BadRequestException('All features are already free for women. No plan purchase is required.');
         const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
         const payment = await this.paymentRepo.save(this.paymentRepo.create({
             userId,

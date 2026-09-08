@@ -5,7 +5,6 @@ import { request as httpsRequest } from 'https';
 import { Repository } from 'typeorm';
 import { Payment } from '../platform/payment.entity';
 import { User, UserPlan } from '../users/user.entity';
-import { isWoman } from '../plans/plan-entitlements';
 import { Coupon } from './coupon.entity';
 import { ProfileBoost, type BoostPlanKey } from '../boosts/boost.entity';
 import { BOOST_PLANS } from '../boosts/boosts.service';
@@ -54,7 +53,6 @@ export class PaymentsService {
     if (!plan) throw new BadRequestException('Invalid paid plan.');
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User account not found.');
-    if (isWoman(user)) throw new BadRequestException('All features are already free for women. No plan purchase is required.');
     const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
     return { code: discount.coupon?.code, discountPercent: discount.coupon?.discountPercent, originalAmount: plan.amountPaise / 100, discountAmount: discount.discountPaise / 100, finalAmount: discount.finalPaise / 100, currency: 'INR' };
   }
@@ -113,7 +111,6 @@ export class PaymentsService {
     if (!plan) throw new BadRequestException('Invalid paid plan.');
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User account not found.');
-    if (isWoman(user)) throw new BadRequestException('All features are already free for women. No plan purchase is required.');
     const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
 
     const payment = await this.paymentRepo.save(this.paymentRepo.create({

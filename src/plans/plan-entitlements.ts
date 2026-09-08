@@ -48,7 +48,9 @@ export function activePlan(user: Pick<User, 'plan' | 'planExpiresAt'>): UserPlan
 }
 
 export function entitlementsFor(user: Pick<User, 'plan' | 'planExpiresAt'> & Partial<Pick<User, 'gender'>>): PlanEntitlements {
-  if (isWoman(user as Pick<User, 'gender'>)) return WOMEN_ENTITLEMENTS;
+  if (isWoman(user as Pick<User, 'gender'>)) {
+    return { ...WOMEN_ENTITLEMENTS, verifiedBadge: PLAN_ENTITLEMENTS[activePlan(user)].verifiedBadge };
+  }
   return PLAN_ENTITLEMENTS[activePlan(user)];
 }
 
