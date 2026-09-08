@@ -515,7 +515,7 @@ export class PlatformApiController {
         joined: user.createdAt,
         lastActive: user.lastSeen || user.updatedAt,
         isVerified: user.isVerified,
-        status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review',
+        status: this.statusLabel(user.status),
       })),
     };
   }
@@ -671,8 +671,12 @@ export class PlatformApiController {
   }
 
   @Patch('users/:id/status')
-  @Roles('admin', 'super_admin')
-  async updateUserStatus(@Param('id') id: string, @Body('status') status: 'active' | 'suspended' | 'banned' | 'pending_verification') {
+  @Roles('admin', 'super_admin', 'support')
+  async updateUserStatus(@Param('id') id: string, @Body('status') status: 'active' | 'suspended' | 'banned' | 'pending_verification', @Req() request: any) {
+    const actor = this.requestUser(request);
+    const allowedStatuses = actor.role === 'support' ? ['active', 'suspended'] : ['active', 'suspended', 'banned', 'pending_verification'];
+    if (!allowedStatuses.includes(status)) throw new ForbiddenException('Support can only activate or suspend user accounts.');
+
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found.');
     user.status = status;

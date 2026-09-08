@@ -702,7 +702,7 @@ let PlatformApiController = class PlatformApiController {
                     joined: user.createdAt,
                     lastActive: user.lastSeen || user.updatedAt,
                     isVerified: user.isVerified,
-                    status: user.status === 'active' ? 'Active' : user.status === 'banned' ? 'Banned' : 'Under Review'
+                    status: this.statusLabel(user.status)
                 }))
         };
     }
@@ -921,7 +921,18 @@ let PlatformApiController = class PlatformApiController {
             user: safe
         };
     }
-    async updateUserStatus(id, status) {
+    async updateUserStatus(id, status, request) {
+        const actor = this.requestUser(request);
+        const allowedStatuses = actor.role === 'support' ? [
+            'active',
+            'suspended'
+        ] : [
+            'active',
+            'suspended',
+            'banned',
+            'pending_verification'
+        ];
+        if (!allowedStatuses.includes(status)) throw new _common.ForbiddenException('Support can only activate or suspend user accounts.');
         const user = await this.userRepo.findOne({
             where: {
                 id
@@ -2179,13 +2190,15 @@ _ts_decorate([
 ], PlatformApiController.prototype, "updateUser", null);
 _ts_decorate([
     (0, _common.Patch)('users/:id/status'),
-    (0, _rolesguard.Roles)('admin', 'super_admin'),
+    (0, _rolesguard.Roles)('admin', 'super_admin', 'support'),
     _ts_param(0, (0, _common.Param)('id')),
     _ts_param(1, (0, _common.Body)('status')),
+    _ts_param(2, (0, _common.Req)()),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         String,
-        String
+        String,
+        Object
     ]),
     _ts_metadata("design:returntype", Promise)
 ], PlatformApiController.prototype, "updateUserStatus", null);
