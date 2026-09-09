@@ -38,8 +38,7 @@ let MatchesController = class MatchesController {
         return this.matchesService.swipe(userId, receiverId, action);
     }
     async unblockUser(req, id) {
-        // Delete the blocked relation so they return to discovery
-        return this.matchesService.delete(id, req.user.userId);
+        return this.matchesService.unblockMatch(id, req.user.userId);
     }
     async undoSwipe(req, receiverId) {
         return this.matchesService.undoSwipe(req.user.userId, receiverId);

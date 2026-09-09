@@ -187,8 +187,10 @@ export class UsersService {
     await this.userRepo.update(userId, updateData);
   }
 
-  private async recordProfileView(profileUserId: string, viewerUserId: string): Promise<void> {
-    if (!viewerUserId || profileUserId === viewerUserId) return;
+  async recordProfileView(profileUserId: string, viewerUserId: string): Promise<{ recorded: boolean }> {
+    if (!viewerUserId || profileUserId === viewerUserId) return { recorded: false };
+    const profileExists = await this.userRepo.exist({ where: { id: profileUserId } });
+    if (!profileExists) throw new NotFoundException('User not found.');
 
     // Store at most one view per viewer/profile pair per day. This keeps reloads
     // from inflating the insight while retaining a useful visit history.
@@ -198,9 +200,10 @@ export class UsersService {
       where: { profileUserId, viewerUserId, createdAt: MoreThanOrEqual(since) },
       select: ['id'],
     });
-    if (!alreadyRecorded) {
-      await this.profileViewRepo.save(this.profileViewRepo.create({ profileUserId, viewerUserId }));
-    }
+    if (alreadyRecorded) return { recorded: false };
+
+    await this.profileViewRepo.save(this.profileViewRepo.create({ profileUserId, viewerUserId }));
+    return { recorded: true };
   }
 
   private compatibilityScore(owner: User, other: User): number {
@@ -245,7 +248,7 @@ export class UsersService {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const viewsResult = await this.profileViewRepo
       .createQueryBuilder('view')
-      .select('COUNT(DISTINCT view.viewerUserId)', 'count')
+      .select('COUNT(*)', 'count')
       .where('view.profileUserId = :userId', { userId })
       .andWhere('view.createdAt >= :sevenDaysAgo', { sevenDaysAgo })
       .getRawOne();

@@ -67,6 +67,9 @@ let UsersController = class UsersController {
     /** DELETE /users/me — permanently delete the currently authenticated user's account and all associated data */ async deleteMe(req) {
         return this.usersService.removeMe(req.user.userId);
     }
+    /** POST /users/:id/view — records a real Discover profile impression. */ recordProfileView(id, req) {
+        return this.usersService.recordProfileView(id, req.user.userId);
+    }
     async getProfileDetails(id, req) {
         return this.usersService.findProfileDetails(id, req.user.userId);
     }
@@ -227,6 +230,18 @@ _ts_decorate([
     ]),
     _ts_metadata("design:returntype", Promise)
 ], UsersController.prototype, "deleteMe", null);
+_ts_decorate([
+    (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
+    (0, _common.Post)(':id/view'),
+    _ts_param(0, (0, _common.Param)('id')),
+    _ts_param(1, (0, _common.Request)()),
+    _ts_metadata("design:type", Function),
+    _ts_metadata("design:paramtypes", [
+        String,
+        Object
+    ]),
+    _ts_metadata("design:returntype", void 0)
+], UsersController.prototype, "recordProfileView", null);
 _ts_decorate([
     (0, _common.UseGuards)((0, _passport.AuthGuard)('jwt')),
     (0, _common.Get)(':id/details'),

@@ -107,7 +107,7 @@ let MessagesService = class MessagesService {
             editedAt: null
         };
     }
-    async assertConversationAccess(conversationId, userId) {
+    async assertConversationAccess(conversationId, userId, allowBlocked = false) {
         const match = await this.matchRepo.findOne({
             where: {
                 id: conversationId
@@ -117,11 +117,11 @@ let MessagesService = class MessagesService {
         if (match.senderId !== userId && match.receiverId !== userId) {
             throw new _common.ForbiddenException('You are not part of this conversation.');
         }
-        if (match.status !== _matchentity.MatchStatus.MATCHED) {
+        if (match.status !== _matchentity.MatchStatus.MATCHED && !(allowBlocked && match.status === _matchentity.MatchStatus.BLOCKED)) {
             throw new _common.ForbiddenException('Messages are available only after both users match.');
         }
         const { limits } = await this.planUsage.get(userId);
-        if (limits.matches !== Number.MAX_SAFE_INTEGER) {
+        if (match.status === _matchentity.MatchStatus.MATCHED && limits.matches !== Number.MAX_SAFE_INTEGER) {
             const unlockedRows = await this.matchRepo.createQueryBuilder('candidate').select([
                 'candidate.id'
             ]).where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', {
@@ -234,7 +234,7 @@ let MessagesService = class MessagesService {
         return msg;
     }
     async findAll(conversationId, userId, requestedLimit = 50, before) {
-        await this.assertConversationAccess(conversationId, userId);
+        await this.assertConversationAccess(conversationId, userId, true);
         const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
         const beforeDate = before ? new Date(before) : null;
         const hasValidCursor = !!beforeDate && !Number.isNaN(beforeDate.getTime());
@@ -351,7 +351,7 @@ let MessagesService = class MessagesService {
         return this.msgRepo.save(msg);
     }
     async markAsRead(conversationId, userId) {
-        await this.assertConversationAccess(conversationId, userId);
+        await this.assertConversationAccess(conversationId, userId, true);
         let unreadMessages;
         try {
             unreadMessages = await this.msgRepo.find({
@@ -410,7 +410,7 @@ let MessagesService = class MessagesService {
         return reactionsMap;
     }
     async clearConversation(conversationId, userId) {
-        const match = await this.assertConversationAccess(conversationId, userId);
+        const match = await this.assertConversationAccess(conversationId, userId, true);
         const messages = await this.msgRepo.find({
             where: {
                 conversationId

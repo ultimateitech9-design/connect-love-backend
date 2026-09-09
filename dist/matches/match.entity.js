@@ -82,6 +82,22 @@ _ts_decorate([
 ], MatchRelation.prototype, "isSuperLike", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'varchar',
+        length: 36,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], MatchRelation.prototype, "blockedByUserId", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
+        type: 'enum',
+        enum: MatchStatus,
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], MatchRelation.prototype, "statusBeforeBlock", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'text',
         nullable: true
     }),

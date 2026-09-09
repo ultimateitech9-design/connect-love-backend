@@ -158,14 +158,18 @@ export class MatchesService {
 
   async findForFilter(
     userId: string,
-    filter?: 'active' | 'sent' | 'received' | 'blocked',
+    filter?: 'active' | 'sent' | 'received' | 'blocked' | 'messages',
     limit = 12,
     offset = 0,
   ): Promise<any[]> {
     const query = this.matchesWithProfilesQuery()
       .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId });
 
-    if (filter === 'active') {
+    if (filter === 'messages') {
+      query
+        .andWhere('match.status IN (:...messageStatuses)', { messageStatuses: [MatchStatus.MATCHED, MatchStatus.BLOCKED] })
+        .andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
+    } else if (filter === 'active') {
       query
         .andWhere('match.status = :status', { status: MatchStatus.MATCHED })
         .andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
@@ -174,7 +178,10 @@ export class MatchesService {
     } else if (filter === 'received') {
       query.andWhere('match.status = :status AND match.receiverId = :userId', { status: MatchStatus.PENDING, userId });
     } else if (filter === 'blocked') {
-      query.andWhere('match.status = :status AND match.senderId = :userId', { status: MatchStatus.BLOCKED, userId });
+      query.andWhere(
+        'match.status = :status AND (match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId))',
+        { status: MatchStatus.BLOCKED, userId },
+      );
     } else {
       query.andWhere('match.status IN (:...statuses)', {
         statuses: [MatchStatus.MATCHED, MatchStatus.PENDING, MatchStatus.BLOCKED],
@@ -234,7 +241,10 @@ export class MatchesService {
       count(MatchStatus.MATCHED),
       count(MatchStatus.PENDING, 'senderId'),
       count(MatchStatus.PENDING, 'receiverId'),
-      count(MatchStatus.BLOCKED, 'senderId'),
+      this.matchesRepository.createQueryBuilder('match')
+        .where('match.status = :status', { status: MatchStatus.BLOCKED })
+        .andWhere('(match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId))', { userId })
+        .getCount(),
     ]);
     return { active, sent, received, blocked };
   }
@@ -323,16 +333,33 @@ export class MatchesService {
     if (match.senderId !== blockerUserId && match.receiverId !== blockerUserId) {
       throw new ForbiddenException('You are not part of this match.');
     }
-
-    match.status = MatchStatus.BLOCKED;
-    if (match.senderId !== blockerUserId) {
-      const temp = match.senderId;
-      match.senderId = blockerUserId;
-      match.receiverId = temp;
+    if (match.status === MatchStatus.BLOCKED) {
+      if (match.blockedByUserId === blockerUserId || (!match.blockedByUserId && match.senderId === blockerUserId)) return match;
+      throw new ForbiddenException('This user has blocked this conversation.');
     }
+
+    match.statusBeforeBlock = match.status;
+    match.blockedByUserId = blockerUserId;
+    match.status = MatchStatus.BLOCKED;
     return this.matchesRepository.save(match);
   }
 
+  async unblockMatch(id: string, userId: string): Promise<MatchRelation> {
+    const match = await this.matchesRepository.findOne({ where: { id } });
+    if (!match) throw new NotFoundException('Match not found.');
+    if (match.senderId !== userId && match.receiverId !== userId) {
+      throw new ForbiddenException('You are not part of this match.');
+    }
+    if (match.status !== MatchStatus.BLOCKED) return match;
+
+    const blockerId = match.blockedByUserId || match.senderId;
+    if (blockerId !== userId) throw new ForbiddenException('Only the user who blocked this conversation can unblock it.');
+
+    match.status = match.statusBeforeBlock || MatchStatus.MATCHED;
+    match.blockedByUserId = null;
+    match.statusBeforeBlock = null;
+    return this.matchesRepository.save(match);
+  }
   async respond(id: string, action: 'accept' | 'decline', userId?: string): Promise<MatchRelation> {
     const match = await this.matchesRepository.findOne({ where: { id } });
     if (!match) throw new NotFoundException('Match request not found.');

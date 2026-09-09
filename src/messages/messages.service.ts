@@ -92,17 +92,17 @@ export class MessagesService {
     } as Message;
   }
 
-  private async assertConversationAccess(conversationId: string, userId: string): Promise<MatchRelation> {
+  private async assertConversationAccess(conversationId: string, userId: string, allowBlocked = false): Promise<MatchRelation> {
     const match = await this.matchRepo.findOne({ where: { id: conversationId } });
     if (!match) throw new NotFoundException('Conversation not found.');
     if (match.senderId !== userId && match.receiverId !== userId) {
       throw new ForbiddenException('You are not part of this conversation.');
     }
-    if (match.status !== MatchStatus.MATCHED) {
+    if (match.status !== MatchStatus.MATCHED && !(allowBlocked && match.status === MatchStatus.BLOCKED)) {
       throw new ForbiddenException('Messages are available only after both users match.');
     }
     const { limits } = await this.planUsage.get(userId);
-    if (limits.matches !== Number.MAX_SAFE_INTEGER) {
+    if (match.status === MatchStatus.MATCHED && limits.matches !== Number.MAX_SAFE_INTEGER) {
       const unlockedRows = await this.matchRepo.createQueryBuilder('candidate')
         .select(['candidate.id'])
         .where('(candidate.senderId = :userId OR candidate.receiverId = :userId)', { userId })
@@ -190,7 +190,7 @@ export class MessagesService {
   }
 
   async findAll(conversationId: string, userId: string, requestedLimit = 50, before?: string): Promise<Message[]> {
-    await this.assertConversationAccess(conversationId, userId);
+    await this.assertConversationAccess(conversationId, userId, true);
     const limit = Math.min(100, Math.max(1, Math.floor(requestedLimit)));
     const beforeDate = before ? new Date(before) : null;
     const hasValidCursor = !!beforeDate && !Number.isNaN(beforeDate.getTime());
@@ -286,7 +286,7 @@ export class MessagesService {
   }
 
   async markAsRead(conversationId: string, userId: string): Promise<Message[]> {
-    await this.assertConversationAccess(conversationId, userId);
+    await this.assertConversationAccess(conversationId, userId, true);
     let unreadMessages: Message[];
     try {
       unreadMessages = await this.msgRepo.find({
@@ -340,7 +340,7 @@ export class MessagesService {
   }
 
   async clearConversation(conversationId: string, userId: string): Promise<void> {
-    const match = await this.assertConversationAccess(conversationId, userId);
+    const match = await this.assertConversationAccess(conversationId, userId, true);
     const messages = await this.msgRepo.find({ where: { conversationId } });
     await Promise.all(messages.map((message) => {
       const deletedFor = new Set(this.parseUserList(message.deletedForUserIds));

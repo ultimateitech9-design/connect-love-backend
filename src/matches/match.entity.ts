@@ -37,6 +37,12 @@ export class MatchRelation {
   @Column({ default: false })
   isSuperLike: boolean;
 
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  blockedByUserId: string | null;
+
+  @Column({ type: 'enum', enum: MatchStatus, nullable: true })
+  statusBeforeBlock: MatchStatus | null;
+
   // Members who cleared this chat; this only hides the conversation for them.
   @Column({ type: 'text', nullable: true })
   hiddenFromChatForUserIds: string | null;

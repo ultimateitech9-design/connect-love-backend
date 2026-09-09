@@ -103,6 +103,13 @@ export class UsersController {
     return this.usersService.removeMe(req.user.userId);
   }
 
+  /** POST /users/:id/view — records a real Discover profile impression. */
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/view')
+  recordProfileView(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.recordProfileView(id, req.user.userId);
+  }
+
   @UseGuards(AuthGuard('jwt'))
   @Get(':id/details')
   async getProfileDetails(@Param('id') id: string, @Request() req: any) {

@@ -9,7 +9,7 @@ export class MatchesController {
   constructor(private readonly matchesService: MatchesService) {}
 
   @Get()
-  async getMatches(@Query('filter') filter: 'active' | 'sent' | 'received' | 'blocked', @Query('limit') limit: string, @Query('offset') offset: string, @Request() req) {
+  async getMatches(@Query('filter') filter: 'active' | 'sent' | 'received' | 'blocked' | 'messages', @Query('limit') limit: string, @Query('offset') offset: string, @Request() req) {
     const userId = req.user.userId;
     return this.matchesService.findForFilter(userId, filter, Number(limit) || 12, Number(offset) || 0);
   }
@@ -27,8 +27,7 @@ export class MatchesController {
 
   @Patch('unblock/:id')
   async unblockUser(@Request() req, @Param('id') id: string) {
-    // Delete the blocked relation so they return to discovery
-    return this.matchesService.delete(id, req.user.userId);
+    return this.matchesService.unblockMatch(id, req.user.userId);
   }
 
   @Delete('swipe/:receiverId')

@@ -177,7 +177,14 @@ let MatchesService = class MatchesService {
         const query = this.matchesWithProfilesQuery().where('(match.senderId = :userId OR match.receiverId = :userId)', {
             userId
         });
-        if (filter === 'active') {
+        if (filter === 'messages') {
+            query.andWhere('match.status IN (:...messageStatuses)', {
+                messageStatuses: [
+                    _matchentity.MatchStatus.MATCHED,
+                    _matchentity.MatchStatus.BLOCKED
+                ]
+            }).andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
+        } else if (filter === 'active') {
             query.andWhere('match.status = :status', {
                 status: _matchentity.MatchStatus.MATCHED
             }).andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
@@ -192,7 +199,7 @@ let MatchesService = class MatchesService {
                 userId
             });
         } else if (filter === 'blocked') {
-            query.andWhere('match.status = :status AND match.senderId = :userId', {
+            query.andWhere('match.status = :status AND (match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId))', {
                 status: _matchentity.MatchStatus.BLOCKED,
                 userId
             });
@@ -272,7 +279,11 @@ let MatchesService = class MatchesService {
             count(_matchentity.MatchStatus.MATCHED),
             count(_matchentity.MatchStatus.PENDING, 'senderId'),
             count(_matchentity.MatchStatus.PENDING, 'receiverId'),
-            count(_matchentity.MatchStatus.BLOCKED, 'senderId')
+            this.matchesRepository.createQueryBuilder('match').where('match.status = :status', {
+                status: _matchentity.MatchStatus.BLOCKED
+            }).andWhere('(match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId))', {
+                userId
+            }).getCount()
         ]);
         return {
             active,
@@ -376,12 +387,31 @@ let MatchesService = class MatchesService {
         if (match.senderId !== blockerUserId && match.receiverId !== blockerUserId) {
             throw new _common.ForbiddenException('You are not part of this match.');
         }
-        match.status = _matchentity.MatchStatus.BLOCKED;
-        if (match.senderId !== blockerUserId) {
-            const temp = match.senderId;
-            match.senderId = blockerUserId;
-            match.receiverId = temp;
+        if (match.status === _matchentity.MatchStatus.BLOCKED) {
+            if (match.blockedByUserId === blockerUserId || !match.blockedByUserId && match.senderId === blockerUserId) return match;
+            throw new _common.ForbiddenException('This user has blocked this conversation.');
         }
+        match.statusBeforeBlock = match.status;
+        match.blockedByUserId = blockerUserId;
+        match.status = _matchentity.MatchStatus.BLOCKED;
+        return this.matchesRepository.save(match);
+    }
+    async unblockMatch(id, userId) {
+        const match = await this.matchesRepository.findOne({
+            where: {
+                id
+            }
+        });
+        if (!match) throw new _common.NotFoundException('Match not found.');
+        if (match.senderId !== userId && match.receiverId !== userId) {
+            throw new _common.ForbiddenException('You are not part of this match.');
+        }
+        if (match.status !== _matchentity.MatchStatus.BLOCKED) return match;
+        const blockerId = match.blockedByUserId || match.senderId;
+        if (blockerId !== userId) throw new _common.ForbiddenException('Only the user who blocked this conversation can unblock it.');
+        match.status = match.statusBeforeBlock || _matchentity.MatchStatus.MATCHED;
+        match.blockedByUserId = null;
+        match.statusBeforeBlock = null;
         return this.matchesRepository.save(match);
     }
     async respond(id, action, userId) {
