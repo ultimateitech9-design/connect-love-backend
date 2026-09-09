@@ -304,7 +304,7 @@ export class PlatformApiController {
   }
 
   private statusLabel(status: string) {
-    return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' ? 'Suspended' : 'Under Review';
+    return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' || status === 'deactivated' ? 'Suspended' : 'Under Review';
   }
 
   private campaignResponse(campaign: PlatformNotification) {

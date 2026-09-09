@@ -436,7 +436,7 @@ let PlatformApiController = class PlatformApiController {
         };
     }
     statusLabel(status) {
-        return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' ? 'Suspended' : 'Under Review';
+        return status === 'active' ? 'Active' : status === 'banned' ? 'Banned' : status === 'suspended' || status === 'deactivated' ? 'Suspended' : 'Under Review';
     }
     campaignResponse(campaign) {
         const ctr = campaign.impressions > 0 ? Number((campaign.clicks / campaign.impressions * 100).toFixed(2)) : 0;
