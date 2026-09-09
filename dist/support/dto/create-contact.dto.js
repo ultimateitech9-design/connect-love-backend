@@ -32,6 +32,9 @@ _ts_decorate([
 _ts_decorate([
     (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
+    (0, _classvalidator.Matches)(/^\d{8,15}$/, {
+        message: 'Phone number must contain only 8 to 15 digits.'
+    }),
     _ts_metadata("design:type", String)
 ], CreateContactDto.prototype, "phone", void 0);
 _ts_decorate([

@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class CreateContactDto {
   @IsString()
@@ -10,6 +10,7 @@ export class CreateContactDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\d{8,15}$/, { message: 'Phone number must contain only 8 to 15 digits.' })
   phone?: string;
 
   @IsOptional()
