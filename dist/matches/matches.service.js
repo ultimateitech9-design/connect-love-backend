@@ -178,7 +178,7 @@ let MatchesService = class MatchesService {
             userId
         });
         if (filter === 'messages') {
-            query.andWhere('match.status IN (:...messageStatuses)', {
+            query.andWhere('(match.status IN (:...messageStatuses) OR EXISTS (SELECT 1 FROM messages history WHERE history.conversationId = match.id))', {
                 messageStatuses: [
                     _matchentity.MatchStatus.MATCHED,
                     _matchentity.MatchStatus.BLOCKED

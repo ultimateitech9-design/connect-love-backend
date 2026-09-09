@@ -98,7 +98,11 @@ export class MessagesService {
     if (match.senderId !== userId && match.receiverId !== userId) {
       throw new ForbiddenException('You are not part of this conversation.');
     }
-    if (match.status !== MatchStatus.MATCHED && !(allowBlocked && match.status === MatchStatus.BLOCKED)) {
+    if (match.status !== MatchStatus.MATCHED && allowBlocked) {
+      const hasHistory = match.status === MatchStatus.BLOCKED
+        || await this.msgRepo.exist({ where: { conversationId } });
+      if (!hasHistory) throw new ForbiddenException('Messages are available only after both users match.');
+    } else if (match.status !== MatchStatus.MATCHED) {
       throw new ForbiddenException('Messages are available only after both users match.');
     }
     const { limits } = await this.planUsage.get(userId);

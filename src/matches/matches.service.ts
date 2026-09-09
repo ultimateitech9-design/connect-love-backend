@@ -167,7 +167,10 @@ export class MatchesService {
 
     if (filter === 'messages') {
       query
-        .andWhere('match.status IN (:...messageStatuses)', { messageStatuses: [MatchStatus.MATCHED, MatchStatus.BLOCKED] })
+        .andWhere(
+          '(match.status IN (:...messageStatuses) OR EXISTS (SELECT 1 FROM messages history WHERE history.conversationId = match.id))',
+          { messageStatuses: [MatchStatus.MATCHED, MatchStatus.BLOCKED] },
+        )
         .andWhere("COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')");
     } else if (filter === 'active') {
       query
