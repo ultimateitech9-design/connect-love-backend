@@ -508,7 +508,7 @@ let PlatformApiController = class PlatformApiController {
         return name.split(' ').map((part)=>part[0]).join('').slice(0, 2).toUpperCase();
     }
     currencySymbol(currency) {
-        return String(currency || 'USD').toUpperCase() === 'INR' ? '₹' : '$';
+        return 'Rs ';
     }
     normalizeSubscriptionPlan(plan) {
         return {

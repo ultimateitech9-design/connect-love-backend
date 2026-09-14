@@ -385,7 +385,7 @@ export class PlatformApiController {
   }
 
   private currencySymbol(currency?: string) {
-    return String(currency || 'USD').toUpperCase() === 'INR' ? '₹' : '$';
+    return 'Rs ';
   }
 
   private normalizeSubscriptionPlan(plan: SubscriptionPlan) {
