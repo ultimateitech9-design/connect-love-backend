@@ -644,7 +644,7 @@ let PlatformApiController = class PlatformApiController {
             growth
         };
     }
-    async users(request, search, pageValue, limitValue, filter) {
+    async users(request, search, pageValue, limitValue, filter, gender) {
         const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
         const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
         const query = this.userRepo.createQueryBuilder('user').select([
@@ -670,6 +670,26 @@ let PlatformApiController = class PlatformApiController {
                 ]
             }).andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :premiumNow)', {
                 premiumNow: new Date()
+            });
+        }
+        const genderKey = gender?.trim().toLowerCase();
+        if (genderKey === 'male' || genderKey === 'female') {
+            const genders = genderKey === 'male' ? [
+                'male',
+                'man',
+                'men',
+                'boy',
+                'm'
+            ] : [
+                'female',
+                'woman',
+                'women',
+                'girl',
+                'ladies',
+                'f'
+            ];
+            query.andWhere('LOWER(TRIM(user.gender)) IN (:...genders)', {
+                genders
             });
         }
         const term = search?.trim().toLowerCase();
@@ -2134,9 +2154,11 @@ _ts_decorate([
     _ts_param(2, (0, _common.Query)('page')),
     _ts_param(3, (0, _common.Query)('limit')),
     _ts_param(4, (0, _common.Query)('filter')),
+    _ts_param(5, (0, _common.Query)('gender')),
     _ts_metadata("design:type", Function),
     _ts_metadata("design:paramtypes", [
         Object,
+        String,
         String,
         String,
         String,

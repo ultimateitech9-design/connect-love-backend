@@ -470,6 +470,7 @@ export class PlatformApiController {
     @Query('page') pageValue?: string,
     @Query('limit') limitValue?: string,
     @Query('filter') filter?: string,
+    @Query('gender') gender?: string,
   ) {
     const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
@@ -488,6 +489,13 @@ export class PlatformApiController {
         .andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :premiumNow)', { premiumNow: new Date() });
     }
 
+    const genderKey = gender?.trim().toLowerCase();
+    if (genderKey === 'male' || genderKey === 'female') {
+      const genders = genderKey === 'male'
+        ? ['male', 'man', 'men', 'boy', 'm']
+        : ['female', 'woman', 'women', 'girl', 'ladies', 'f'];
+      query.andWhere('LOWER(TRIM(user.gender)) IN (:...genders)', { genders });
+    }
     const term = search?.trim().toLowerCase();
     if (term) {
       query.andWhere(`(
