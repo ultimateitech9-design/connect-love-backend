@@ -56,6 +56,13 @@ export class UsersService {
     return this.serializeUser(user);
   }
 
+  async clearAllNotifications(id: string): Promise<{ clearedAt: string }> {
+    const clearedAt = new Date();
+    const result = await this.userRepo.update(id, { notificationsClearedAt: clearedAt });
+    if (!result.affected) throw new NotFoundException('User not found.');
+    return { clearedAt: clearedAt.toISOString() };
+  }
+
   async findProfileDetails(id: string, viewerId: string): Promise<any> {
     const [user, viewer] = await Promise.all([
       this.userRepo.findOne({ where: { id } }),

@@ -66,6 +66,16 @@ let UsersService = class UsersService {
         if (!user) throw new _common.NotFoundException('User not found.');
         return this.serializeUser(user);
     }
+    async clearAllNotifications(id) {
+        const clearedAt = new Date();
+        const result = await this.userRepo.update(id, {
+            notificationsClearedAt: clearedAt
+        });
+        if (!result.affected) throw new _common.NotFoundException('User not found.');
+        return {
+            clearedAt: clearedAt.toISOString()
+        };
+    }
     async findProfileDetails(id, viewerId) {
         const [user, viewer] = await Promise.all([
             this.userRepo.findOne({

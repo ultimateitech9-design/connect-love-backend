@@ -454,7 +454,7 @@ export class PlatformApiController {
         { label: 'Total Users', value: String(totalUsers), delta: this.periodDelta(countPeriod(users, currentStart, now), countPeriod(users, previousStart, currentStart)) },
         { label: 'Active Users', value: String(activeUsers), delta: 'Live DB' },
         { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
-        { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
+        { label: 'Total Revenue', value: `\u20B9${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
         { label: 'Pending Reports', value: String(pendingReports), delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart)) },
         { label: 'Premium Users', value: String(premiumUsers), delta: this.periodDelta(countPeriod(users.filter((user) => user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), currentStart, now), countPeriod(users.filter((user) => user.plan !== 'free' && (!user.planExpiresAt || new Date(user.planExpiresAt).getTime() > now)), previousStart, currentStart)) },
       ],
@@ -476,6 +476,7 @@ export class PlatformApiController {
     const query = this.userRepo.createQueryBuilder('user')
       .select([
         'user.id', 'user.name', 'user.email', 'user.phone', 'user.role', 'user.plan',
+        'user.gender',
         'user.city', 'user.lastSeen', 'user.updatedAt', 'user.createdAt',
         'user.isVerified', 'user.status',
       ])
@@ -508,6 +509,7 @@ export class PlatformApiController {
         name: user.name,
         email: user.email,
         phone: user.phone || '',
+        gender: user.gender || '',
         ...(actor.role === 'super_admin' || actor.role === 'admin' ? { role: user.role } : {}),
         plan: user.plan,
         account: user.plan === 'platinum' ? 'Diamond' : user.plan === 'gold' ? 'Gold' : 'Free',
@@ -1300,7 +1302,7 @@ export class PlatformApiController {
       kpis: [
         { label: 'Total Subscriptions', value: String(premiumUsers.length), delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', '')) },
         { label: 'New Premium Users', value: String(currentPremiumSignups), delta: Number(this.periodDelta(currentPremiumSignups, previousPremiumSignups).replace('%', '')) },
-        { label: 'Renewal Rate', value: renewalRate === null ? '—' : `${renewalRate.toFixed(1)}%`, delta: 0 },
+        { label: 'Renewal Rate', value: renewalRate === null ? '\u2014' : `${renewalRate.toFixed(1)}%`, delta: 0 },
         { label: 'Conversion Rate', value: `${conversionRate.toFixed(1)}%`, delta: 0 },
       ],
       revenueData: Object.values(revenueData),

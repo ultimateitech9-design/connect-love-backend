@@ -323,6 +323,13 @@ _ts_decorate([
 ], User.prototype, "notifyPush", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        nullable: true,
+        type: 'datetime'
+    }),
+    _ts_metadata("design:type", Object)
+], User.prototype, "notificationsClearedAt", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'int',
         unsigned: true,
         default: 0

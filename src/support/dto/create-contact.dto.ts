@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsPhoneNumber, IsString, Matches, MinLength } from 'class-validator';
 
 export class CreateContactDto {
   @IsString()
@@ -8,10 +8,11 @@ export class CreateContactDto {
   @IsEmail()
   email: string;
 
-  @IsOptional()
   @IsString()
-  @Matches(/^\d{8,15}$/, { message: 'Phone number must contain only 8 to 15 digits.' })
-  phone?: string;
+  @IsNotEmpty({ message: 'Call number is required.' })
+  @Matches(/^\+[1-9]\d{7,14}$/, { message: 'Call number must include a country code, for example +919876543210.' })
+  @IsPhoneNumber(null, { message: 'Please enter a valid international phone number.' })
+  phone: string;
 
   @IsOptional()
   @IsString()

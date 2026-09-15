@@ -15,6 +15,13 @@ export class UsersController {
     return this.usersService.findById(req.user.userId);
   }
 
+  /** Persist the member's Clear All acknowledgement across sessions. */
+  @UseGuards(AuthGuard('jwt'))
+  @Post('me/notifications/clear-all')
+  clearAllNotifications(@Request() req: any) {
+    return this.usersService.clearAllNotifications(req.user.userId);
+  }
+
   /** GET /users/me/insights — real profile activity for the signed-in user */
   @UseGuards(AuthGuard('jwt'))
   @Get('me/insights')

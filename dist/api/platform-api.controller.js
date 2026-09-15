@@ -627,7 +627,7 @@ let PlatformApiController = class PlatformApiController {
                 },
                 {
                     label: 'Total Revenue',
-                    value: `₹${totalRevenue.toLocaleString()}`,
+                    value: `\u20B9${totalRevenue.toLocaleString()}`,
                     delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart))
                 },
                 {
@@ -654,6 +654,7 @@ let PlatformApiController = class PlatformApiController {
             'user.phone',
             'user.role',
             'user.plan',
+            'user.gender',
             'user.city',
             'user.lastSeen',
             'user.updatedAt',
@@ -693,6 +694,7 @@ let PlatformApiController = class PlatformApiController {
                     name: user.name,
                     email: user.email,
                     phone: user.phone || '',
+                    gender: user.gender || '',
                     ...actor.role === 'super_admin' || actor.role === 'admin' ? {
                         role: user.role
                     } : {},
@@ -1725,7 +1727,7 @@ let PlatformApiController = class PlatformApiController {
                 },
                 {
                     label: 'Renewal Rate',
-                    value: renewalRate === null ? '—' : `${renewalRate.toFixed(1)}%`,
+                    value: renewalRate === null ? '\u2014' : `${renewalRate.toFixed(1)}%`,
                     delta: 0
                 },
                 {

@@ -30,10 +30,15 @@ _ts_decorate([
     _ts_metadata("design:type", String)
 ], CreateContactDto.prototype, "email", void 0);
 _ts_decorate([
-    (0, _classvalidator.IsOptional)(),
     (0, _classvalidator.IsString)(),
-    (0, _classvalidator.Matches)(/^\d{8,15}$/, {
-        message: 'Phone number must contain only 8 to 15 digits.'
+    (0, _classvalidator.IsNotEmpty)({
+        message: 'Call number is required.'
+    }),
+    (0, _classvalidator.Matches)(/^\+[1-9]\d{7,14}$/, {
+        message: 'Call number must include a country code, for example +919876543210.'
+    }),
+    (0, _classvalidator.IsPhoneNumber)(null, {
+        message: 'Please enter a valid international phone number.'
     }),
     _ts_metadata("design:type", String)
 ], CreateContactDto.prototype, "phone", void 0);

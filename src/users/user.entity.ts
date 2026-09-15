@@ -156,6 +156,9 @@ export class User {
   @Column({ default: true })
   notifyPush: boolean;
 
+  @Column({ nullable: true, type: 'datetime' })
+  notificationsClearedAt: Date | null;
+
   @Column({ type: 'int', unsigned: true, default: 0 })
   coinBalance: number;
 
