@@ -85,25 +85,24 @@ export class WalletPaymentsService {
     });
   }
 
-  async requestWithdrawal(userId: string, amount: number, upiId: string) {
-    const coins = Number(amount); const address = String(upiId || '').trim().toLowerCase();
+  async requestWithdrawal(userId: string, amount: number, payout: Record<string, string>) {
+    const coins = Number(amount); const method = String(payout?.method || '').trim().toLowerCase();
     if (!Number.isInteger(coins) || coins < 50) throw new BadRequestException('Minimum withdrawal is 50 coins.');
-    if (!/^[a-z0-9._-]{2,256}@[a-z0-9.-]{2,64}$/.test(address)) throw new BadRequestException('Enter a valid UPI ID, for example name@upi.');
-    const config = this.payoutCredentials();
+    if (method !== 'upi' && method !== 'bank') throw new BadRequestException('Select UPI or bank account.');
+    const address = String(payout?.upiId || '').trim().toLowerCase();
+    if (method === 'upi' && !/^[a-z0-9._-]{2,256}@[a-z0-9.-]{2,64}$/.test(address)) throw new BadRequestException('Enter a valid UPI ID, for example name@upi.');
+    if (method === 'bank' && (!String(payout?.accountHolder || '').trim() || !String(payout?.accountNumber || '').trim() || !String(payout?.ifsc || '').trim())) throw new BadRequestException('Enter account holder, account number and IFSC.');
+    const payoutDetails = JSON.stringify({ method, upiId: address || undefined, accountHolder: String(payout?.accountHolder || '').trim(), accountNumber: String(payout?.accountNumber || '').trim(), ifsc: String(payout?.ifsc || '').trim().toUpperCase(), bankName: String(payout?.bankName || '').trim() });
     const transaction = await this.dataSource.transaction(async (manager) => {
       const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } }); if (!user) throw new NotFoundException('User not found.');
       if (user.earnedCoinBalance < coins) throw new BadRequestException('Only gift earnings can be withdrawn. Your earned balance is too low.');
       user.earnedCoinBalance -= coins; await manager.getRepository(User).save(user);
-      return manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({ type: 'withdrawal', status: 'pending', userId, senderId: null, receiverId: userId, grossCoins: coins, userCoins: coins, platformCoins: 0, amountPaise: coins * this.withdrawalValuePaise(), label: 'RazorpayX UPI withdrawal', payoutAccount: address, gatewayOrderId: null, gatewayPaymentId: null, gatewayPayoutId: null }));
+      // The 80/20 split is applied when the gift is sent. Withdrawal only
+      // pays out the recipient's already-earned balance, so do not split it a
+      // second time here.
+      return manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({ type: 'withdrawal', status: 'pending', userId, senderId: null, receiverId: userId, grossCoins: coins, userCoins: coins, platformCoins: 0, amountPaise: coins * this.withdrawalValuePaise(), label: `Manual ${method} withdrawal`, payoutAccount: address || String(payout?.accountNumber || '').trim(), payoutDetails, gatewayOrderId: null, gatewayPaymentId: null, gatewayPayoutId: null }));
     });
-    try {
-      const user = await this.users.findOne({ where: { id: userId } });
-      const contact = await this.gateway('/contacts', config, 'POST', { name: user?.name || 'ConnectLove user', email: user?.email || undefined, type: 'customer', reference_id: userId.slice(0, 40) });
-      const fundAccount = await this.gateway('/fund_accounts', config, 'POST', { contact_id: contact.id, account_type: 'vpa', vpa: { address } });
-      const payout = await this.gateway('/payouts', config, 'POST', { account_number: config.accountNumber, fund_account_id: fundAccount.id, amount: transaction.amountPaise, currency: 'INR', mode: 'UPI', purpose: 'payout', queue_if_low_balance: true, reference_id: transaction.id, narration: 'ConnectLove gift earnings' });
-      transaction.gatewayPayoutId = payout.id; transaction.status = payout.status === 'processed' ? 'completed' : 'pending'; await this.transactions.save(transaction);
-      return { id: transaction.id, status: transaction.status, amountPaise: transaction.amountPaise, message: transaction.status === 'completed' ? 'Payout sent successfully.' : 'Withdrawal is being processed.' };
-    } catch (error) { await this.rejectWithdrawal(transaction.id); throw error; }
+    return { id: transaction.id, status: transaction.status, amountPaise: transaction.amountPaise, message: 'Withdrawal request submitted. Payment will be reviewed by our team.' };
   }
 
   private async rejectWithdrawal(id: string) { await this.dataSource.transaction(async (manager) => { const tx = await manager.getRepository(CoinTransaction).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } }); if (!tx || tx.status !== 'pending') return; const user = tx.userId ? await manager.getRepository(User).findOne({ where: { id: tx.userId }, lock: { mode: 'pessimistic_write' } }) : null; if (user) { user.earnedCoinBalance += tx.grossCoins; await manager.getRepository(User).save(user); } tx.status = 'rejected'; await manager.getRepository(CoinTransaction).save(tx); }); }

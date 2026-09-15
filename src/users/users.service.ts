@@ -347,8 +347,16 @@ export class UsersService {
   async getCoinTransactions() {
     const rows = await this.coinTransactionRepo.find({ order: { createdAt: 'DESC' }, take: 1000 });
     const ids = [...new Set(rows.flatMap((row) => [row.userId, row.senderId, row.receiverId]).filter((id): id is string => Boolean(id)))];
-    const users = ids.length ? await this.userRepo.find({ select: ['id', 'name', 'email'], where: { id: In(ids) } }) : [];
-    const names = new Map(users.map((user) => [user.id, { name: user.name, email: user.email }]));
+    const users = ids.length ? await this.userRepo.find({ select: ['id', 'name', 'email', 'phone', 'gender', 'birthDate', 'city', 'profession'], where: { id: In(ids) } }) : [];
+    const names = new Map(users.map((user) => [user.id, {
+      name: user.name,
+      email: user.email,
+      phone: user.phone,
+      gender: user.gender,
+      birthDate: user.birthDate,
+      city: user.city,
+      profession: user.profession,
+    }]));
     return rows.map((row) => ({
       ...row,
       user: row.userId ? names.get(row.userId) || null : null,

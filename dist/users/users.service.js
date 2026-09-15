@@ -443,7 +443,12 @@ let UsersService = class UsersService {
             select: [
                 'id',
                 'name',
-                'email'
+                'email',
+                'phone',
+                'gender',
+                'birthDate',
+                'city',
+                'profession'
             ],
             where: {
                 id: (0, _typeorm1.In)(ids)
@@ -453,7 +458,12 @@ let UsersService = class UsersService {
                 user.id,
                 {
                     name: user.name,
-                    email: user.email
+                    email: user.email,
+                    phone: user.phone,
+                    gender: user.gender,
+                    birthDate: user.birthDate,
+                    city: user.city,
+                    profession: user.profession
                 }
             ]));
         return rows.map((row)=>({

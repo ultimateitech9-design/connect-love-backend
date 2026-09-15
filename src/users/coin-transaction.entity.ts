@@ -16,6 +16,7 @@ export class CoinTransaction {
   @Column({ type: 'int', unsigned: true, default: 0 }) platformCoins: number;
   @Column({ type: 'varchar', length: 120, nullable: true }) label: string | null;
   @Column({ type: 'varchar', length: 160, nullable: true }) payoutAccount: string | null;
+  @Column({ type: 'text', nullable: true }) payoutDetails: string | null;
   @Column({ type: 'int', unsigned: true, nullable: true }) amountPaise: number | null;
   @Column({ type: 'varchar', length: 100, nullable: true, unique: true }) gatewayOrderId: string | null;
   @Column({ type: 'varchar', length: 100, nullable: true, unique: true }) gatewayPaymentId: string | null;

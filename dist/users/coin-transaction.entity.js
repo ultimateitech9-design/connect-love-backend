@@ -104,6 +104,13 @@ _ts_decorate([
 ], CoinTransaction.prototype, "payoutAccount", void 0);
 _ts_decorate([
     (0, _typeorm.Column)({
+        type: 'text',
+        nullable: true
+    }),
+    _ts_metadata("design:type", Object)
+], CoinTransaction.prototype, "payoutDetails", void 0);
+_ts_decorate([
+    (0, _typeorm.Column)({
         type: 'int',
         unsigned: true,
         nullable: true

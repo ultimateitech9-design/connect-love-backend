@@ -528,62 +528,64 @@ let PlatformApiController = class PlatformApiController {
         }));
     }
     async dashboard() {
-        const totalUsers = await this.userRepo.count();
-        const activeUsers = await this.userRepo.count({
-            where: {
-                status: 'active'
-            }
-        });
-        const premiumUsers = await this.userRepo.createQueryBuilder('user').where('user.plan IN (:...paidPlans)', {
-            paidPlans: [
-                'gold',
-                'platinum'
-            ]
-        }).andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :now)', {
-            now: new Date()
-        }).getCount();
-        const matchesDone = await this.matchRepo.count({
-            where: {
-                status: _matchentity.MatchStatus.MATCHED
-            }
-        });
-        const pendingReports = await this.contactRepo.count({
-            where: {
-                status: 'open'
-            }
-        });
-        const revenue = await this.paymentRepo.createQueryBuilder('payment').select('COALESCE(SUM(payment.amount), 0)', 'total').where('payment.status = :status', {
-            status: 'successful'
-        }).getRawOne();
-        const totalRevenue = Number(revenue?.total || 0);
-        const users = await this.userRepo.find({
-            select: [
-                'createdAt',
-                'plan',
-                'planExpiresAt',
-                'status'
-            ]
-        });
-        const matches = await this.matchRepo.find({
-            select: [
-                'createdAt'
-            ]
-        });
-        const payments = await this.paymentRepo.find({
-            where: {
+        const [totalUsers, activeUsers, premiumUsers, matchesDone, pendingReports, revenue, users, matches, payments, reports] = await Promise.all([
+            this.userRepo.count(),
+            this.userRepo.count({
+                where: {
+                    status: 'active'
+                }
+            }),
+            this.userRepo.createQueryBuilder('user').where('user.plan IN (:...paidPlans)', {
+                paidPlans: [
+                    'gold',
+                    'platinum'
+                ]
+            }).andWhere('(user.planExpiresAt IS NULL OR user.planExpiresAt > :now)', {
+                now: new Date()
+            }).getCount(),
+            this.matchRepo.count({
+                where: {
+                    status: _matchentity.MatchStatus.MATCHED
+                }
+            }),
+            this.contactRepo.count({
+                where: {
+                    status: 'open'
+                }
+            }),
+            this.paymentRepo.createQueryBuilder('payment').select('COALESCE(SUM(payment.amount), 0)', 'total').where('payment.status = :status', {
                 status: 'successful'
-            },
-            select: [
-                'amount',
-                'createdAt'
-            ]
-        });
-        const reports = await this.contactRepo.find({
-            select: [
-                'createdAt',
-                'status'
-            ]
-        });
+            }).getRawOne(),
+            this.userRepo.find({
+                select: [
+                    'createdAt',
+                    'plan',
+                    'planExpiresAt',
+                    'status'
+                ]
+            }),
+            this.matchRepo.find({
+                select: [
+                    'createdAt'
+                ]
+            }),
+            this.paymentRepo.find({
+                where: {
+                    status: 'successful'
+                },
+                select: [
+                    'amount',
+                    'createdAt'
+                ]
+            }),
+            this.contactRepo.find({
+                select: [
+                    'createdAt',
+                    'status'
+                ]
+            })
+        ]);
+        const totalRevenue = Number(revenue?.total || 0);
         const now = Date.now();
         const currentStart = now - 30 * 86400000;
         const previousStart = now - 60 * 86400000;
