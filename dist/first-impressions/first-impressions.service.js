@@ -67,7 +67,17 @@ let FirstImpressionsService = class FirstImpressionsService {
         if (relation?.status === _matchentity.MatchStatus.BLOCKED) {
             throw new _common.ForbiddenException('You cannot send a First Impression to a blocked profile.');
         }
-        const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId);
+        const sender = await this.users.findOne({
+            where: {
+                id: senderId
+            },
+            select: [
+                'id',
+                'gender'
+            ]
+        });
+        const womenDailyLimit = sender && (0, _planentitlements.isWoman)(sender) ? 10 : undefined;
+        const quota = await this.planUsage.assertAndRecord(senderId, 'firstImpressionsPerMonth', 'First Impression', receiverId, Boolean(womenDailyLimit), womenDailyLimit);
         let saved;
         try {
             saved = await this.impressions.save(this.impressions.create({
