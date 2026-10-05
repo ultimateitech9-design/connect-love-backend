@@ -1,0 +1,1719 @@
+-  TSC  Initializing type checker...
+√  TSC  Initializing type checker...
+Successfully compiled: 149 files with swc (645.98ms)
+(node:15760) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243
+                                new QueryFailedError(query, parameters, err),
+                                ^
+
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+
+Node.js v24.15.0
+-  TSC  Initializing type checker...
+√  TSC  Initializing type checker...
+Successfully compiled: 149 files with swc (5.45ms)
+(node:22788) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 4276  - 09/17/2026, 10:39:01 AM   ERROR [NestApplication] Error: listen EADDRINUSE: address already in use 0.0.0.0:5002 +19ms
+node:net:2008
+    const ex = new UVExceptionWithHostPort(err, 'listen', address, port);
+               ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:5002
+    at Server.setupListenHandle [as _listen2] (node:net:2008:16)
+    at listenInCluster (node:net:2065:12)
+    at node:net:2274:7
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '0.0.0.0',
+  port: 5002
+}
+
+Node.js v24.15.0
+-  TSC  Initializing type checker...
+√  TSC  Initializing type checker...
+Successfully compiled: 149 files with swc (51.43ms)
+(node:8556) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:12:34.501Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 10:42:34.501', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 10:42:34.501', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+[Nest] 8940  - 09/17/2026, 10:42:36 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'ec0b8ff5-1f3d-4e22-9c6a-57974bc167d6',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('ec0b8ff5-1f3d-4e22-9c6a-57974bc167d6', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('ec0b8ff5-1f3d-4e22-9c6a-57974bc167d6', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '819beae7-f06c-4919-b8ee-1960939089db',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('819beae7-f06c-4919-b8ee-1960939089db', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('819beae7-f06c-4919-b8ee-1960939089db', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 10:42:36 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'b1c11512-79e6-4c10-b40d-dcb9893e7ec9',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('b1c11512-79e6-4c10-b40d-dcb9893e7ec9', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('b1c11512-79e6-4c10-b40d-dcb9893e7ec9', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'a2cab7b7-5497-48de-b64b-ed538bae6a95',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('a2cab7b7-5497-48de-b64b-ed538bae6a95', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('a2cab7b7-5497-48de-b64b-ed538bae6a95', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:17:51.585Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 10:47:51.585', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 10:47:51.585', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+[Nest] 8940  - 09/17/2026, 10:47:54 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'd9d305b5-726d-4735-88ae-aa7278ffeed0',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d9d305b5-726d-4735-88ae-aa7278ffeed0', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d9d305b5-726d-4735-88ae-aa7278ffeed0', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '6869e0fb-ac41-4a7d-8dd2-10a2a1a41489',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('6869e0fb-ac41-4a7d-8dd2-10a2a1a41489', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('6869e0fb-ac41-4a7d-8dd2-10a2a1a41489', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'd60e9559-50cd-4ab7-8403-8913c88e953e',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d60e9559-50cd-4ab7-8403-8913c88e953e', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d60e9559-50cd-4ab7-8403-8913c88e953e', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '273cf95e-6124-4b95-be30-2c2c51d314f7',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('273cf95e-6124-4b95-be30-2c2c51d314f7', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('273cf95e-6124-4b95-be30-2c2c51d314f7', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 10:47:56 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 10:48:15 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 10:48:20 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:35:54.917Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:05:54.917', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:05:54.917', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+[Nest] 8940  - 09/17/2026, 11:15:36 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:15:37 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:45:40.447Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:15:40.447', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:15:40.447', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'f3a9f542-5ffb-4a01-a2cb-4919f4995be1',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('f3a9f542-5ffb-4a01-a2cb-4919f4995be1', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('f3a9f542-5ffb-4a01-a2cb-4919f4995be1', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'acac0e80-c034-4956-866e-6cae510d2a23',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('acac0e80-c034-4956-866e-6cae510d2a23', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('acac0e80-c034-4956-866e-6cae510d2a23', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 11:15:41 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '95cdde4b-6653-4107-a2da-cc46ac73b0b2',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('95cdde4b-6653-4107-a2da-cc46ac73b0b2', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('95cdde4b-6653-4107-a2da-cc46ac73b0b2', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '9060a2e4-0271-4e8a-8ebf-e321f963079f',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('9060a2e4-0271-4e8a-8ebf-e321f963079f', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('9060a2e4-0271-4e8a-8ebf-e321f963079f', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 11:15:43 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:47:51.226Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:17:51.226', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:17:51.226', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+[Nest] 8940  - 09/17/2026, 11:18:00 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:18:01 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:51:08.028Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:21:08.028', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:21:08.028', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+[Nest] 8940  - 09/17/2026, 11:21:56 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:21:57 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:21:58 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:22:00 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'a9d14577-e9d2-4908-bf04-b21b7946ce17',
+    '4bae51c0-210a-4abd-bfab-ab70e84a834c',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('a9d14577-e9d2-4908-bf04-b21b7946ce17', '4bae51c0-210a-4abd-bfab-ab70e84a834c', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('a9d14577-e9d2-4908-bf04-b21b7946ce17', '4bae51c0-210a-4abd-bfab-ab70e84a834c', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T05:53:07.824Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:23:07.824', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 11:23:07.824', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [ 1, '64cd2b0f-e866-4a22-97f1-484b198b6475' ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 1, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '1e82e286-496d-42ed-8f46-95490412edf3',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('1e82e286-496d-42ed-8f46-95490412edf3', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('1e82e286-496d-42ed-8f46-95490412edf3', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'd852d36f-7831-4970-a4af-8eb8167019d9',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d852d36f-7831-4970-a4af-8eb8167019d9', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('d852d36f-7831-4970-a4af-8eb8167019d9', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 11:23:08 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    'da90b261-0f99-4df7-acce-d33b0e69a29c',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('da90b261-0f99-4df7-acce-d33b0e69a29c', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('da90b261-0f99-4df7-acce-d33b0e69a29c', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '34b60983-04b1-4e67-881a-f5dc85cc49a4',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('34b60983-04b1-4e67-881a-f5dc85cc49a4', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('34b60983-04b1-4e67-881a-f5dc85cc49a4', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '4f060001-2d29-4988-b0b2-e0cf183223b0',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('4f060001-2d29-4988-b0b2-e0cf183223b0', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('4f060001-2d29-4988-b0b2-e0cf183223b0', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+Profile-view analytics unavailable. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES (?, ?, ?, DEFAULT)',
+  parameters: [
+    '964eedb4-95e8-4f8b-b965-e28fb080ed69',
+    'be245599-00cd-4100-8a51-596cf943ce86',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('964eedb4-95e8-4f8b-b965-e28fb080ed69', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `profile_views`(`id`, `profileUserId`, `viewerUserId`, `createdAt`) VALUES ('964eedb4-95e8-4f8b-b965-e28fb080ed69', 'be245599-00cd-4100-8a51-596cf943ce86', '64cd2b0f-e866-4a22-97f1-484b198b6475', DEFAULT)"
+}
+[Nest] 8940  - 09/17/2026, 11:23:11 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+[Nest] 8940  - 09/17/2026, 11:55:14 AM   ERROR [ExceptionsHandler] Operation not allowed when innodb_force_recovery > 0.
+QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5)
+Presence update unavailable; continuing without persistence. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'UPDATE `users` SET `isOnline` = ?, `lastSeen` = ?, `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN (?)',
+  parameters: [
+    0,
+    2026-09-17T06:30:16.376Z,
+    '64cd2b0f-e866-4a22-97f1-484b198b6475'
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 12:00:16.376', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "UPDATE `users` SET `isOnline` = 0, `lastSeen` = '2026-09-17 12:00:16.376', `updatedAt` = CURRENT_TIMESTAMP WHERE `id` IN ('64cd2b0f-e866-4a22-97f1-484b198b6475')"
+}
+Login audit unavailable; continuing without a persisted session. QueryFailedError: Operation not allowed when innodb_force_recovery > 0.
+    at Query.onResult (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\typeorm\driver\src\driver\mysql\MysqlQueryRunner.ts:243:33)
+    at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:36:14)
+    at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+    at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+    at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+    at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+    at Socket.emit (node:events:509:28)
+    at addChunk (node:internal/streams/readable:563:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+    at Readable.push (node:internal/streams/readable:394:5) {
+  query: 'INSERT INTO `audit_logs`(`id`, `userId`, `user`, `activity`, `ipAddress`, `action`, `module`, `sessionId`, `role`, `device`, `loginAt`, `lastActivityAt`, `logoutAt`, `durationSeconds`, `createdAt`) VALUES (?, ?, ?, ?, ?, ?, ?, DEFAULT, ?, ?, ?, ?, DEFAULT, DEFAULT, DEFAULT)',
+  parameters: [
+    'e62aa8aa-6068-4c11-a833-bda01628e105',
+    '64cd2b0f-e866-4a22-97f1-484b198b6475',
+    'ajeet ',
+    'Logged in',
+    '127.0.0.1',
+    'Active',
+    'Authentication',
+    'user',
+    'Unknown device',
+    2026-09-17T07:10:34.327Z,
+    2026-09-17T07:10:34.327Z
+  ],
+  driverError: Error: Operation not allowed when innodb_force_recovery > 0.
+      at Packet.asError (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packets\packet.js:740:17)
+      at Query.execute (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\commands\command.js:29:26)
+      at PoolConnection.handlePacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:475:34)
+      at PacketParser.onPacket (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:93:12)
+      at PacketParser.executeStart (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\packet_parser.js:75:16)
+      at Socket.<anonymous> (C:\Users\User\Desktop\Dating App\connect-love-backend\node_modules\mysql2\lib\base\connection.js:100:25)
+      at Socket.emit (node:events:509:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5) {
+    code: 'ER_INNODB_FORCED_RECOVERY',
+    errno: 1881,
+    sqlState: 'HY000',
+    sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+    sql: "INSERT INTO `audit_logs`(`id`, `userId`, `user`, `activity`, `ipAddress`, `action`, `module`, `sessionId`, `role`, `device`, `loginAt`, `lastActivityAt`, `logoutAt`, `durationSeconds`, `createdAt`) VALUES ('e62aa8aa-6068-4c11-a833-bda01628e105', '64cd2b0f-e866-4a22-97f1-484b198b6475', 'ajeet ', 'Logged in', '127.0.0.1', 'Active', 'Authentication', DEFAULT, 'user', 'Unknown device', '2026-09-17 12:40:34.327', '2026-09-17 12:40:34.327', DEFAULT, DEFAULT, DEFAULT)"
+  },
+  code: 'ER_INNODB_FORCED_RECOVERY',
+  errno: 1881,
+  sqlState: 'HY000',
+  sqlMessage: 'Operation not allowed when innodb_force_recovery > 0.',
+  sql: "INSERT INTO `audit_logs`(`id`, `userId`, `user`, `activity`, `ipAddress`, `action`, `module`, `sessionId`, `role`, `device`, `loginAt`, `lastActivityAt`, `logoutAt`, `durationSeconds`, `createdAt`) VALUES ('e62aa8aa-6068-4c11-a833-bda01628e105', '64cd2b0f-e866-4a22-97f1-484b198b6475', 'ajeet ', 'Logged in', '127.0.0.1', 'Active', 'Authentication', DEFAULT, 'user', 'Unknown device', '2026-09-17 12:40:34.327', '2026-09-17 12:40:34.327', DEFAULT, DEFAULT, DEFAULT)"
+}

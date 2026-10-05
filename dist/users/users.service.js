@@ -226,7 +226,13 @@ let UsersService = class UsersService {
         if (!isOnline) {
             updateData.lastSeen = new Date();
         }
-        await this.userRepo.update(userId, updateData);
+        try {
+            await this.userRepo.update(userId, updateData);
+        } catch (error) {
+            // The local recovered database may be read-only. Presence is transient
+            // state, so it must not crash the API or WebSocket connection.
+            console.warn('Presence update unavailable; continuing without persistence.', error);
+        }
     }
     async recordProfileView(profileUserId, viewerUserId) {
         if (!viewerUserId || profileUserId === viewerUserId) return {
@@ -255,13 +261,20 @@ let UsersService = class UsersService {
         if (alreadyRecorded) return {
             recorded: false
         };
-        await this.profileViewRepo.save(this.profileViewRepo.create({
-            profileUserId,
-            viewerUserId
-        }));
-        return {
-            recorded: true
-        };
+        try {
+            await this.profileViewRepo.save(this.profileViewRepo.create({
+                profileUserId,
+                viewerUserId
+            }));
+            return {
+                recorded: true
+            };
+        } catch (error) {
+            console.warn('Profile-view analytics unavailable.', error);
+            return {
+                recorded: false
+            };
+        }
     }
     compatibilityScore(owner, other) {
         const normalize = (values)=>new Set((values || []).map((value)=>value.trim().toLowerCase()).filter(Boolean));

@@ -55,31 +55,42 @@ export class AuthService {
 
   private async startSession(user: User, context: LoginContext = {}) {
     const now = new Date();
-    const log = await this.auditRepo.save(this.auditRepo.create({
-      userId: user.id,
-      user: user.name || user.email,
-      activity: 'Logged in',
-      ipAddress: context.ipAddress || 'Unknown',
-      action: 'Active',
-      module: 'Authentication',
-      role: user.role || 'user',
-      device: (context.device || 'Unknown device').slice(0, 255),
-      loginAt: now,
-      lastActivityAt: now,
-    }));
-    log.sessionId = log.id;
-    return this.auditRepo.save(log);
+    try {
+      const log = await this.auditRepo.save(this.auditRepo.create({
+        userId: user.id,
+        user: user.name || user.email,
+        activity: 'Logged in',
+        ipAddress: context.ipAddress || 'Unknown',
+        action: 'Active',
+        module: 'Authentication',
+        role: user.role || 'user',
+        device: (context.device || 'Unknown device').slice(0, 255),
+        loginAt: now,
+        lastActivityAt: now,
+      }));
+      log.sessionId = log.id;
+      return this.auditRepo.save(log);
+    } catch (error) {
+      // MySQL recovery mode can be temporarily read-only. A valid login must
+      // still work; session auditing can resume after the database is repaired.
+      console.warn('Login audit unavailable; continuing without a persisted session.', error);
+      return { sessionId: undefined };
+    }
   }
 
   private async rejectLogin(email: string, context: LoginContext, message: string): Promise<never> {
-    await this.auditRepo.save(this.auditRepo.create({
-      user: email.trim().toLowerCase() || 'Unknown user',
-      activity: 'Failed login attempt',
-      ipAddress: context.ipAddress || 'Unknown',
-      action: 'Failed',
-      module: 'Authentication',
-      device: (context.device || 'Unknown device').slice(0, 255),
-    }));
+    try {
+      await this.auditRepo.save(this.auditRepo.create({
+        user: email.trim().toLowerCase() || 'Unknown user',
+        activity: 'Failed login attempt',
+        ipAddress: context.ipAddress || 'Unknown',
+        action: 'Failed',
+        module: 'Authentication',
+        device: (context.device || 'Unknown device').slice(0, 255),
+      }));
+    } catch (error) {
+      console.warn('Failed-login audit unavailable.', error);
+    }
     throw new UnauthorizedException(message);
   }
 
