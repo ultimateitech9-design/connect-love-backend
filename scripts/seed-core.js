@@ -7,8 +7,6 @@ dotenv.config({ path: path.join(__dirname, '..', '.env') });
 
 const managementAccounts = [
   ['ADMIN_USER', 'admin'],
-  ['DATA_ENTRY_USER', 'data_entry'],
-  ['FINANCE_USER', 'finance'],
   ['SALES_USER', 'sales'],
   ['SUPPORT_USER', 'support'],
   ['SUPER_ADMIN', 'super_admin'],
