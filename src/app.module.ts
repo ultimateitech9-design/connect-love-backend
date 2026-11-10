@@ -22,6 +22,7 @@ import { PushNotificationsModule } from './push-notifications/push-notifications
 import { PaymentsModule } from './payments/payments.module';
 import { FirstImpressionsModule } from './first-impressions/first-impressions.module';
 import { PlansModule } from './plans/plans.module';
+import { WebrtcModule } from './webrtc/webrtc.module';
 
 dotenv.config();
 
@@ -65,6 +66,7 @@ dotenv.config();
     DivorcedModule,
     PushNotificationsModule,
     PaymentsModule,
+    WebrtcModule,
     FirstImpressionsModule,
     PlansModule,
   ],
