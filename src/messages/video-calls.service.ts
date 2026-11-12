@@ -4,6 +4,9 @@ import { MoreThan, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { VideoCall, VideoCallStatus, VideoCallType } from './video-call.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
+import { User } from '../users/user.entity';
+
+export type CallParticipant = { id: string; name: string; photo: string | null };
 
 @Injectable()
 export class VideoCallsService {
@@ -13,7 +16,16 @@ export class VideoCallsService {
     @InjectRepository(MatchRelation)
     private readonly matchRepo: Repository<MatchRelation>,
     private readonly planUsage: PlanUsageService,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
+
+  /** Name and first photo, so a call can be shown on any page without the chat list. */
+  async participant(userId: string): Promise<CallParticipant | null> {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: { id: true, name: true, photos: true } });
+    if (!user) return null;
+    return { id: user.id, name: user.name, photo: user.photos?.[0] ?? null };
+  }
 
   private async assertMatchedConversation(conversationId: string, userId: string): Promise<MatchRelation> {
     const match = await this.matchRepo.findOne({ where: { id: conversationId } });
@@ -44,12 +56,14 @@ export class VideoCallsService {
     }));
   }
 
-  async findIncoming(userId: string): Promise<VideoCall | null> {
+  async findIncoming(userId: string): Promise<(VideoCall & { callerProfile: CallParticipant | null }) | null> {
     const recentThreshold = new Date(Date.now() - 2 * 60 * 1000);
-    return this.callRepo.findOne({
+    const call = await this.callRepo.findOne({
       where: { receiverId: userId, status: 'ringing', createdAt: MoreThan(recentThreshold) },
       order: { createdAt: 'DESC' },
     });
+    if (!call) return null;
+    return { ...call, callerProfile: await this.participant(call.callerId) };
   }
 
   async accept(callId: string, userId: string): Promise<VideoCall> {

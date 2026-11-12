@@ -315,7 +315,11 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       const callMessage = await this.messagesService.upsertCallLog(call);
       this.emitToUser(call.callerId, 'receiveMessage', callMessage);
       this.emitToUser(call.receiverId, 'receiveMessage', callMessage);
-      const payload = { call, callerId, conversationId: data.conversationId, callType };
+      const [caller, receiver] = await Promise.all([
+        this.videoCallsService.participant(call.callerId),
+        this.videoCallsService.participant(call.receiverId),
+      ]);
+      const payload = { call, callerId, conversationId: data.conversationId, callType, caller, receiver };
       this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
       this.server.to(client.id).emit('videoCallStarted', payload);
       return { event: 'videoCallStarted', data: payload };
@@ -341,6 +345,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       const payload = { call, receiverId, maxDurationMinutes };
       this.emitToUser(data.callerId, 'videoCallAccepted', payload);
       this.server.to(client.id).emit('videoCallAccepted', payload);
+      // The receiver's other tabs/devices are still ringing: tell them to stop.
+      client.to(`user:${receiverId}`).emit('videoCallAnsweredElsewhere', { callId: call.id });
       if (maxDurationMinutes) {
         setTimeout(() => {
           void this.videoCallsService.finish(call.id, call.callerId, 'ended').then(async (endedCall) => {
