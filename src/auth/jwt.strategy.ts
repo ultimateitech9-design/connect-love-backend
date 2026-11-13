@@ -4,6 +4,9 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { Request } from 'express';
 import * as dotenv from 'dotenv';
 import { TokenBlacklistService } from './token-blacklist.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../users/user.entity';
 
 dotenv.config();
 
@@ -14,7 +17,7 @@ if (!jwtSecret) {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
-  constructor(private readonly blacklist: TokenBlacklistService) {
+  constructor(private readonly blacklist: TokenBlacklistService, @InjectRepository(User) private readonly users: Repository<User>) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
@@ -35,6 +38,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('Session has been terminated. Please log in again.');
     }
 
-    return { userId: payload.sub, email: payload.email, plan: payload.plan, role: payload.role || 'user' };
+    if (typeof payload.sub !== 'string' || !payload.sub) throw new UnauthorizedException('Invalid account session.');
+    const user = await this.users.findOne({ where: { id: payload.sub }, select: ['id', 'email', 'plan', 'role', 'status'] });
+    if (!user || user.status !== 'active') throw new UnauthorizedException('This account is no longer active.');
+    return { userId: user.id, email: user.email, plan: user.plan, role: user.role };
   }
 }

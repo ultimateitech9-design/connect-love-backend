@@ -12,6 +12,7 @@ import { AuditLog } from '../platform/audit-log.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
 import { RolesGuard } from '../auth/roles.guard';
+import { UserActivityService } from '../users/user-activity.service';
 
 @Module({
   imports: [
@@ -29,6 +30,6 @@ import { RolesGuard } from '../auth/roles.guard';
     ]),
   ],
   controllers: [PlatformApiController],
-  providers: [RolesGuard],
+  providers: [RolesGuard, UserActivityService],
 })
 export class ApiModule {}

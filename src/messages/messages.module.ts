@@ -25,6 +25,6 @@ import { FirstImpression } from '../first-impressions/first-impression.entity';
   ],
   providers: [MessagesService, VideoCallsService, MessagesGateway],
   controllers: [MessagesController, VideoCallsController],
-  exports: [MessagesService, VideoCallsService],
+  exports: [MessagesService, VideoCallsService, MessagesGateway],
 })
 export class MessagesModule {}

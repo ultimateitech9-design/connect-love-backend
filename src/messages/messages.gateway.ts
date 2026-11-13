@@ -53,6 +53,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return !!this.connectedUsers.get(userId)?.size;
   }
 
+  disconnectUser(userId: string) {
+    this.server?.in(`user:${userId}`).disconnectSockets(true);
+  }
+
   async handleConnection(client: Socket) {
     const token = (client.handshake.auth?.token || client.handshake.query.token) as string | undefined;
     let userId: string | undefined;
@@ -65,12 +69,24 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         secret: jwtSecret,
       });
       userId = payload.sub || payload.userId;
+      if (!userId || !await this.usersService.isActiveAccount(userId)) throw new Error('Account is not active');
     } catch {
       client.disconnect(true);
       return;
     }
 
     if (userId) {
+      const authenticatedUserId = userId;
+      client.use(async (_packet, next) => {
+        try {
+          if (!await this.usersService.isActiveAccount(authenticatedUserId)) {
+            next(new Error('Account is no longer active'));
+            client.disconnect(true);
+            return;
+          }
+          next();
+        } catch { next(new Error('Unable to verify account')); client.disconnect(true); }
+      });
       await client.join(`user:${userId}`);
       const userSockets = this.connectedUsers.get(userId);
       if (!userSockets || userSockets.size === 0) {

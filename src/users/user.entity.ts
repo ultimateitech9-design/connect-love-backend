@@ -11,6 +11,9 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  createdByAgentId: string | null;
+
   @Column({ length: 150 })
   name: string;
 

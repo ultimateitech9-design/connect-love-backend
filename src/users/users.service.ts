@@ -56,6 +56,10 @@ export class UsersService {
     return this.serializeUser(user);
   }
 
+  async isActiveAccount(id: string): Promise<boolean> {
+    return this.userRepo.existsBy({ id, status: 'active' });
+  }
+
   async clearAllNotifications(id: string): Promise<{ clearedAt: string }> {
     const clearedAt = new Date();
     const result = await this.userRepo.update(id, { notificationsClearedAt: clearedAt });

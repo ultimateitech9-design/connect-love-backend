@@ -15,6 +15,8 @@ import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
 import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray, IsBoolean, IsDateString, IsInt, Max, MaxLength, Min, Matches } from 'class-validator';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { Agent } from '../agents/agent.entity';
+import { UserActivityService } from '../users/user-activity.service';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -280,7 +282,19 @@ export class PlatformApiController {
     private readonly settingRepo: Repository<PlatformSetting>,
     @InjectRepository(PlatformRole)
     private readonly roleRepo: Repository<PlatformRole>,
+    private readonly userActivity: UserActivityService,
   ) {}
+
+  private async creationOrigins(users: User[]) {
+    const ids = [...new Set(users.map(user => user.createdByAgentId).filter(Boolean))];
+    const agents = ids.length ? await this.userRepo.manager.getRepository(Agent).find({ where: { id: In(ids) }, select: ['id', 'name', 'email', 'createdAt'] }) : [];
+    const byId = new Map(agents.map(agent => [agent.id, agent]));
+    return new Map(users.map(user => [user.id, {
+      registrationSource: user.createdByAgentId ? 'agent' : 'direct',
+      createdByAgentId: user.createdByAgentId || null,
+      createdByAgent: byId.get(user.createdByAgentId) || null,
+    }]));
+  }
 
   private dayKey(date: Date) {
     return date.toLocaleString('en-US', { weekday: 'short' });
@@ -408,7 +422,7 @@ export class PlatformApiController {
   }
 
   @Get('dashboard')
-  async dashboard() {
+  async dashboard(@Req() request: any) {
     const [totalUsers, activeUsers, premiumUsers, matchesDone, pendingReports, revenue, users, matches, payments, reports] = await Promise.all([
     this.userRepo.count(),
     this.userRepo.count({ where: { status: 'active' } }),
@@ -450,9 +464,14 @@ export class PlatformApiController {
       ensureMonth(match.createdAt).matches += 1;
     });
     const growth = Object.values(monthly);
+    const agentStats = this.requestUser(request).role === 'super_admin' ? [
+      { label: 'Agent-created Users', value: String(await this.userRepo.countBy({ createdByAgentId: Not(IsNull()) })), delta: 'Live DB' },
+      { label: 'Registered Agents', value: String(await this.userRepo.manager.getRepository(Agent).count()), delta: 'Live DB' },
+    ] : [];
 
     return {
       stats: [
+        ...agentStats,
         { label: 'Total Users', value: String(totalUsers), delta: this.periodDelta(countPeriod(users, currentStart, now), countPeriod(users, previousStart, currentStart)) },
         { label: 'Active Users', value: String(activeUsers), delta: 'Live DB' },
         { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
@@ -474,6 +493,7 @@ export class PlatformApiController {
     @Query('filter') filter?: string,
     @Query('gender') gender?: string,
   ) {
+    const actor = this.requestUser(request);
     const page = Math.max(1, Number.parseInt(pageValue || '1', 10) || 1);
     const limit = Math.min(100, Math.max(1, Number.parseInt(limitValue || '100', 10) || 100));
     const query = this.userRepo.createQueryBuilder('user')
@@ -481,7 +501,7 @@ export class PlatformApiController {
         'user.id', 'user.name', 'user.email', 'user.phone', 'user.role', 'user.plan',
         'user.gender',
         'user.city', 'user.lastSeen', 'user.updatedAt', 'user.createdAt',
-        'user.isVerified', 'user.status',
+        'user.isVerified', 'user.status', 'user.createdByAgentId',
       ])
       .orderBy('user.createdAt', 'DESC');
 
@@ -504,11 +524,12 @@ export class PlatformApiController {
         LOWER(user.id) LIKE :term OR
         LOWER(user.name) LIKE :term OR
         LOWER(user.email) LIKE :term
+        ${actor.role === 'super_admin' ? 'OR EXISTS (SELECT 1 FROM agents registrationAgent WHERE registrationAgent.id = user.createdByAgentId AND (LOWER(registrationAgent.name) LIKE :term OR LOWER(registrationAgent.email) LIKE :term))' : ''}
       )`, { term: `%${term}%` });
     }
 
     const [users, total] = await query.skip((page - 1) * limit).take(limit).getManyAndCount();
-    const actor = this.requestUser(request);
+    const origins = actor.role === 'super_admin' ? await this.creationOrigins(users) : new Map();
     return {
       total,
       page,
@@ -528,6 +549,7 @@ export class PlatformApiController {
         lastActive: user.lastSeen || user.updatedAt,
         isVerified: user.isVerified,
         status: this.statusLabel(user.status),
+        ...origins.get(user.id),
       })),
     };
   }
@@ -623,6 +645,8 @@ export class PlatformApiController {
     return {
       user: actor.role === 'super_admin' ? {
         ...necessary,
+        ...(await this.creationOrigins([user])).get(user.id),
+        activity: await this.userActivity.get(id),
         age: user.age,
         birthDate: user.birthDate,
         gender: user.gender,
@@ -651,6 +675,13 @@ export class PlatformApiController {
       if (existing && existing.id !== id) return { message: 'A user with this email already exists.', user };
     }
 
+    if (body.photos !== undefined) {
+      if (body.photos.length > 10) throw new BadRequestException('Maximum 10 profile photos allowed.');
+      for (const photo of body.photos) {
+        if (photo.length > 1500000 || (!user.photos?.includes(photo) && !/^(https?:\/\/\S+|\/[^\s]*|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*)$/.test(photo))) throw new BadRequestException('Upload a valid JPG, PNG or WebP photo, or use a valid photo URL.');
+      }
+    }
+    const primaryPhotoChanged = body.photos !== undefined && (body.photos[0] || null) !== (user.photos?.[0] || null);
     const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
     const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
     const role = ['user', 'admin', 'super_admin', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
@@ -676,6 +707,10 @@ export class PlatformApiController {
       ...(body.isVerified !== undefined ? { isVerified: body.isVerified } : {}),
     });
 
+    if (primaryPhotoChanged) {
+      user.isVerified = false; user.kycMatched = false; user.kycLivePhoto = null;
+      user.kycMatchScore = null; user.kycVerifiedAt = null;
+    }
     const saved = await this.userRepo.save(user);
     await this.audit('Users', 'Update', `Updated user profile ${saved.email}`);
     const { password: _, ...safe } = saved as any;
@@ -716,6 +751,13 @@ export class PlatformApiController {
     await this.userRepo.remove(user);
     await this.audit('Users', 'Delete', `Deleted user account ${user.email}`);
     return { success: true };
+  }
+
+  @Get('users/:id/activity')
+  @Roles('super_admin')
+  async activity(@Param('id') id: string, @Query('page') page?: string) {
+    if (!await this.userRepo.existsBy({ id })) throw new NotFoundException('User not found.');
+    return this.userActivity.get(id, Number(page || 1));
   }
 
 
