@@ -17,6 +17,7 @@ import { IsEmail, IsString, MinLength, IsOptional, IsNumber, IsArray, IsBoolean,
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { Agent } from '../agents/agent.entity';
 import { UserActivityService } from '../users/user-activity.service';
+import { AdminAccountsService } from '../admin/admin-accounts.service';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -283,6 +284,7 @@ export class PlatformApiController {
     @InjectRepository(PlatformRole)
     private readonly roleRepo: Repository<PlatformRole>,
     private readonly userActivity: UserActivityService,
+    private readonly adminAccounts: AdminAccountsService,
   ) {}
 
   private async creationOrigins(users: User[]) {
@@ -423,6 +425,8 @@ export class PlatformApiController {
 
   @Get('dashboard')
   async dashboard(@Req() request: any) {
+    const agents = this.requestUser(request).role === 'super_admin'
+      ? await this.userRepo.manager.getRepository(Agent).find({ select: ['id', 'createdAt'] }) : [];
     const [totalUsers, activeUsers, premiumUsers, matchesDone, pendingReports, revenue, users, matches, payments, reports] = await Promise.all([
     this.userRepo.count(),
     this.userRepo.count({ where: { status: 'active' } }),
@@ -463,17 +467,18 @@ export class PlatformApiController {
     matches.forEach((match) => {
       ensureMonth(match.createdAt).matches += 1;
     });
+    agents.forEach(agent => { ensureMonth(agent.createdAt).users += 1; });
     const growth = Object.values(monthly);
     const agentStats = this.requestUser(request).role === 'super_admin' ? [
       { label: 'Agent-created Users', value: String(await this.userRepo.countBy({ createdByAgentId: Not(IsNull()) })), delta: 'Live DB' },
-      { label: 'Registered Agents', value: String(await this.userRepo.manager.getRepository(Agent).count()), delta: 'Live DB' },
+      { label: 'Registered Agents', value: String(agents.length), delta: 'Live DB' },
     ] : [];
 
     return {
       stats: [
         ...agentStats,
-        { label: 'Total Users', value: String(totalUsers), delta: this.periodDelta(countPeriod(users, currentStart, now), countPeriod(users, previousStart, currentStart)) },
-        { label: 'Active Users', value: String(activeUsers), delta: 'Live DB' },
+        { label: 'Total Users', value: String(totalUsers + agents.length), delta: this.periodDelta(countPeriod([...users, ...agents], currentStart, now), countPeriod([...users, ...agents], previousStart, currentStart)) },
+        { label: 'Active Users', value: String(activeUsers + agents.length), delta: 'Live DB' },
         { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
         { label: 'Total Revenue', value: `\u20B9${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
         { label: 'Pending Reports', value: String(pendingReports), delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart)) },
@@ -481,6 +486,18 @@ export class PlatformApiController {
       ],
       growth,
     };
+  }
+
+  @Get('agents')
+  @Roles('super_admin')
+  agents(@Query('search') search?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.adminAccounts.agents(search, page, limit);
+  }
+
+  @Get('accounts')
+  @Roles('super_admin')
+  accounts(@Query('search') search?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.adminAccounts.accounts(search, status, page, limit);
   }
 
   @Get('users')

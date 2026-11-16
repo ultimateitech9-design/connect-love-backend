@@ -13,6 +13,7 @@ import { PlatformSetting } from '../platform/platform-setting.entity';
 import { PlatformRole } from '../platform/role.entity';
 import { RolesGuard } from '../auth/roles.guard';
 import { UserActivityService } from '../users/user-activity.service';
+import { AdminAccountsService } from '../admin/admin-accounts.service';
 
 @Module({
   imports: [
@@ -30,6 +31,6 @@ import { UserActivityService } from '../users/user-activity.service';
     ]),
   ],
   controllers: [PlatformApiController],
-  providers: [RolesGuard, UserActivityService],
+  providers: [RolesGuard, UserActivityService, AdminAccountsService],
 })
 export class ApiModule {}
