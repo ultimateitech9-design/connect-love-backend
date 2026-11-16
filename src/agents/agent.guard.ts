@@ -19,8 +19,9 @@ export class AgentGuard implements CanActivate {
       const token = request.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
       if (!token) throw new Error();
       const payload = await this.jwt.verifyAsync(token, { secret: agentSecret(), audience: 'agent' });
+      if (typeof payload.sub !== 'string' || !payload.sub) throw new Error();
       const agent = await this.agents.findOneBy({ id: payload.sub });
-      if (!agent || payload.version !== agent.sessionVersion) throw new Error();
+      if (!agent || agent.status !== 'active' || payload.version !== agent.sessionVersion) throw new Error();
       request.agent = agent;
       return true;
     } catch { throw new UnauthorizedException('Please sign in to your agent account.'); }

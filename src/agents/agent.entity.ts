@@ -7,6 +7,8 @@ export class Agent {
   @Column({ unique: true, length: 255 }) email: string;
   @Column({ select: false }) password: string;
   @Column({ default: 0 }) sessionVersion: number;
+  @Column({ type: 'enum', enum: ['active', 'banned', 'deleted'], default: 'active' }) status: 'active' | 'banned' | 'deleted';
+  @Column({ type: 'datetime', nullable: true }) deletedAt: Date | null;
   @CreateDateColumn() createdAt: Date;
 }
 

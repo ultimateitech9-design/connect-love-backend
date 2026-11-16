@@ -5,7 +5,7 @@ if (process.env.NODE_ENV === 'production' || !['localhost', '127.0.0.1'].include
 process.env.TYPEORM_MIGRATIONS_RUN = 'false';
 const { NestFactory } = require('@nestjs/core');
 const { ValidationPipe } = require('@nestjs/common');
-const { DataSource, In } = require('typeorm');
+const { DataSource, In, Not } = require('typeorm');
 const { JwtService } = require('@nestjs/jwt');
 const { AppModule } = require('../dist/app.module');
 const { Agent } = require('../dist/agents/agent.entity');
@@ -42,9 +42,9 @@ async function run() {
   assert.equal(new Set(found).size, 7);
   const dashboard = await get('/api/dashboard');
   const stats = Object.fromEntries(dashboard.stats.map(row => [row.label, Number(row.value)]));
-  assert.equal(stats['Registered Agents'], await agentRepo.count());
-  assert.equal(stats['Active Users'], await userRepo.countBy({ status: 'active' }) + await agentRepo.count());
-  assert.equal(stats['Total Users'], await userRepo.count() + await agentRepo.count());
+  assert.equal(stats['Registered Agents'], await agentRepo.countBy({ status: Not('deleted') }));
+  assert.equal(stats['Active Users'], await userRepo.countBy({ status: 'active' }) + await agentRepo.countBy({ status: 'active' }));
+  assert.equal(stats['Total Users'], await userRepo.count() + await agentRepo.countBy({ status: Not('deleted') }));
   for (const id of [userIds[0], userIds[4]]) { await get('/api/agents', token(id), 403); await get('/api/accounts', token(id), 403); }
   console.log('PASS: agent-only directory, created-user counts, combined active/all account counts, search/pagination, dashboard consistency, secret-field exclusion and Super Admin authorization.');
 }

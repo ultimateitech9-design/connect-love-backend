@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Not, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
@@ -18,6 +18,7 @@ import { Roles, RolesGuard } from '../auth/roles.guard';
 import { Agent } from '../agents/agent.entity';
 import { UserActivityService } from '../users/user-activity.service';
 import { AdminAccountsService } from '../admin/admin-accounts.service';
+import { AdminAgentStatusDto } from '../admin/admin-agent-status.dto';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -426,7 +427,7 @@ export class PlatformApiController {
   @Get('dashboard')
   async dashboard(@Req() request: any) {
     const agents = this.requestUser(request).role === 'super_admin'
-      ? await this.userRepo.manager.getRepository(Agent).find({ select: ['id', 'createdAt'] }) : [];
+      ? await this.userRepo.manager.getRepository(Agent).find({ where: { status: Not('deleted') }, select: ['id', 'createdAt', 'status'] }) : [];
     const [totalUsers, activeUsers, premiumUsers, matchesDone, pendingReports, revenue, users, matches, payments, reports] = await Promise.all([
     this.userRepo.count(),
     this.userRepo.count({ where: { status: 'active' } }),
@@ -478,7 +479,7 @@ export class PlatformApiController {
       stats: [
         ...agentStats,
         { label: 'Total Users', value: String(totalUsers + agents.length), delta: this.periodDelta(countPeriod([...users, ...agents], currentStart, now), countPeriod([...users, ...agents], previousStart, currentStart)) },
-        { label: 'Active Users', value: String(activeUsers + agents.length), delta: 'Live DB' },
+        { label: 'Active Users', value: String(activeUsers + agents.filter(agent => agent.status === 'active').length), delta: 'Live DB' },
         { label: 'Matches Done', value: String(matchesDone), delta: this.periodDelta(countPeriod(matches, currentStart, now), countPeriod(matches, previousStart, currentStart)) },
         { label: 'Total Revenue', value: `\u20B9${totalRevenue.toLocaleString()}`, delta: this.periodDelta(sumPeriod(payments, currentStart, now), sumPeriod(payments, previousStart, currentStart)) },
         { label: 'Pending Reports', value: String(pendingReports), delta: this.periodDelta(countPeriod(reports, currentStart, now), countPeriod(reports, previousStart, currentStart)) },
@@ -498,6 +499,24 @@ export class PlatformApiController {
   @Roles('super_admin')
   accounts(@Query('search') search?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
     return this.adminAccounts.accounts(search, status, page, limit);
+  }
+
+  @Get('agents/:id')
+  @Roles('super_admin')
+  agentDetails(@Param('id', ParseUUIDPipe) id: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+    return this.adminAccounts.agentDetails(id, page, limit);
+  }
+
+  @Patch('agents/:id/status')
+  @Roles('super_admin')
+  agentStatus(@Param('id', ParseUUIDPipe) id: string, @Body() body: AdminAgentStatusDto, @Req() request: any) {
+    return this.adminAccounts.manageAgent(id, body.status, this.requestUser(request).userId);
+  }
+
+  @Delete('agents/:id')
+  @Roles('super_admin')
+  deleteAgent(@Param('id', ParseUUIDPipe) id: string, @Req() request: any) {
+    return this.adminAccounts.manageAgent(id, 'deleted', this.requestUser(request).userId);
   }
 
   @Get('users')

@@ -99,6 +99,7 @@ export class AgentsService {
   async login(dto: AgentLoginDto) {
     const agent = await this.agents.createQueryBuilder('agent').addSelect('agent.password').where('agent.email = :email', { email: dto.email }).getOne();
     if (!agent || !await bcrypt.compare(dto.password, agent.password)) throw new UnauthorizedException('Incorrect email or password.');
+    if (agent.status !== 'active') throw new UnauthorizedException('This agent account is not active. Please contact support.');
     return this.session(agent);
   }
   async reset(dto: AgentResetDto) {
@@ -138,8 +139,9 @@ export class AgentsService {
     const prepared = [];
     for (const user of dto.users) prepared.push({ ...user, photos: user.photos || [], photosVisibleToNonMatches: true, password: await bcrypt.hash(user.password, 12), createdByAgentId: agentId, role: 'user' as const, status: 'active' as const, onboardingCompleted: false, isVerified: false });
     const result = await this.writeConflict(() => this.db.transaction(async manager => {
+      const agent = await manager.findOne(Agent, { where: { id: agentId }, lock: { mode: 'pessimistic_write' } });
+      if (!agent || agent.status !== 'active') throw new UnauthorizedException('This agent account is not active.');
       const saved = await manager.save(User, prepared.map(user => manager.create(User, user)));
-      const agent = await manager.findOneByOrFail(Agent, { id: agentId });
       await manager.save(AuditLog, saved.map(user => manager.create(AuditLog, {
         user: agent.name, userId: user.id, activity: `Agent ${agentId} created user ${user.id}`,
         action: 'Create', module: 'Agent Users', role: 'agent',
