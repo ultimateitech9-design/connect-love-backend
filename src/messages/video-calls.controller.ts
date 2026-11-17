@@ -1,11 +1,20 @@
-import { Body, Controller, Get, Param, Patch, Post, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { VideoCallsService } from './video-calls.service';
+import { CallHistoryFilter, VideoCallsService } from './video-calls.service';
+
+const HISTORY_FILTERS: CallHistoryFilter[] = ['all', 'missed', 'incoming', 'outgoing'];
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('video-calls')
 export class VideoCallsController {
   constructor(private readonly videoCallsService: VideoCallsService) {}
+
+  /** GET /video-calls/history?filter=all|missed|incoming|outgoing&before=<ISO date> */
+  @Get('history')
+  history(@Request() req, @Query('filter') filter?: string, @Query('before') before?: string) {
+    const safeFilter = HISTORY_FILTERS.includes(filter as CallHistoryFilter) ? (filter as CallHistoryFilter) : 'all';
+    return this.videoCallsService.history(req.user.userId, safeFilter, before);
+  }
 
   @Get('incoming')
   incomingCall(@Request() req) {

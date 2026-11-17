@@ -1,12 +1,13 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MoreThan, Repository } from 'typeorm';
+import { In, MoreThan, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { VideoCall, VideoCallStatus, VideoCallType } from './video-call.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
 import { User } from '../users/user.entity';
 
 export type CallParticipant = { id: string; name: string; photo: string | null };
+export type CallHistoryFilter = 'all' | 'missed' | 'incoming' | 'outgoing';
 
 @Injectable()
 export class VideoCallsService {
@@ -54,6 +55,71 @@ export class VideoCallsService {
       callType,
       status: 'ringing',
     }));
+  }
+
+  /**
+   * Call history for one user, newest first, paged by createdAt.
+   * outcome is from this user's point of view: a call nobody answered is
+   * 'missed' for the receiver and 'no_answer' for the caller.
+   */
+  async history(userId: string, filter: CallHistoryFilter = 'all', before?: string, limit = 30) {
+    const ringingCutoff = new Date(Date.now() - 2 * 60 * 1000);
+    const query = this.callRepo.createQueryBuilder('call')
+      .where('(call.callerId = :userId OR call.receiverId = :userId)', { userId })
+      .orderBy('call.createdAt', 'DESC')
+      .take(limit + 1);
+    if (filter === 'outgoing') query.andWhere('call.callerId = :userId', { userId });
+    if (filter === 'incoming') query.andWhere('call.receiverId = :userId', { userId });
+    if (filter === 'missed') {
+      query.andWhere('call.receiverId = :userId', { userId })
+        .andWhere('call.startedAt IS NULL')
+        .andWhere("call.status <> 'rejected'")
+        .andWhere("(call.status <> 'ringing' OR call.createdAt < :ringingCutoff)", { ringingCutoff });
+    }
+    const beforeDate = before ? new Date(before) : null;
+    if (beforeDate && !Number.isNaN(beforeDate.getTime())) query.andWhere('call.createdAt < :before', { before: beforeDate });
+
+    const rows = await query.getMany();
+    const page = rows.slice(0, limit);
+    const otherIds = [...new Set(page.map((call) => (call.callerId === userId ? call.receiverId : call.callerId)))];
+    const others = otherIds.length
+      ? await this.userRepo.find({ where: { id: In(otherIds) }, select: { id: true, name: true, photos: true } })
+      : [];
+    const byId = new Map(others.map((user) => [user.id, { id: user.id, name: user.name, photo: user.photos?.[0] ?? null }]));
+
+    const items = page.map((call) => {
+      const direction = call.callerId === userId ? 'outgoing' : 'incoming';
+      const stillRinging = call.status === 'ringing' && call.createdAt >= ringingCutoff;
+      const outcome = call.startedAt
+        ? (call.status === 'active' ? 'ongoing' : 'answered')
+        : call.status === 'rejected'
+          ? 'declined'
+          : stillRinging
+            ? 'ringing'
+            : direction === 'incoming' ? 'missed' : 'no_answer';
+      const durationSeconds = call.startedAt && call.endedAt
+        ? Math.max(0, Math.round((call.endedAt.getTime() - call.startedAt.getTime()) / 1000))
+        : null;
+      return {
+        id: call.id,
+        callType: call.callType,
+        mode: call.mode,
+        direction,
+        outcome,
+        createdAt: call.createdAt,
+        durationSeconds,
+        conversationId: call.conversationId,
+        isFreeTrial: call.isFreeTrial,
+        // Only the caller pays; never show a receiver what the caller spent.
+        coinsCharged: direction === 'outgoing' ? call.coinsCharged : null,
+        endReason: call.endReason,
+        otherUser: byId.get(direction === 'outgoing' ? call.receiverId : call.callerId) ?? null,
+      };
+    });
+    return {
+      items,
+      nextCursor: rows.length > limit ? page[page.length - 1].createdAt.toISOString() : null,
+    };
   }
 
   findById(id: string): Promise<VideoCall | null> {
