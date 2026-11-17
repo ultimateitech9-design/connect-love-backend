@@ -25,6 +25,9 @@ export type DirectCallSettings = {
   maxCallsPerReceiverPerDay: number;
   /** Coin packs offered in the upgrade popup (1 coin = ₹1). */
   packs: number[];
+  /** Gifts that can be sent during a call (coins) and the receiver's share of them. */
+  giftAmounts: number[];
+  giftReceiverPercent: number;
 };
 
 export const DEFAULT_DIRECT_CALL_SETTINGS: DirectCallSettings = {
@@ -38,6 +41,8 @@ export const DEFAULT_DIRECT_CALL_SETTINGS: DirectCallSettings = {
   agentPercent: 10,
   maxCallsPerReceiverPerDay: 5,
   packs: [299, 499, 999],
+  giftAmounts: [100, 250, 500, 1000],
+  giftReceiverPercent: 70,
 };
 
 const SETTINGS_KEY = 'direct_calls';
@@ -150,7 +155,12 @@ export class DirectCallsService {
       packs: Array.isArray(input.packs)
         ? input.packs.map((coins) => wholeNumber(coins, 10, 100000, 'Pack coins'))
         : current.packs,
+      giftAmounts: Array.isArray(input.giftAmounts)
+        ? input.giftAmounts.map((coins) => wholeNumber(coins, 1, 100000, 'Gift amount'))
+        : current.giftAmounts,
+      giftReceiverPercent: wholeNumber(input.giftReceiverPercent ?? current.giftReceiverPercent, 0, 100, 'Gift receiver share'),
     };
+    if (!next.giftAmounts.length || next.giftAmounts.length > 6) throw new BadRequestException('Offer between 1 and 6 gift amounts.');
     if (next.receiverPercent + next.agentPercent > 100) {
       throw new BadRequestException('Receiver and agent shares cannot exceed 100%.');
     }
@@ -192,6 +202,7 @@ export class DirectCallsService {
       freeVideoSeconds: settings.freeVideoSeconds,
       freeAudioSeconds: settings.freeAudioSeconds,
       packs: settings.packs,
+      giftAmounts: settings.giftAmounts,
       balance: user.coinBalance + user.earnedCoinBalance,
       allowDirectCalls: user.allowDirectCalls,
     };
@@ -349,6 +360,50 @@ export class DirectCallsService {
       this.callRepo.count({ where: { mode: 'direct', isFreeTrial: true, startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(since) } }),
     ]);
     return { month: { ...month, answeredCalls: callsThisMonth, freeCalls: freeCallsThisMonth }, allTime };
+  }
+
+  /**
+   * A gift sent during a call (match or direct). The receiver gets
+   * giftReceiverPercent of it as withdrawable earnings; the rest is the
+   * platform's. Returns what the socket layer needs to notify the receiver.
+   */
+  async sendCallGift(senderId: string, callId: string, amount: number) {
+    const settings = await this.settings();
+    const coins = Number(amount);
+    if (!settings.giftAmounts.includes(coins)) throw new BadRequestException('Choose one of the gift amounts.');
+    return this.dataSource.transaction(async (manager) => {
+      const call = await manager.getRepository(VideoCall).findOne({ where: { id: callId } });
+      if (!call || call.status !== 'active' || (call.callerId !== senderId && call.receiverId !== senderId)) {
+        throw new BadRequestException('Gifts can be sent only during an active call.');
+      }
+      const receiverId = call.callerId === senderId ? call.receiverId : call.callerId;
+      const users = await manager.getRepository(User).find({ where: { id: In([senderId, receiverId]) }, lock: { mode: 'pessimistic_write' } });
+      const sender = users.find((user) => user.id === senderId);
+      const receiver = users.find((user) => user.id === receiverId);
+      if (!sender || !receiver) throw new NotFoundException('User not found.');
+      if (sender.coinBalance + sender.earnedCoinBalance < coins) throw new ForbiddenException(UPGRADE_REQUIRED);
+
+      const receiverCoins = Math.floor((coins * settings.giftReceiverPercent) / 100);
+      const fromPurchased = Math.min(sender.coinBalance, coins);
+      sender.coinBalance -= fromPurchased;
+      sender.earnedCoinBalance -= coins - fromPurchased;
+      receiver.earnedCoinBalance += receiverCoins;
+      await manager.getRepository(User).save([sender, receiver]);
+      await manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({
+        type: 'gift',
+        status: 'completed',
+        userId: senderId,
+        senderId,
+        receiverId,
+        callId: call.id,
+        grossCoins: coins,
+        userCoins: receiverCoins,
+        platformCoins: coins - receiverCoins,
+        label: `Call gift ${coins}`,
+        payoutAccount: null,
+      }));
+      return { receiverId, senderName: sender.name, coins, balance: sender.coinBalance + sender.earnedCoinBalance };
+    });
   }
 
   async setEndReason(callId: string, reason: string) {
