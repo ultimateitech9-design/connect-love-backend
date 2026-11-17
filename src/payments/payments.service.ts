@@ -203,27 +203,67 @@ export class PaymentsService {
     return { received: true };
   }
 
-  private async activatePlan(payment: Payment, gatewayPaymentId: string) {
+  /**
+   * Repairs a recent checkout if its browser callback was interrupted. This is
+   * deliberately limited to recent, pending orders; the gateway remains the
+   * source of truth and a declined order is never activated.
+   */
+  async reconcileRecentPendingPayments() {
+    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    const pending = await this.paymentRepo.find({
+      where: { status: 'pending' },
+      order: { createdAt: 'DESC' },
+      take: 10,
+    });
+
+    await Promise.all(pending
+      .filter((payment) => payment.gatewayOrderId && payment.createdAt >= cutoff)
+      .map(async (payment) => {
+        try { await this.reconcilePendingPayment(payment); } catch { /* A gateway outage must not block the billing page. */ }
+      }));
+  }
+
+  private async reconcilePendingPayment(payment: Payment) {
+    if (!payment.gatewayOrderId || payment.status !== 'pending') return;
+    const response = await this.razorpay(`/orders/${encodeURIComponent(payment.gatewayOrderId)}/payments`);
+    const expectedAmount = Math.round(Number(payment.amount) * 100);
+    const captured = (response?.items || []).find((gatewayPayment: any) =>
+      gatewayPayment?.status === 'captured'
+      && gatewayPayment?.order_id === payment.gatewayOrderId
+      && gatewayPayment?.amount === expectedAmount
+      && gatewayPayment?.currency === payment.currency,
+    );
+    if (captured?.id) await this.activatePlan(payment, captured.id);
+  }
+
+  private async activatePlan(requestedPayment: Payment, gatewayPaymentId: string) {
+    return this.paymentRepo.manager.transaction(async (manager) => {
+      const payment = await manager.findOne(Payment, {
+        where: { id: requestedPayment.id },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!payment) throw new BadRequestException('Payment was not found.');
     if (payment.status === 'successful') {
       if (payment.planName.startsWith('boost:')) {
-        const boost = await this.boostRepo.findOne({ where: { userId: payment.userId, requestId: payment.id } });
+        const boost = await manager.getRepository(ProfileBoost).findOne({ where: { userId: payment.userId, requestId: payment.id } });
         return { success: true, product: 'profile_boost', plan: payment.planName.slice('boost:'.length), startsAt: boost?.startsAt, endsAt: boost?.endsAt };
       }
       return { success: true, plan: payment.planName };
     }
-    const user = await this.userRepo.findOne({ where: { id: payment.userId } });
+    const user = await manager.findOne(User, { where: { id: payment.userId }, lock: { mode: 'pessimistic_write' } });
     if (!user) throw new BadRequestException('Payment user no longer exists.');
     if (payment.planName.startsWith('boost:')) {
       const planKey = payment.planName.slice('boost:'.length) as BoostPlanKey;
       const plan = BOOST_PLANS[planKey];
       if (!plan) throw new BadRequestException('Boost plan no longer exists.');
-      let boost = await this.boostRepo.findOne({ where: { userId: payment.userId, requestId: payment.id } });
+      const boosts = manager.getRepository(ProfileBoost);
+      let boost = await boosts.findOne({ where: { userId: payment.userId, requestId: payment.id } });
       if (!boost) {
-        const latest = await this.boostRepo.findOne({ where: { userId: payment.userId }, order: { endsAt: 'DESC' } });
+        const latest = await boosts.findOne({ where: { userId: payment.userId }, order: { endsAt: 'DESC' } });
         const now = new Date(); const startsAt = latest?.endsAt && latest.endsAt > now ? latest.endsAt : now;
-        boost = await this.boostRepo.save(this.boostRepo.create({ userId: payment.userId, requestId: payment.id, planKey, amount: plan.price, currency: 'INR', startsAt, endsAt: new Date(startsAt.getTime() + plan.durationMinutes * 60_000) }));
+        boost = await boosts.save(boosts.create({ userId: payment.userId, requestId: payment.id, planKey, amount: plan.price, currency: 'INR', startsAt, endsAt: new Date(startsAt.getTime() + plan.durationMinutes * 60_000) }));
       }
-      payment.gatewayPaymentId = gatewayPaymentId; payment.status = 'successful'; await this.paymentRepo.save(payment);
+      payment.gatewayPaymentId = gatewayPaymentId; payment.status = 'successful'; await manager.save(payment);
       return { success: true, product: 'profile_boost', plan: planKey, startsAt: boost.startsAt, endsAt: boost.endsAt };
     }
     const base = user.planExpiresAt && user.planExpiresAt > new Date() ? user.planExpiresAt : new Date();
@@ -233,10 +273,11 @@ export class PaymentsService {
     user.planExpiresAt = expiresAt;
     payment.gatewayPaymentId = gatewayPaymentId;
     payment.status = 'successful';
-    await this.userRepo.save(user);
-    await this.paymentRepo.save(payment);
-    if (payment.couponCode) await this.couponRepo.increment({ code: payment.couponCode }, 'usedCount', 1);
+    await manager.save(user);
+    await manager.save(payment);
+    if (payment.couponCode) await manager.getRepository(Coupon).increment({ code: payment.couponCode }, 'usedCount', 1);
     return { success: true, plan: user.plan, expiresAt };
+    });
   }
 
   private safeEqual(left: string, right: string) {

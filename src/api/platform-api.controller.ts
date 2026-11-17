@@ -19,6 +19,7 @@ import { Agent } from '../agents/agent.entity';
 import { UserActivityService } from '../users/user-activity.service';
 import { AdminAccountsService } from '../admin/admin-accounts.service';
 import { AdminAgentStatusDto } from '../admin/admin-agent-status.dto';
+import { PaymentsService } from '../payments/payments.service';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -286,6 +287,7 @@ export class PlatformApiController {
     private readonly roleRepo: Repository<PlatformRole>,
     private readonly userActivity: UserActivityService,
     private readonly adminAccounts: AdminAccountsService,
+    private readonly paymentsService: PaymentsService,
   ) {}
 
   private async creationOrigins(users: User[]) {
@@ -875,6 +877,10 @@ export class PlatformApiController {
 
   @Get('payments')
   async payments() {
+    // A browser can close immediately after Razorpay accepts a payment. Recheck
+    // recent pending orders here, so the billing view repairs that interruption
+    // even if the checkout callback was missed.
+    await this.paymentsService.reconcileRecentPendingPayments();
     const plans = await this.planRepo.find({ order: { sortOrder: 'ASC' } });
     const users = await this.userRepo.find({ select: ['plan'] });
     const subscriberCounts = users.reduce<Record<string, number>>((acc, user) => {

@@ -12,5 +12,6 @@ import { ProfileBoost } from '../boosts/boost.entity';
   imports: [TypeOrmModule.forFeature([Payment, User, Coupon, ProfileBoost])],
   controllers: [PaymentsController, CouponsController],
   providers: [PaymentsService],
+  exports: [PaymentsService],
 })
 export class PaymentsModule {}

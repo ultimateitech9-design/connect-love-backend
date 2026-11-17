@@ -14,9 +14,11 @@ import { PlatformRole } from '../platform/role.entity';
 import { RolesGuard } from '../auth/roles.guard';
 import { UserActivityService } from '../users/user-activity.service';
 import { AdminAccountsService } from '../admin/admin-accounts.service';
+import { PaymentsModule } from '../payments/payments.module';
 
 @Module({
   imports: [
+    PaymentsModule,
     TypeOrmModule.forFeature([
       User,
       Contact,
