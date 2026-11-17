@@ -12,6 +12,7 @@ import { Repository } from 'typeorm';
 import * as nodemailer from 'nodemailer';
 import { User } from '../users/user.entity';
 import { EmailRegistrationOtp } from './email-registration-otp.entity';
+import { UserEmail } from '../users/user-email.entity';
 
 const OTP_EXPIRY_MINUTES = 10;
 const OTP_RESEND_SECONDS = 60;
@@ -27,6 +28,8 @@ export class RegistrationOtpService {
     private readonly otpRepo: Repository<EmailRegistrationOtp>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(UserEmail)
+    private readonly userEmailRepo: Repository<UserEmail>,
   ) {}
 
   private normalizeEmail(email: string) {
@@ -72,7 +75,8 @@ export class RegistrationOtpService {
   async request(emailInput: string) {
     const email = this.normalizeEmail(emailInput);
     const existingUser = await this.userRepo.findOne({ where: { email } });
-    if (existingUser) {
+    const existingManagedEmail = existingUser ? null : await this.userEmailRepo.findOne({ where: { email } });
+    if (existingUser || existingManagedEmail) {
       throw new ConflictException('An account with this email already exists.');
     }
 
@@ -137,7 +141,8 @@ export class RegistrationOtpService {
   async requestPasswordReset(emailInput: string) {
     const email = this.normalizeEmail(emailInput);
     const existingUser = await this.userRepo.findOne({ where: { email } });
-    if (!existingUser) {
+    const loginAlias = existingUser ? null : await this.userEmailRepo.findOne({ where: { email, loginEnabled: true } });
+    if (!existingUser && !loginAlias) {
       throw new UnauthorizedException('No account was found with this email address.');
     }
 

@@ -21,6 +21,8 @@ import { UserDevice } from './push-notifications/user-device.entity';
 import { CoinTransaction } from './users/coin-transaction.entity';
 import { PlanUsage } from './plans/plan-usage.entity';
 import { Coupon } from './payments/coupon.entity';
+import { UserEmail } from './users/user-email.entity';
+import { UserEmailChallenge } from './users/user-email-challenge.entity';
 import { Agent, AgentEmailChallenge } from './agents/agent.entity';
 
 dotenv.config();
@@ -53,6 +55,8 @@ export default new DataSource({
     CoinTransaction,
     PlanUsage,
     Coupon,
+    UserEmail,
+    UserEmailChallenge,
     Agent,
     AgentEmailChallenge,
   ],

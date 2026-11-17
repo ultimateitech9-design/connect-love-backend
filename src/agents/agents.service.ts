@@ -115,7 +115,7 @@ export class AgentsService {
   async logout(id: string) { await this.agents.increment({ id }, 'sessionVersion', 1); return { success: true }; }
 
   async listUsers(agentId: string, query: AgentUsersQueryDto) {
-    const builder = this.users.createQueryBuilder('user').select(['user.id', 'user.name', 'user.email', 'user.phone', 'user.birthDate', 'user.gender', 'user.city', 'user.profession', 'user.bio', 'user.status', 'user.createdAt', 'user.onboardingCompleted']).where('user.createdByAgentId = :agentId', { agentId }).andWhere('user.role = :role', { role: 'user' });
+    const builder = this.users.createQueryBuilder('user').select(['user.id', 'user.name', 'user.email', 'user.phone', 'user.birthDate', 'user.gender', 'user.city', 'user.profession', 'user.bio', 'user.status', 'user.createdAt', 'user.onboardingCompleted', 'user.agentEmailChangedAt']).where('user.createdByAgentId = :agentId', { agentId }).andWhere('user.role = :role', { role: 'user' });
     if (query.search.trim()) builder.andWhere('(user.name LIKE :search OR user.email LIKE :search OR user.city LIKE :search)', { search: `%${query.search.trim()}%` });
     const [users, total] = await builder.orderBy('user.createdAt', 'DESC').skip((query.page - 1) * query.limit).take(query.limit).getManyAndCount();
     const totalAccounts = await this.users.countBy({ createdByAgentId: agentId, role: 'user' });
@@ -154,7 +154,7 @@ export class AgentsService {
   async userDetails(agentId: string, id: string) {
     const user = await this.users.findOne({
       where: { id, createdByAgentId: agentId, role: 'user' },
-      select: ['id', 'name', 'email', 'phone', 'birthDate', 'gender', 'city', 'profession', 'bio', 'photos', 'status', 'createdAt', 'onboardingCompleted'],
+      select: ['id', 'name', 'email', 'phone', 'birthDate', 'gender', 'city', 'profession', 'bio', 'photos', 'status', 'createdAt', 'onboardingCompleted', 'agentEmailChangedAt'],
     });
     if (!user) throw new NotFoundException('User not found in your workspace.');
     return { user: { ...user, activity: await this.activity.get(id) } };

@@ -13,6 +13,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { randomUUID } from 'crypto';
 import { RegistrationOtpService } from './registration-otp.service';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto';
+import { UserEmail } from '../users/user-email.entity';
 
 export interface LoginContext {
   ipAddress?: string;
@@ -27,6 +28,8 @@ export class AuthService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(AuditLog)
     private readonly auditRepo: Repository<AuditLog>,
+    @InjectRepository(UserEmail)
+    private readonly userEmailRepo: Repository<UserEmail>,
     private readonly jwtService: JwtService,
     private readonly registrationOtpService: RegistrationOtpService,
   ) {}
@@ -51,6 +54,16 @@ export class AuthService {
       role: user.role || 'user',
       sid: sessionId,
     });
+  }
+
+  private async loginUserForEmail(emailInput: string): Promise<User | null> {
+    const email = emailInput.trim().toLowerCase();
+    const primary = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.email = :email', { email }).getOne();
+    if (primary) return primary;
+    const alias = await this.userEmailRepo.findOne({ where: { email, loginEnabled: true }, relations: ['user'] });
+    if (!alias?.user) return null;
+    const user = await this.userRepo.createQueryBuilder('u').addSelect('u.password').where('u.id = :id', { id: alias.user.id }).getOne();
+    return user || null;
   }
 
   private async startSession(user: User, context: LoginContext = {}) {
@@ -138,11 +151,7 @@ export class AuthService {
 
   async resetPassword(emailInput: string, otp: string, newPassword: string) {
     const email = emailInput.trim().toLowerCase();
-    const user = await this.userRepo
-      .createQueryBuilder('u')
-      .addSelect('u.password')
-      .where('u.email = :email', { email })
-      .getOne();
+    const user = await this.loginUserForEmail(email);
     if (!user) throw new UnauthorizedException('No account was found with this email address.');
 
     await this.registrationOtpService.verify(email, otp);
@@ -194,11 +203,7 @@ export class AuthService {
 
   async login(dto: LoginDto, context: LoginContext = {}) {
     const email = dto.email.trim().toLowerCase();
-    const user = await this.userRepo
-      .createQueryBuilder('u')
-      .addSelect('u.password')
-      .where('u.email = :email', { email })
-      .getOne();
+    const user = await this.loginUserForEmail(email);
 
     if (!user) return this.rejectLogin(email, context, 'Invalid email or password.');
     if (user.role !== 'user') {

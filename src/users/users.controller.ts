@@ -3,10 +3,25 @@ import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Roles, RolesGuard } from '../auth/roles.guard';
+import { EmailManagementService } from './email-management.service';
+import { EmailDto, EmailOtpDto, OtpDto } from './dto/email-management.dto';
 
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(private readonly usersService: UsersService, private readonly emailManagement: EmailManagementService) {}
+
+  @UseGuards(AuthGuard('jwt')) @Get('me/emails') listEmails(@Request() req: any) { return this.emailManagement.list(req.user.userId); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/change/request-old-otp') requestOldEmailOtp(@Request() req: any) { return this.emailManagement.requestOldPrimary(req.user.userId); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/change/verify-old-otp') verifyOldEmailOtp(@Request() req: any, @Body() body: OtpDto) { return this.emailManagement.verifyOldPrimary(req.user.userId, body.otp); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/change/request-new-otp') requestNewEmailOtp(@Request() req: any, @Body() body: EmailDto) { return this.emailManagement.requestNewPrimary(req.user.userId, body.email); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/change/verify-new-otp') verifyNewEmailOtp(@Request() req: any, @Body() body: OtpDto) { return this.emailManagement.verifyNewPrimary(req.user.userId, body.otp); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/secondary/request-otp') requestSecondaryOtp(@Request() req: any, @Body() body: EmailDto) { return this.emailManagement.requestSecondary(req.user.userId, body.email); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/secondary/verify-otp') verifySecondaryOtp(@Request() req: any, @Body() body: OtpDto) { return this.emailManagement.verifySecondary(req.user.userId, body.otp); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/secondary/remove/request-otp') requestRemoveSecondaryOtp(@Request() req: any, @Body() body: EmailDto) { return this.emailManagement.requestRemoveSecondary(req.user.userId, body.email); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/secondary/remove') removeSecondary(@Request() req: any, @Body() body: EmailOtpDto) { return this.emailManagement.removeSecondary(req.user.userId, body.email, body.otp); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/secondary/make-primary') makePrimary(@Request() req: any, @Body() body: EmailDto) { return this.emailManagement.makePrimary(req.user.userId, body.email); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/recovery/request-otp') requestRecoveryOtp(@Request() req: any) { return this.emailManagement.requestRecovery(req.user.userId); }
+  @UseGuards(AuthGuard('jwt')) @Post('me/emails/recovery/verify-otp') verifyRecoveryOtp(@Request() req: any, @Body() body: OtpDto) { return this.emailManagement.verifyRecovery(req.user.userId, body.otp); }
 
   /** GET /users/me — returns the currently authenticated user's profile */
   @UseGuards(AuthGuard('jwt'))
