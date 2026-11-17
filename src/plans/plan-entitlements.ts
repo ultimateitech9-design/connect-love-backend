@@ -59,6 +59,13 @@ export function monthStart(): Date {
   return new Date(now.getFullYear(), now.getMonth(), 1);
 }
 
+/** First day of the current month at midnight India time. */
+export function monthStartIndia(): Date {
+  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit' }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return new Date(`${value('year')}-${value('month')}-01T00:00:00+05:30`);
+}
+
 export function dayStart(): Date {
   // Plans are sold to the India audience; daily call and like allowances reset
   // together at midnight India time even when the API host runs in UTC.

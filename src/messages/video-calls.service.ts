@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, MoreThan, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
@@ -10,7 +10,7 @@ export type CallParticipant = { id: string; name: string; photo: string | null }
 export type CallHistoryFilter = 'all' | 'missed' | 'incoming' | 'outgoing';
 
 @Injectable()
-export class VideoCallsService {
+export class VideoCallsService implements OnApplicationBootstrap {
   constructor(
     @InjectRepository(VideoCall)
     private readonly callRepo: Repository<VideoCall>,
@@ -20,6 +20,27 @@ export class VideoCallsService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
+
+  /**
+   * After a restart no socket or billing timer survives, so calls still marked
+   * ringing/active are dead: close them so they stop showing as in progress
+   * (and paid direct calls are not left open).
+   */
+  async onApplicationBootstrap() {
+    try {
+      const ended = await this.callRepo.createQueryBuilder().update(VideoCall)
+        .set({ status: 'ended', endedAt: () => 'CURRENT_TIMESTAMP', endReason: 'server_restart' })
+        .where("status = 'active'").execute();
+      const missed = await this.callRepo.createQueryBuilder().update(VideoCall)
+        .set({ status: 'missed', endedAt: () => 'CURRENT_TIMESTAMP' })
+        .where("status = 'ringing'").execute();
+      if (ended.affected || missed.affected) {
+        new Logger(VideoCallsService.name).log(`Closed ${ended.affected ?? 0} active and ${missed.affected ?? 0} ringing calls left by a restart.`);
+      }
+    } catch (error) {
+      new Logger(VideoCallsService.name).warn(`Could not close stale calls: ${String(error)}`);
+    }
+  }
 
   /** Name and first photo, so a call can be shown on any page without the chat list. */
   async participant(userId: string): Promise<CallParticipant | null> {

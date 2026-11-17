@@ -7,7 +7,8 @@ import { CoinTransaction } from '../users/coin-transaction.entity';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { PlatformSetting } from '../platform/platform-setting.entity';
 import { VideoCall, VideoCallType } from '../messages/video-call.entity';
-import { dayStart, monthStart } from '../plans/plan-entitlements';
+import { dayStart, monthStartIndia } from '../plans/plan-entitlements';
+import { Contact } from '../support/contact.entity';
 
 /** Super-admin editable rules for paid direct calls (platform_settings 'direct_calls'). */
 export type DirectCallSettings = {
@@ -66,7 +67,66 @@ export class DirectCallsService {
     @InjectRepository(VideoCall) private readonly callRepo: Repository<VideoCall>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(MatchRelation) private readonly matchRepo: Repository<MatchRelation>,
+    @InjectRepository(Contact) private readonly contactRepo: Repository<Contact>,
   ) {}
+
+  // --- Safety ---------------------------------------------------------------
+
+  /**
+   * Blocks another user from calls (and chat, for matches). Works without a
+   * match: a BLOCKED relation is created whose pre-block status is DECLINED,
+   * so unblocking never turns it into a match.
+   */
+  async blockUser(userId: string, otherUserId: string) {
+    if (!otherUserId || otherUserId === userId) throw new BadRequestException('Choose another user to block.');
+    const relation = await this.matchRepo.findOne({
+      where: [
+        { senderId: userId, receiverId: otherUserId },
+        { senderId: otherUserId, receiverId: userId },
+      ],
+    });
+    if (relation) {
+      if (relation.status !== MatchStatus.BLOCKED) {
+        relation.statusBeforeBlock = relation.status;
+        relation.status = MatchStatus.BLOCKED;
+        relation.blockedByUserId = userId;
+        await this.matchRepo.save(relation);
+      }
+    } else {
+      await this.matchRepo.save(this.matchRepo.create({
+        senderId: userId,
+        receiverId: otherUserId,
+        status: MatchStatus.BLOCKED,
+        statusBeforeBlock: MatchStatus.DECLINED,
+        blockedByUserId: userId,
+      }));
+    }
+    return { blocked: true };
+  }
+
+  /** Files a report from the call screen into the super-admin complaints queue. */
+  async reportCall(userId: string, callId: string, reason: string, details: string) {
+    const call = await this.callRepo.findOne({ where: { id: callId } });
+    if (!call || (call.callerId !== userId && call.receiverId !== userId)) throw new NotFoundException('Call not found.');
+    const reportedId = call.callerId === userId ? call.receiverId : call.callerId;
+    const users = await this.userRepo.find({ where: { id: In([userId, reportedId]) }, select: { id: true, name: true, email: true } });
+    const reporter = users.find((user) => user.id === userId);
+    const reported = users.find((user) => user.id === reportedId);
+    const safeReason = String(reason || 'Other').slice(0, 80);
+    await this.contactRepo.save(this.contactRepo.create({
+      name: reporter?.name || 'ConnectLove user',
+      email: reporter?.email || 'unknown@connectlove.in',
+      subject: `Call report: ${safeReason}`.slice(0, 255),
+      message: [
+        `Reported user: ${reported?.name || 'Unknown'} (${reportedId}, ${reported?.email || 'no email'})`,
+        `Reported by: ${reporter?.name || 'Unknown'} (${userId})`,
+        `Call: ${call.id} · ${call.mode} ${call.callType} call · ${call.createdAt.toISOString()}`,
+        `Reason: ${safeReason}`,
+        details ? `Details: ${String(details).slice(0, 2000)}` : '',
+      ].filter(Boolean).join('\n'),
+    }));
+    return { reported: true };
+  }
 
   // --- Settings -------------------------------------------------------------
 
@@ -112,7 +172,7 @@ export class DirectCallsService {
   /** Free direct calls this month: only answered calls count. */
   async freeCallsUsed(userId: string): Promise<number> {
     return this.callRepo.count({
-      where: { callerId: userId, mode: 'direct', isFreeTrial: true, startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(monthStart()) },
+      where: { callerId: userId, mode: 'direct', isFreeTrial: true, startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(monthStartIndia()) },
     });
   }
 
@@ -281,7 +341,7 @@ export class DirectCallsService {
       if (since) query.andWhere('tx.createdAt >= :since', { since });
       return query.getRawOne().then((row) => Object.fromEntries(Object.entries(row ?? {}).map(([key, value]) => [key, Number(value) || 0])));
     };
-    const since = monthStart();
+    const since = monthStartIndia();
     const [month, allTime, callsThisMonth, freeCallsThisMonth] = await Promise.all([
       sums(since),
       sums(null),

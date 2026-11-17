@@ -13,6 +13,7 @@ import { UserActivityService } from '../users/user-activity.service';
 import { AuditLog } from '../platform/audit-log.entity';
 import { VideoCall } from '../messages/video-call.entity';
 import { CoinTransaction } from '../users/coin-transaction.entity';
+import { monthStartIndia } from '../plans/plan-entitlements';
 import { MessagesGateway } from '../messages/messages.gateway';
 
 @Injectable()
@@ -42,8 +43,7 @@ export class AgentsService {
     const agent = await this.agents.findOne({ where: { id: agentId } });
     if (!agent) throw new NotFoundException('Agent not found.');
     const tx = () => this.db.getRepository(CoinTransaction).createQueryBuilder('tx').where("tx.type = 'call' AND tx.agentId = :agentId", { agentId });
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthStart = monthStartIndia();
     const [month, allTime, byUser, recent] = await Promise.all([
       tx().andWhere('tx.createdAt >= :monthStart', { monthStart }).select('COALESCE(SUM(tx.agentCoins), 0)', 'coins').getRawOne(),
       tx().select('COALESCE(SUM(tx.agentCoins), 0)', 'coins').addSelect('COUNT(*)', 'minutes').getRawOne(),
