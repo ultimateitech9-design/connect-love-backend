@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import * as nodemailer from 'nodemailer';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { DataSource, Repository } from 'typeorm';
@@ -254,6 +255,58 @@ export class PayoutsService {
       }
       return { id: tx.id, type: tx.type, status: tx.status, label: tx.label, coins, wallet, createdAt: tx.createdAt };
     });
+  }
+
+  private transporter: nodemailer.Transporter | null = null;
+  private readonly logger = new Logger(PayoutsService.name);
+
+  private mailer() {
+    if (this.transporter) return this.transporter;
+    const host = process.env.SMTP_HOST?.trim();
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASSWORD;
+    if (!host || !user || !pass) return null;
+    const port = Number(process.env.SMTP_PORT || 465);
+    this.transporter = nodemailer.createTransport({ host, port, secure: (process.env.SMTP_SECURE || String(port === 465)).toLowerCase() === 'true', auth: { user, pass } });
+    return this.transporter;
+  }
+
+  /**
+   * Emails the member or agent when the super admin marks their withdrawal
+   * paid or rejected. Never throws: the status change has already happened.
+   */
+  async notifyWithdrawalStatus(transactionId: string) {
+    try {
+      const tx = await this.dataSource.getRepository(CoinTransaction).findOne({ where: { id: transactionId } });
+      if (!tx || tx.type !== 'withdrawal' || (tx.status !== 'completed' && tx.status !== 'rejected')) return;
+      const owner = tx.userId
+        ? await this.dataSource.getRepository(User).findOne({ where: { id: tx.userId }, select: { id: true, name: true, email: true } })
+        : tx.agentId
+          ? await this.dataSource.getRepository(Agent).findOne({ where: { id: tx.agentId }, select: { id: true, name: true, email: true } })
+          : null;
+      const mailer = this.mailer();
+      if (!owner?.email || !mailer) return;
+      let details: Partial<PayoutDetails> = {};
+      try { details = tx.payoutDetails ? JSON.parse(tx.payoutDetails) : {}; } catch { /* old rows */ }
+      const destination = details.method === 'upi'
+        ? `UPI ${details.upiId}`
+        : [details.bankName, details.accountNumber ? `account ending ${String(details.accountNumber).slice(-4)}` : null].filter(Boolean).join(', ');
+      const rupees = `₹${((tx.amountPaise ?? tx.grossCoins * 100) / 100).toLocaleString('en-IN')}`;
+      const paid = tx.status === 'completed';
+      const subject = paid ? `Your ConnectLove withdrawal of ${rupees} has been paid` : 'Your ConnectLove withdrawal could not be processed';
+      const text = paid
+        ? `Hi ${owner.name},\n\nWe have sent ${rupees} (${tx.grossCoins} coins) to ${destination || 'your account'}. Depending on your bank it can take a few hours to show up.\n\nThank you,\nConnectLove`
+        : `Hi ${owner.name},\n\nYour withdrawal request of ${rupees} (${tx.grossCoins} coins) to ${destination || 'your account'} could not be processed. The ${tx.grossCoins} coins have been returned to your earnings. Please check your account details and try again, or contact support.\n\nConnectLove`;
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
+        to: owner.email,
+        subject,
+        text,
+        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h1 style="color:#e11d48">ConnectLove</h1>${text.split('\n\n').map((part) => `<p>${part.replace(/\n/g, '<br>')}</p>`).join('')}</div>`,
+      });
+    } catch (error) {
+      this.logger.warn(`Withdrawal email for ${transactionId} failed: ${String(error)}`);
+    }
   }
 
   /** The owner's latest withdrawal requests with masked account details. */

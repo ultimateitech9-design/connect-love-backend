@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PayoutsService } from '../payouts/payouts.service';
 import { Agent } from '../agents/agent.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
@@ -29,6 +30,7 @@ export class UsersService {
     @InjectRepository(CoinTransaction)
     private readonly coinTransactionRepo: Repository<CoinTransaction>,
     private readonly dataSource: DataSource,
+    private readonly payouts: PayoutsService,
   ) {}
 
   serializeUser(user: User): any {
@@ -427,7 +429,7 @@ export class UsersService {
 
   async updateWithdrawalStatus(id: string, status: 'completed' | 'rejected') {
     if (status !== 'completed' && status !== 'rejected') throw new BadRequestException('Invalid withdrawal status.');
-    return this.dataSource.transaction(async (manager) => {
+    const updated = await this.dataSource.transaction(async (manager) => {
       const repository = manager.getRepository(CoinTransaction);
       const transaction = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!transaction || transaction.type !== 'withdrawal') throw new NotFoundException('Withdrawal request not found.');
@@ -448,5 +450,8 @@ export class UsersService {
       transaction.status = status;
       return repository.save(transaction);
     });
+    // Tell the member or agent; does not block or fail the status change.
+    void this.payouts.notifyWithdrawalStatus(updated.id);
+    return updated;
   }
 }
