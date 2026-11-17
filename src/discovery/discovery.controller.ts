@@ -19,8 +19,16 @@ export class DiscoveryController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('excludeIds') excludeIds?: string,
+    @Query('cursor') cursor?: string,
+    @Query('queue') queue?: string,
+    @Query('interests') interests?: string,
+    @Query('verifiedOnly') verifiedOnly?: string,
   ) {
     return this.discoveryService.getSuggestions(req.user.userId, {
+      cursor,
+      queue: queue === 'true',
+      interests: interests?.split(',').map(value => value.trim()).filter(Boolean).slice(0, 30),
+      verifiedOnly: verifiedOnly === 'true',
       search,
       ageMin: ageMin ? Number(ageMin) : undefined,
       ageMax: ageMax ? Number(ageMax) : undefined,

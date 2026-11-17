@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
@@ -9,6 +9,10 @@ import { distanceBetweenKm } from '../location/distance';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 interface DiscoveryFilters {
+  interests?: string[];
+  verifiedOnly?: boolean;
+  cursor?: string;
+  queue?: boolean;
   interestedIn?: string;
   search?: string;
   ageMin?: number;
@@ -64,7 +68,7 @@ export class DiscoveryService {
     private readonly searchService: SearchService,
   ) {}
 
-  async getSuggestions(currentUserId: string, filters: DiscoveryFilters = {}): Promise<User[]> {
+  async getSuggestions(currentUserId: string, filters: DiscoveryFilters = {}): Promise<any> {
     // Do not hydrate the current user's complete base64 photo gallery before
     // discovery can start. Only ranking/privacy fields are needed here.
     const currentUser = await this.userRepo.findOne({
@@ -177,7 +181,7 @@ export class DiscoveryService {
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim();
-      const searchIds = await this.searchService.searchUserIds(term, { ageMin, ageMax, limit, offset });
+      const searchIds = filters.queue ? null : await this.searchService.searchUserIds(term, { ageMin, ageMax, limit, offset });
       if (searchIds) {
         if (searchIds.length === 0) return [];
         query.andWhere('user.id IN (:...searchIds)', { searchIds });
@@ -193,7 +197,14 @@ export class DiscoveryService {
       }
     }
 
-    if (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim())) {
+    if (filters.interests?.length) {
+      const parts = filters.interests.map((interest, index) => {
+        query.setParameter('interest' + index, JSON.stringify(interest));
+        return 'JSON_CONTAINS(user.interests, :interest' + index + ')';
+      });
+      query.andWhere('(' + parts.join(' OR ') + ')');
+    }
+    if (filters.verifiedOnly || (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim()))) {
       query.andWhere('user.isVerified = :verified', { verified: true });
     }
 
@@ -254,14 +265,39 @@ export class DiscoveryService {
         .addOrderBy('user.createdAt', 'DESC')
         .skip(offset);
     }
-    const rankedResult = await query.take(limit).getRawAndEntities();
+    if (filters.queue) {
+      // Preserve preference/distance ranking and add a unique tie breaker.
+      query.skip(0).addOrderBy('user.id', 'DESC');
+      if (filters.cursor) {
+        let cursor: { values: (string | number)[] };
+        const ordering = Object.entries(query.expressionMap.orderBys);
+        try {
+          cursor = JSON.parse(Buffer.from(filters.cursor, 'base64url').toString());
+          if (!Array.isArray(cursor.values) || cursor.values.length !== ordering.length ||
+            cursor.values.some(value => typeof value !== 'string' && typeof value !== 'number')) throw new Error();
+        } catch { throw new BadRequestException('Invalid discovery cursor.'); }
+        // MySQL HAVING supports the computed ranking aliases.
+        const parameters: Record<string, string | number | Date> = {};
+        const clauses = ordering.map(([column, direction], index) => {
+          parameters['cursor' + index] = column === 'user.createdAt' ? new Date(cursor.values[index]) : cursor.values[index];
+          const equals = ordering.slice(0, index).map(([previous], preceding) => previous + ' = :cursor' + preceding);
+          return '(' + [...equals, column + (direction === 'ASC' ? ' > ' : ' < ') + ':cursor' + index].join(' AND ') + ')';
+        });
+        query.having('(' + clauses.join(' OR ') + ')', parameters);
+      }
+    }
+    const rankedResult = await query.take(filters.queue ? limit + 1 : limit).getRawAndEntities();
     let users = rankedResult.entities;
     rankedResult.raw.forEach((row, index) => {
       (users[index] as any).__primaryPhoto = row.primaryPhoto || null;
       (users[index] as any).__photoCount = Number(row.profilePhotoCount) || 0;
     });
 
-    return users.map(user => {
+    const hasMore = filters.queue && users.length > limit;
+    if (filters.queue) users = users.slice(0, limit);
+    const last = users[users.length - 1];
+    const lastRaw = rankedResult.raw[users.length - 1];
+    const items = users.map(user => {
       const primaryPhoto = (user as any).__primaryPhoto ?? user.avatarUrl;
       const visiblePhotos = primaryPhoto ? [primaryPhoto] : [];
       return {
@@ -299,6 +335,8 @@ export class DiscoveryService {
         goals: user.relationshipGoal,
       } as any;
     });
+    const values = last ? Object.keys(query.expressionMap.orderBys).map(column => column === 'user.createdAt' ? last.createdAt.toISOString() : column === 'user.id' ? last.id : Number(lastRaw[column])) : [];
+    return filters.queue ? { items, hasMore, nextCursor: hasMore && last ? Buffer.from(JSON.stringify({ values })).toString('base64url') : null } : items;
   }
 
   async getPopularTags(): Promise<{ interests: string[] }> {
