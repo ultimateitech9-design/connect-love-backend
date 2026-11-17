@@ -45,7 +45,7 @@ export class VideoCallsService {
     if (!validReceiver || receiverId === callerId) {
       throw new ForbiddenException('Invalid receiver for this call.');
     }
-    if (callType === 'video') await this.planUsage.assertAndRecord(callerId, 'videoCallsPerMonth', 'Video call', receiverId);
+    if (callType === 'video') await this.planUsage.assertAndRecord(callerId, 'videoCallsPerDay', 'Video call', receiverId, true);
 
     return this.callRepo.save(this.callRepo.create({
       conversationId,

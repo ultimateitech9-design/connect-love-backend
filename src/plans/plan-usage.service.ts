@@ -15,7 +15,7 @@ export class PlanUsageService {
     return { user, limits: entitlementsFor(user) };
   }
 
-  async assertAndRecord(userId: string, action: keyof Pick<PlanEntitlements, 'likesPerDay' | 'videoCallsPerMonth' | 'sharedImagesPerMonth' | 'superLikesPerMonth' | 'rewindsPerMonth' | 'firstImpressionsPerMonth' | 'boostsPerMonth'>, label: string, targetId?: string, period: boolean | 'week' = false, limitOverride?: number, minimumUsed = 0) {
+  async assertAndRecord(userId: string, action: keyof Pick<PlanEntitlements, 'likesPerDay' | 'videoCallsPerDay' | 'sharedImagesPerMonth' | 'superLikesPerMonth' | 'rewindsPerMonth' | 'firstImpressionsPerMonth' | 'boostsPerMonth'>, label: string, targetId?: string, period: boolean | 'week' = false, limitOverride?: number, minimumUsed = 0) {
     const start = period === true ? dayStart() : period === 'week' ? new Date(Date.now() - 7 * 86400000) : monthStart();
     return this.usage.manager.transaction(async (manager) => {
       // Serialise usage updates per user. Without this lock, rapid clicks could
@@ -30,7 +30,7 @@ export class PlanUsageService {
       const usageRepository = manager.getRepository(PlanUsage);
       const recorded = await usageRepository.count({ where: { userId, action, createdAt: MoreThanOrEqual(start) } });
       const used = Math.max(recorded, minimumUsed);
-      if (used >= limit) throw new BadRequestException(`${label} limit reached. Upgrade your plan to continue.`);
+      if (used >= limit) throw new BadRequestException(`${label} daily limit reached. Your allowance resets tomorrow.`);
       await usageRepository.save(usageRepository.create({ userId, action, targetId: targetId || null }));
       return { limit, remaining: limit - used - 1 };
     });

@@ -5,7 +5,7 @@ export type PlanEntitlements = {
   messagesPerUser: number | null;
   matches: number;
   profilePhotos: number;
-  videoCallsPerMonth: number;
+  videoCallsPerDay: number;
   sharedImagesPerMonth: number;
   superLikesPerMonth: number;
   rewindsPerMonth: number;
@@ -17,9 +17,9 @@ export type PlanEntitlements = {
 };
 
 export const PLAN_ENTITLEMENTS: Record<UserPlan, PlanEntitlements> = {
-  free: { likesPerDay: 10, messagesPerUser: 10, matches: 2, profilePhotos: 2, videoCallsPerMonth: 0, sharedImagesPerMonth: 0, superLikesPerMonth: 0, rewindsPerMonth: 0, firstImpressionsPerMonth: 0, boostsPerMonth: 0, voiceMessages: false, verifiedBadge: false, maxVideoCallMinutes: 0 },
-  gold: { likesPerDay: 20, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 5, videoCallsPerMonth: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 60 },
-  platinum: { likesPerDay: 40, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 10, videoCallsPerMonth: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 120 },
+  free: { likesPerDay: 10, messagesPerUser: 10, matches: 2, profilePhotos: 2, videoCallsPerDay: 0, sharedImagesPerMonth: 0, superLikesPerMonth: 0, rewindsPerMonth: 0, firstImpressionsPerMonth: 0, boostsPerMonth: 0, voiceMessages: false, verifiedBadge: false, maxVideoCallMinutes: 0 },
+  gold: { likesPerDay: 20, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 5, videoCallsPerDay: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 60 },
+  platinum: { likesPerDay: 40, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 10, videoCallsPerDay: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 120 },
 };
 
 const WOMEN_ENTITLEMENTS: PlanEntitlements = {
@@ -27,7 +27,7 @@ const WOMEN_ENTITLEMENTS: PlanEntitlements = {
   messagesPerUser: null,
   matches: Number.MAX_SAFE_INTEGER,
   profilePhotos: 10,
-  videoCallsPerMonth: Number.MAX_SAFE_INTEGER,
+  videoCallsPerDay: Number.MAX_SAFE_INTEGER,
   sharedImagesPerMonth: Number.MAX_SAFE_INTEGER,
   superLikesPerMonth: Number.MAX_SAFE_INTEGER,
   rewindsPerMonth: Number.MAX_SAFE_INTEGER,
@@ -60,7 +60,11 @@ export function monthStart(): Date {
 }
 
 export function dayStart(): Date {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return start;
+  // Plans are sold to the India audience; daily call and like allowances reset
+  // together at midnight India time even when the API host runs in UTC.
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  return new Date(`${value('year')}-${value('month')}-${value('day')}T00:00:00+05:30`);
 }
