@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Agent } from '../agents/agent.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, MoreThanOrEqual, Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -372,8 +373,12 @@ export class UsersService {
       city: user.city,
       profession: user.profession,
     }]));
+    const agentIds = [...new Set(rows.map((row) => row.agentId).filter((id): id is string => Boolean(id)))];
+    const agents = agentIds.length ? await this.dataSource.getRepository(Agent).find({ select: ['id', 'name', 'email'], where: { id: In(agentIds) } }) : [];
+    const agentById = new Map(agents.map((agent) => [agent.id, { name: agent.name, email: agent.email }]));
     return rows.map((row) => ({
       ...row,
+      agent: row.agentId ? agentById.get(row.agentId) || null : null,
       user: row.userId ? names.get(row.userId) || null : null,
       sender: row.senderId ? names.get(row.senderId) || null : null,
       receiver: row.receiverId ? names.get(row.receiverId) || null : null,
@@ -432,6 +437,12 @@ export class UsersService {
         if (user) {
           user.earnedCoinBalance += transaction.grossCoins;
           await manager.getRepository(User).save(user);
+        }
+      } else if (status === 'rejected' && transaction.agentId) {
+        const agent = await manager.getRepository(Agent).findOne({ where: { id: transaction.agentId }, lock: { mode: 'pessimistic_write' } });
+        if (agent) {
+          agent.earnedCoinBalance += transaction.grossCoins;
+          await manager.getRepository(Agent).save(agent);
         }
       }
       transaction.status = status;

@@ -1,4 +1,6 @@
 import { BadGatewayException, BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { PayoutsService } from '../payouts/payouts.service';
+import { Agent } from '../agents/agent.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { request as httpsRequest } from 'https';
@@ -12,6 +14,7 @@ export class WalletPaymentsService {
     @InjectRepository(User) private readonly users: Repository<User>,
     @InjectRepository(CoinTransaction) private readonly transactions: Repository<CoinTransaction>,
     private readonly dataSource: DataSource,
+    private readonly payouts: PayoutsService,
   ) {}
 
   private coinPricePaise() { return Math.max(1, Number(process.env.COIN_PRICE_PAISE || 100)); }
@@ -85,27 +88,12 @@ export class WalletPaymentsService {
     });
   }
 
+  /** Kept for older clients; same rules as POST /wallet/withdrawals. */
   async requestWithdrawal(userId: string, amount: number, payout: Record<string, string>) {
-    const coins = Number(amount); const method = String(payout?.method || '').trim().toLowerCase();
-    if (!Number.isInteger(coins) || coins < 50) throw new BadRequestException('Minimum withdrawal is 50 coins.');
-    if (method !== 'upi' && method !== 'bank') throw new BadRequestException('Select UPI or bank account.');
-    const address = String(payout?.upiId || '').trim().toLowerCase();
-    if (method === 'upi' && !/^[a-z0-9._-]{2,256}@[a-z0-9.-]{2,64}$/.test(address)) throw new BadRequestException('Enter a valid UPI ID, for example name@upi.');
-    if (method === 'bank' && (!String(payout?.accountHolder || '').trim() || !String(payout?.accountNumber || '').trim() || !String(payout?.ifsc || '').trim())) throw new BadRequestException('Enter account holder, account number and IFSC.');
-    const payoutDetails = JSON.stringify({ method, upiId: address || undefined, accountHolder: String(payout?.accountHolder || '').trim(), accountNumber: String(payout?.accountNumber || '').trim(), ifsc: String(payout?.ifsc || '').trim().toUpperCase(), bankName: String(payout?.bankName || '').trim() });
-    const transaction = await this.dataSource.transaction(async (manager) => {
-      const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } }); if (!user) throw new NotFoundException('User not found.');
-      if (user.earnedCoinBalance < coins) throw new BadRequestException('Only gift earnings can be withdrawn. Your earned balance is too low.');
-      user.earnedCoinBalance -= coins; await manager.getRepository(User).save(user);
-      // The 80/20 split is applied when the gift is sent. Withdrawal only
-      // pays out the recipient's already-earned balance, so do not split it a
-      // second time here.
-      return manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({ type: 'withdrawal', status: 'pending', userId, senderId: null, receiverId: userId, grossCoins: coins, userCoins: coins, platformCoins: 0, amountPaise: coins * this.withdrawalValuePaise(), label: `Manual ${method} withdrawal`, payoutAccount: address || String(payout?.accountNumber || '').trim(), payoutDetails, gatewayOrderId: null, gatewayPaymentId: null, gatewayPayoutId: null }));
-    });
-    return { id: transaction.id, status: transaction.status, amountPaise: transaction.amountPaise, message: 'Withdrawal request submitted. Payment will be reviewed by our team.' };
+    return this.payouts.requestWithdrawal('user', userId, { coins: amount, payout });
   }
 
-  private async rejectWithdrawal(id: string) { await this.dataSource.transaction(async (manager) => { const tx = await manager.getRepository(CoinTransaction).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } }); if (!tx || tx.status !== 'pending') return; const user = tx.userId ? await manager.getRepository(User).findOne({ where: { id: tx.userId }, lock: { mode: 'pessimistic_write' } }) : null; if (user) { user.earnedCoinBalance += tx.grossCoins; await manager.getRepository(User).save(user); } tx.status = 'rejected'; await manager.getRepository(CoinTransaction).save(tx); }); }
+  private async rejectWithdrawal(id: string) { await this.dataSource.transaction(async (manager) => { const tx = await manager.getRepository(CoinTransaction).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } }); if (!tx || tx.status !== 'pending') return; const user = tx.userId ? await manager.getRepository(User).findOne({ where: { id: tx.userId }, lock: { mode: 'pessimistic_write' } }) : null; if (user) { user.earnedCoinBalance += tx.grossCoins; await manager.getRepository(User).save(user); } else if (tx.agentId) { const agent = await manager.getRepository(Agent).findOne({ where: { id: tx.agentId }, lock: { mode: 'pessimistic_write' } }); if (agent) { agent.earnedCoinBalance += tx.grossCoins; await manager.getRepository(Agent).save(agent); } } tx.status = 'rejected'; await manager.getRepository(CoinTransaction).save(tx); }); }
 
   async handleWebhook(raw: Buffer | undefined, body: any, signature?: string) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim(); if (!secret || !raw || !signature) throw new BadRequestException('Webhook verification is not configured.');

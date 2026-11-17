@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PayoutsModule } from '../payouts/payouts.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { User } from '../users/user.entity';
@@ -10,7 +11,7 @@ import { UserActivityService } from '../users/user-activity.service';
 import { MessagesModule } from '../messages/messages.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Agent, AgentEmailChallenge, User]), AuthModule, MessagesModule],
+  imports: [TypeOrmModule.forFeature([Agent, AgentEmailChallenge, User]), AuthModule, MessagesModule, PayoutsModule],
   controllers: [AgentsController], providers: [AgentsService, AgentGuard, UserActivityService],
 })
 export class AgentsModule {}

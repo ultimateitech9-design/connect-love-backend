@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { PayoutsModule } from '../payouts/payouts.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
@@ -14,7 +15,7 @@ import { UserEmailChallenge } from './user-email-challenge.entity';
 import { EmailManagementService } from './email-management.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, MatchRelation, ProfileView, CoinTransaction, UserEmail, UserEmailChallenge])],
+  imports: [TypeOrmModule.forFeature([User, MatchRelation, ProfileView, CoinTransaction, UserEmail, UserEmailChallenge]), PayoutsModule],
   controllers: [UsersController, WalletPaymentsController],
   providers: [UsersService, WalletPaymentsService, EmailManagementService, RolesGuard],
   exports: [UsersService],
