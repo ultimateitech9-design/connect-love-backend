@@ -25,7 +25,7 @@ export class AgentUserDto extends AgentLoginDto {
   @IsOptional() @IsString() @MaxLength(30) phone?: string;
   @IsOptional() @IsString() @MaxLength(150) profession?: string;
   @IsOptional() @IsString() @MaxLength(500) bio?: string;
-  @IsOptional() @IsArray() @ArrayMaxSize(6) @IsString({ each: true }) @MaxLength(1500000, { each: true }) photos?: string[];
+  @IsOptional() @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) @MaxLength(1500000, { each: true }) photos?: string[];
 }
 export class AgentBulkUsersDto {
   @IsArray() @ArrayMinSize(1) @ArrayMaxSize(25)

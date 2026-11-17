@@ -19,12 +19,16 @@ async function run() {
   const jwt = new JwtService();
   const token = jwt.sign({ sub: agentId, version: 0 }, { secret: `${process.env.JWT_SECRET.trim()}:connectlove-agent`, audience: 'agent', expiresIn: '10m' });
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE } : {}) });
-  const page = await browser.newPage();
+  const page = await browser.newPage({ reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(value => sessionStorage.setItem('connectlove_agent_token', value), token);
   await page.goto('http://localhost:3002/agent/dashboard', { waitUntil: 'networkidle', timeout: 120000 });
+  await page.getByRole('button', { name: 'Create accounts', exact: true }).last().click();
+  await page.waitForFunction(() => { const panel = document.querySelector('.ag-create-panel'); return panel && Math.abs(panel.getBoundingClientRect().top - 24) < 4; });
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.getByRole('button', { name: 'Create accounts', exact: true }).first().click();
+  await page.waitForFunction(() => Math.abs(document.querySelector('.ag-create-panel').getBoundingClientRect().top - 24) < 4);
   await page.getByPlaceholder('Full name', { exact: true }).fill(name);
   await page.getByPlaceholder('user@gmail.com').fill(`${agentId}-user@example.invalid`);
   await page.getByPlaceholder('At least 8 characters').fill('Photo-Test-Password-123');
@@ -51,12 +55,32 @@ async function run() {
   await preview.waitFor();
   assert.equal(await preview.evaluate(img => img.complete && img.naturalWidth > 0 && img.naturalWidth <= 1280), true);
   const savedImage = await preview.getAttribute('src'); assert.ok(savedImage.length <= 1400000);
+  const extraImages = await page.evaluate(() => ['#ff0000', '#00ff00', '#0000ff', '#cc0099', '#998800'].map(color => {
+    const canvas = document.createElement('canvas'); canvas.width = 80; canvas.height = 80;
+    const ctx = canvas.getContext('2d'); ctx.fillStyle = color; ctx.fillRect(0, 0, 80, 80);
+    return canvas.toDataURL('image/png').split(',')[1];
+  }));
+  const files = extraImages.map((data, i) => ({ name: `photo-${i}.png`, mimeType: 'image/png', buffer: Buffer.from(data, 'base64') }));
+  await fileInput.setInputFiles(files);
+  await page.getByText('You can add up to 5 photos per user.', { exact: false }).waitFor();
+  assert.equal(await page.locator('.ag-draft-photos img').count(), 1);
+  await fileInput.setInputFiles(files.slice(0, 4));
+  await page.getByText('5/5 photos', { exact: false }).waitFor();
+  assert.equal(await page.locator('.ag-draft input[type=file]').count(), 0);
+  await page.getByRole('button', { name: 'Remove photo 3 for user 1', exact: true }).click();
+  await page.getByText('4/5 photos', { exact: false }).waitFor();
+  await fileInput.setInputFiles(files[4]);
+  await page.getByText('5/5 photos', { exact: false }).waitFor();
+  const savedImages = await page.locator('.ag-draft-photos img').evaluateAll(images => images.map(img => img.src));
+  assert.equal(savedImages.length, 5);
+  const rejected = await fetch(`${api}/agents/users/bulk`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ consentConfirmed: true, users: [{ name: 'Too many photos', email: `${agentId}-rejected@example.invalid`, password: 'Photo-Test-Password-123', birthDate: '1998-04-15', gender: 'female', city: 'Mumbai', photos: [...savedImages, savedImages[0]] }] }) });
+  assert.equal(rejected.status, 400);
   const createButton = page.getByRole('button', { name: 'Create 1 account', exact: true });
   await createButton.click(); await page.getByText('Login details are ready', { exact: true }).waitFor();
   const [users] = await db.execute('SELECT id,photos,photosVisibleToNonMatches FROM users WHERE createdByAgentId=?', [agentId]);
   assert.equal(users.length, 1);
   const photos = typeof users[0].photos === 'string' ? JSON.parse(users[0].photos) : users[0].photos;
-  assert.deepEqual(photos, [savedImage]); assert.equal(users[0].photosVisibleToNonMatches, 1);
+  assert.deepEqual(photos, savedImages); assert.equal(users[0].photosVisibleToNonMatches, 1);
   await db.execute('INSERT INTO users (id,name,email,password,birthDate,gender,city,role,status) VALUES (?,?,?,?,?,?,?,?,?)', [viewerId, 'Photo Test Viewer', `${viewerId}@example.invalid`, 'not-a-login', '1995-01-01', 'male', 'Mumbai', 'user', 'active']);
   const viewerToken = jwt.sign({ sub: viewerId, role: 'user' }, { secret: process.env.JWT_SECRET.trim(), expiresIn: '10m' });
   async function discovery() {
@@ -64,6 +88,7 @@ async function run() {
     assert.equal(response.status, 200); const profiles = await response.json(); return profiles.find(profile => profile.id === users[0].id);
   }
   assert.equal((await discovery()).photo, savedImage);
+  assert.equal((await discovery()).photoCount, 5);
   await page.getByRole('button', { name: 'View details' }).click();
   await page.getByRole('dialog').waitFor();
   const replacement = await page.evaluate(() => { const canvas = document.createElement('canvas'); canvas.width = 100; canvas.height = 100; const ctx = canvas.getContext('2d'); ctx.fillStyle = '#c63865'; ctx.fillRect(0, 0, 100, 100); return canvas.toDataURL('image/png').split(',')[1]; });
@@ -71,9 +96,10 @@ async function run() {
   await page.getByText('Profile photo saved successfully.', { exact: true }).waitFor();
   const newPhoto = await page.getByRole('dialog').locator('.ag-detail-photos img').first().getAttribute('src');
   assert.notEqual(newPhoto, savedImage); assert.equal((await discovery()).photo, newPhoto);
+  assert.equal(await page.getByRole('dialog').locator('.ag-detail-photos img').count(), 5);
   assert.equal(await page.getByRole('dialog').locator('.ag-detail-photos img').first().evaluate(img => img.complete && img.naturalWidth > 0), true);
   assert.deepEqual(errors, []);
-  console.log('PASS: corrupt-image feedback, >1 MB phone photo resizing, visible preview, real account creation and DB persistence, Discover photo, existing-user photo replacement and Discover refresh.');
+  console.log('PASS: create-form scroll (including repeated navigation), five-photo selection/removal, sixth-photo rejection (UI/API), five-photo persistence and Discover count, corrupt-image feedback, >1 MB phone photo resizing, visible preview, real account creation and DB persistence, Discover photo, existing-user photo replacement and Discover refresh.');
 }
 run().catch(error => { console.error(error.message); process.exitCode = 1; }).finally(async () => {
   if (browser) await browser.close();
