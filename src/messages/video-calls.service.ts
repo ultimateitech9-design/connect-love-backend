@@ -56,6 +56,10 @@ export class VideoCallsService {
     }));
   }
 
+  findById(id: string): Promise<VideoCall | null> {
+    return this.callRepo.findOne({ where: { id } });
+  }
+
   async findIncoming(userId: string): Promise<(VideoCall & { callerProfile: CallParticipant | null }) | null> {
     const recentThreshold = new Date(Date.now() - 2 * 60 * 1000);
     const call = await this.callRepo.findOne({

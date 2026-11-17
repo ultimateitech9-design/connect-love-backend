@@ -172,6 +172,10 @@ export class User {
   @Column({ type: 'int', unsigned: true, default: 0 })
   earnedCoinBalance: number;
 
+  /** When false, only matched users can call this user (no paid direct calls). */
+  @Column({ type: 'boolean', default: true })
+  allowDirectCalls: boolean;
+
   @Column({ default: false })
   darkMode: boolean;
 

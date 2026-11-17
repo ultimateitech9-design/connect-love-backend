@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from 'typeorm';
 
-export type CoinTransactionType = 'recharge' | 'gift' | 'theme' | 'withdrawal' | 'admin_credit';
+export type CoinTransactionType = 'recharge' | 'gift' | 'theme' | 'withdrawal' | 'admin_credit' | 'call';
 export type CoinTransactionStatus = 'completed' | 'pending' | 'rejected';
 
 @Entity('coin_transactions')
@@ -11,9 +11,13 @@ export class CoinTransaction {
   @Column({ type: 'char', length: 36, nullable: true }) userId: string | null;
   @Column({ type: 'char', length: 36, nullable: true }) senderId: string | null;
   @Column({ type: 'char', length: 36, nullable: true }) receiverId: string | null;
+  /** Agent who created the receiver's account and earned a share (direct calls). */
+  @Column({ type: 'char', length: 36, nullable: true }) agentId: string | null;
+  @Column({ type: 'char', length: 36, nullable: true }) callId: string | null;
   @Column({ type: 'int', unsigned: true }) grossCoins: number;
   @Column({ type: 'int', unsigned: true, default: 0 }) userCoins: number;
   @Column({ type: 'int', unsigned: true, default: 0 }) platformCoins: number;
+  @Column({ type: 'int', unsigned: true, default: 0 }) agentCoins: number;
   @Column({ type: 'varchar', length: 120, nullable: true }) label: string | null;
   @Column({ type: 'varchar', length: 160, nullable: true }) payoutAccount: string | null;
   @Column({ type: 'text', nullable: true }) payoutDetails: string | null;

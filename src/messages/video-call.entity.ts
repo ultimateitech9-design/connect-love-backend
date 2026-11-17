@@ -12,14 +12,16 @@ import { MatchRelation } from '../matches/match.entity';
 
 export type VideoCallStatus = 'ringing' | 'active' | 'ended' | 'rejected' | 'missed';
 export type VideoCallType = 'audio' | 'video';
+/** 'match': free call between matched users. 'direct': paid call without a match. */
+export type VideoCallMode = 'match' | 'direct';
 
 @Entity('video_calls')
 export class VideoCall {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column()
-  conversationId: string;
+  @Column({ type: 'varchar', length: 36, nullable: true })
+  conversationId: string | null;
 
   @Column()
   callerId: string;
@@ -44,6 +46,27 @@ export class VideoCall {
 
   @Column({ type: 'enum', enum: ['audio', 'video'], default: 'video' })
   callType: VideoCallType;
+
+  @Column({ type: 'enum', enum: ['match', 'direct'], default: 'match' })
+  mode: VideoCallMode;
+
+  /** Direct call made on the caller's monthly free allowance (time-limited). */
+  @Column({ type: 'boolean', default: false })
+  isFreeTrial: boolean;
+
+  /** Coins per started minute for a paid direct call. */
+  @Column({ type: 'int', unsigned: true, nullable: true })
+  ratePerMinute: number | null;
+
+  @Column({ type: 'int', unsigned: true, default: 0 })
+  billedMinutes: number;
+
+  @Column({ type: 'int', unsigned: true, default: 0 })
+  coinsCharged: number;
+
+  /** Why the server ended the call, e.g. 'free_limit' or 'coins_exhausted'. */
+  @Column({ type: 'varchar', length: 30, nullable: true })
+  endReason: string | null;
 
   @Column({ nullable: true, type: 'timestamp' })
   startedAt: Date | null;

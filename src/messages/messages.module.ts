@@ -14,6 +14,7 @@ import { AuthModule } from '../auth/auth.module';
 import { User } from '../users/user.entity';
 import { PushNotificationsModule } from '../push-notifications/push-notifications.module';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
+import { DirectCallsModule } from '../direct-calls/direct-calls.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { FirstImpression } from '../first-impressions/first-impression.entity';
     MatchesModule,
     AuthModule,
     PushNotificationsModule,
+    DirectCallsModule,
   ],
   providers: [MessagesService, VideoCallsService, MessagesGateway],
   controllers: [MessagesController, VideoCallsController],

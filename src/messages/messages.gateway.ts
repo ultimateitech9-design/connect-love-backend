@@ -14,6 +14,11 @@ import { VideoCallsService } from './video-calls.service';
 import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
 import { MatchStatus } from '../matches/match.entity';
+import { VideoCall } from './video-call.entity';
+import { DirectCallsService, UPGRADE_REQUIRED } from '../direct-calls/direct-calls.service';
+
+/** Grace period before a direct call is ended because a participant went offline. */
+const OFFLINE_END_DELAY_MS = 20_000;
 
 @WebSocketGateway({
   cors: {
@@ -30,13 +35,83 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Map to store connected users: userId -> Set of socketIds
   private connectedUsers = new Map<string, Set<string>>();
 
+  // Server-side timers for direct calls: free-trial cut-off or per-minute billing.
+  private callTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
+  // Active direct calls, so they can be ended if a participant goes offline
+  // (otherwise per-minute billing would keep charging).
+  private activeDirectCalls = new Map<string, { callerId: string; receiverId: string }>();
+
   constructor(
     private readonly messagesService: MessagesService,
     private readonly videoCallsService: VideoCallsService,
     private readonly usersService: UsersService,
     private readonly matchesService: MatchesService,
     private readonly jwtService: JwtService,
+    private readonly directCalls: DirectCallsService,
   ) {}
+
+  private clearCallTimers(callId: string) {
+    for (const timer of this.callTimers.get(callId) ?? []) {
+      clearTimeout(timer);
+      clearInterval(timer);
+    }
+    this.callTimers.delete(callId);
+    this.activeDirectCalls.delete(callId);
+  }
+
+  /** Ends a call on the server's behalf (time limit, no coins, participant offline). */
+  private async endCallBySystem(callId: string, reason: string) {
+    this.clearCallTimers(callId);
+    try {
+      const call = await this.videoCallsService.findById(callId);
+      if (!call || (call.status !== 'active' && call.status !== 'ringing')) return;
+      const endedCall = await this.videoCallsService.finish(call.id, call.callerId, call.status === 'ringing' ? 'missed' : 'ended');
+      if (endedCall.mode === 'direct') {
+        await this.directCalls.setEndReason(endedCall.id, reason);
+        endedCall.endReason = reason;
+      } else {
+        const endedMessage = await this.messagesService.upsertCallLog(endedCall);
+        this.emitToUser(endedCall.callerId, 'messageUpdated', endedMessage);
+        this.emitToUser(endedCall.receiverId, 'messageUpdated', endedMessage);
+      }
+      const payload = { call: endedCall, endedBy: reason };
+      this.emitToUser(endedCall.callerId, 'videoCallEnded', payload);
+      this.emitToUser(endedCall.receiverId, 'videoCallEnded', payload);
+    } catch {
+      // The call was already ended by a participant.
+    }
+  }
+
+  /**
+   * Starts server-side enforcement for an answered direct call: a free trial
+   * is cut after its allowance; a paid call is charged per started minute and
+   * ended as soon as the caller cannot pay for the next minute.
+   */
+  private async startDirectCallBilling(call: VideoCall) {
+    this.activeDirectCalls.set(call.id, { callerId: call.callerId, receiverId: call.receiverId });
+    const settings = await this.directCalls.settings();
+    const ratePerMinute = call.ratePerMinute ?? this.directCalls.rateFor(settings, call.callType);
+
+    if (call.isFreeTrial) {
+      const limitSeconds = this.directCalls.freeSecondsFor(settings, call.callType);
+      this.callTimers.set(call.id, [setTimeout(() => void this.endCallBySystem(call.id, 'free_limit'), limitSeconds * 1000)]);
+      return { isFreeTrial: true, limitSeconds, ratePerMinute };
+    }
+
+    const first = await this.directCalls.chargeMinute(call.id);
+    if (!first.charged) {
+      await this.endCallBySystem(call.id, 'coins_exhausted');
+      return { isFreeTrial: false, ratePerMinute, balance: first.balance, ended: true };
+    }
+    const interval = setInterval(() => {
+      void this.directCalls.chargeMinute(call.id).then((next) => {
+        if (!next.charged) return this.endCallBySystem(call.id, 'coins_exhausted');
+        this.emitToUser(call.callerId, 'callBilling', { callId: call.id, ratePerMinute, ...next });
+      }).catch(() => undefined);
+    }, 60_000);
+    this.callTimers.set(call.id, [interval]);
+    return { isFreeTrial: false, ratePerMinute, ...first };
+  }
 
   private getUserIdForSocket(client: Socket): string | undefined {
     for (const [userId, sockets] of this.connectedUsers.entries()) {
@@ -113,6 +188,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
 
     if (disconnectedUserId) {
+      const offlineUserId = disconnectedUserId;
+      for (const [callId, participants] of this.activeDirectCalls.entries()) {
+        if (participants.callerId !== offlineUserId && participants.receiverId !== offlineUserId) continue;
+        setTimeout(() => {
+          if (!this.isUserOnline(offlineUserId)) void this.endCallBySystem(callId, 'disconnected');
+        }, OFFLINE_END_DELAY_MS);
+      }
       const now = new Date();
       await this.usersService.updatePresence(disconnectedUserId, false);
       await this.broadcastPresenceToMatches(disconnectedUserId, false, now);
@@ -344,6 +426,35 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /** Paid call to someone the caller has not matched with (see DirectCallsService). */
+  @SubscribeMessage('startDirectCall')
+  async handleStartDirectCall(
+    @MessageBody() data: { receiverId: string; callType?: 'audio' | 'video' },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const callerId = this.getUserIdForSocket(client);
+    if (!callerId) return { error: 'Not authenticated' };
+
+    try {
+      const callType = data.callType === 'audio' ? 'audio' : 'video';
+      const plan = await this.directCalls.planCall(callerId, data.receiverId, callType);
+      const call = await this.directCalls.createCall(callerId, data.receiverId, callType, plan);
+      const [caller, receiver] = await Promise.all([
+        this.videoCallsService.participant(call.callerId),
+        this.videoCallsService.participant(call.receiverId),
+      ]);
+      const payload = { call, callerId, conversationId: null, callType, caller, receiver, mode: 'direct' as const };
+      this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
+      this.server.to(client.id).emit('videoCallStarted', payload);
+      return { event: 'videoCallStarted', data: payload };
+    } catch (error: any) {
+      const message = error?.message || 'Could not start call';
+      return message === UPGRADE_REQUIRED
+        ? { error: 'Your free calls for this month are used up. Buy coins to keep calling.', code: UPGRADE_REQUIRED }
+        : { error: message };
+    }
+  }
+
   @SubscribeMessage('acceptVideoCall')
   async handleAcceptVideoCall(
     @MessageBody() data: { callId: string; callerId: string },
@@ -354,6 +465,16 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.accept(data.callId, receiverId);
+      if (call.mode === 'direct') {
+        const billing = await this.startDirectCallBilling(call);
+        const payload = { call, receiverId, maxDurationMinutes: null, mode: 'direct' as const, billing };
+        // Only the caller sees balances; the receiver just needs any time limit.
+        this.emitToUser(data.callerId, 'videoCallAccepted', payload);
+        const receiverPayload = { ...payload, billing: { isFreeTrial: billing.isFreeTrial, limitSeconds: 'limitSeconds' in billing ? billing.limitSeconds : undefined } };
+        this.server.to(client.id).emit('videoCallAccepted', receiverPayload);
+        client.to(`user:${receiverId}`).emit('videoCallAnsweredElsewhere', { callId: call.id });
+        return { event: 'videoCallAccepted', data: receiverPayload };
+      }
       const callMessage = await this.messagesService.upsertCallLog(call);
       this.emitToUser(call.callerId, 'messageUpdated', callMessage);
       this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
@@ -390,10 +511,13 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!userId) return { error: 'Not authenticated' };
 
     try {
+      this.clearCallTimers(data.callId);
       const call = await this.videoCallsService.finish(data.callId, userId, data.status || 'ended');
-      const callMessage = await this.messagesService.upsertCallLog(call);
-      this.emitToUser(call.callerId, 'messageUpdated', callMessage);
-      this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
+      if (call.mode !== 'direct') {
+        const callMessage = await this.messagesService.upsertCallLog(call);
+        this.emitToUser(call.callerId, 'messageUpdated', callMessage);
+        this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
+      }
       const payload = { call, endedBy: userId };
       this.emitToUser(data.otherUserId, 'videoCallEnded', payload);
       this.server.to(client.id).emit('videoCallEnded', payload);

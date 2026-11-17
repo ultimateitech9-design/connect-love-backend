@@ -8,6 +8,8 @@ export class Agent {
   @Column({ select: false }) password: string;
   @Column({ default: 0 }) sessionVersion: number;
   @Column({ type: 'enum', enum: ['active', 'banned', 'deleted'], default: 'active' }) status: 'active' | 'banned' | 'deleted';
+  /** Share of direct-call coins earned from calls to users this agent created. */
+  @Column({ type: 'int', unsigned: true, default: 0 }) earnedCoinBalance: number;
   @Column({ type: 'datetime', nullable: true }) deletedAt: Date | null;
   @CreateDateColumn() createdAt: Date;
 }
