@@ -227,6 +227,35 @@ export class PayoutsService {
     };
   }
 
+  /**
+   * A member's wallet history, newest first, as signed amounts from their
+   * point of view: purchases and earnings are positive, spending and
+   * withdrawals negative. 'wallet' says which balance it affected.
+   */
+  async walletHistory(userId: string, limit = 50) {
+    const rows = await this.dataSource.getRepository(CoinTransaction).createQueryBuilder('tx')
+      .where('(tx.userId = :userId OR tx.senderId = :userId OR tx.receiverId = :userId)', { userId })
+      .andWhere("NOT (tx.type = 'recharge' AND tx.status <> 'completed')")
+      .orderBy('tx.createdAt', 'DESC')
+      .take(limit)
+      .getMany();
+    return rows.map((tx) => {
+      // Gifts and calls record the payer as senderId.
+      const sent = tx.senderId === userId;
+      let coins: number;
+      let wallet: 'coins' | 'earnings';
+      switch (tx.type) {
+        case 'recharge': coins = tx.grossCoins; wallet = 'coins'; break;
+        case 'admin_credit': coins = tx.userCoins || tx.grossCoins; wallet = 'coins'; break;
+        case 'withdrawal': coins = -tx.grossCoins; wallet = 'earnings'; break;
+        case 'gift':
+        case 'call': coins = sent ? -tx.grossCoins : tx.userCoins; wallet = sent ? 'coins' : 'earnings'; break;
+        default: coins = -tx.grossCoins; wallet = 'coins';
+      }
+      return { id: tx.id, type: tx.type, status: tx.status, label: tx.label, coins, wallet, createdAt: tx.createdAt };
+    });
+  }
+
   /** The owner's latest withdrawal requests with masked account details. */
   async withdrawals(ownerType: PayoutOwnerType, ownerId: string) {
     const rows = await this.dataSource.getRepository(CoinTransaction).find({

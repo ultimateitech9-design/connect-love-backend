@@ -28,6 +28,12 @@ export class PayoutsController {
     return this.payouts.deleteAccount('user', req.user.userId, id);
   }
 
+  /** Wallet history: purchases, gifts, calls, withdrawals. */
+  @Get('transactions')
+  transactions(@Request() req: any) {
+    return this.payouts.walletHistory(req.user.userId);
+  }
+
   @Get('withdrawals')
   withdrawals(@Request() req: any) {
     return this.payouts.withdrawals('user', req.user.userId);
