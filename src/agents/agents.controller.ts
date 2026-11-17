@@ -13,6 +13,7 @@ export class AgentsController {
   @Post('auth/reset-password') reset(@Body() body: AgentResetDto, @Req() req: any) { this.service.throttle(`verify:${req.ip}`, 20); return this.service.reset(body); }
   @Get('me') @UseGuards(AgentGuard) me(@Req() req: any) { return { agent: this.service.publicAgent(req.agent) }; }
   @Post('auth/logout') @UseGuards(AgentGuard) logout(@Req() req: any) { return this.service.logout(req.agent.id); }
+  @Get('earnings') @UseGuards(AgentGuard) earnings(@Req() req: any) { return this.service.earnings(req.agent.id); }
   @Get('users') @UseGuards(AgentGuard) users(@Req() req: any, @Query() query: AgentUsersQueryDto) { return this.service.listUsers(req.agent.id, query); }
   @Get('users/:id') @UseGuards(AgentGuard) user(@Req() req: any, @Param('id', ParseUUIDPipe) id: string) { return this.service.userDetails(req.agent.id, id); }
   @Get('users/:id/activity') @UseGuards(AgentGuard) activity(@Req() req: any, @Param('id', ParseUUIDPipe) id: string, @Query('page') page?: string) { return this.service.userActivity(req.agent.id, id, Number(page || 1)); }

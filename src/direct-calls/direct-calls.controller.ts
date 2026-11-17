@@ -27,6 +27,13 @@ export class DirectCallsController {
     return this.directCalls.settings();
   }
 
+  @Get('admin/stats')
+  @UseGuards(RolesGuard)
+  @Roles('super_admin')
+  adminStats() {
+    return this.directCalls.adminStats();
+  }
+
   @Patch('admin/settings')
   @UseGuards(RolesGuard)
   @Roles('super_admin')

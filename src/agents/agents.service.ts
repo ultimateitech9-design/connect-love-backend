@@ -12,6 +12,7 @@ import { AgentBulkUsersDto, AgentLoginDto, AgentRegisterDto, AgentResetDto, Agen
 import { UserActivityService } from '../users/user-activity.service';
 import { AuditLog } from '../platform/audit-log.entity';
 import { VideoCall } from '../messages/video-call.entity';
+import { CoinTransaction } from '../users/coin-transaction.entity';
 import { MessagesGateway } from '../messages/messages.gateway';
 
 @Injectable()
@@ -32,6 +33,39 @@ export class AgentsService {
     if (++value.count > max) throw new HttpException('Too many attempts. Please try again in 15 minutes.', 429);
     this.limits.set(key, value);
   }
+  /**
+   * Coins this agent earned from direct calls to the users it created:
+   * wallet balance, this month / all-time totals, per-user totals and the
+   * latest entries.
+   */
+  async earnings(agentId: string) {
+    const agent = await this.agents.findOne({ where: { id: agentId } });
+    if (!agent) throw new NotFoundException('Agent not found.');
+    const tx = () => this.db.getRepository(CoinTransaction).createQueryBuilder('tx').where("tx.type = 'call' AND tx.agentId = :agentId", { agentId });
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [month, allTime, byUser, recent] = await Promise.all([
+      tx().andWhere('tx.createdAt >= :monthStart', { monthStart }).select('COALESCE(SUM(tx.agentCoins), 0)', 'coins').getRawOne(),
+      tx().select('COALESCE(SUM(tx.agentCoins), 0)', 'coins').addSelect('COUNT(*)', 'minutes').getRawOne(),
+      tx().leftJoin(User, 'user', 'user.id = tx.receiverId')
+        .select('tx.receiverId', 'userId').addSelect('user.name', 'name')
+        .addSelect('SUM(tx.agentCoins)', 'coins').addSelect('COUNT(*)', 'minutes')
+        .groupBy('tx.receiverId').addGroupBy('user.name')
+        .orderBy('coins', 'DESC').limit(20).getRawMany(),
+      tx().leftJoin(User, 'user', 'user.id = tx.receiverId')
+        .select(['tx.id AS id', 'tx.createdAt AS createdAt', 'tx.agentCoins AS coins', 'tx.label AS label', 'user.name AS name'])
+        .orderBy('tx.createdAt', 'DESC').limit(20).getRawMany(),
+    ]);
+    return {
+      balance: agent.earnedCoinBalance,
+      thisMonth: Number(month?.coins) || 0,
+      allTime: Number(allTime?.coins) || 0,
+      paidMinutes: Number(allTime?.minutes) || 0,
+      byUser: byUser.map((row) => ({ userId: row.userId, name: row.name, coins: Number(row.coins) || 0, minutes: Number(row.minutes) || 0 })),
+      recent: recent.map((row) => ({ id: row.id, createdAt: row.createdAt, coins: Number(row.coins) || 0, label: row.label, name: row.name })),
+    };
+  }
+
   publicAgent(agent: Agent) { return { id: agent.id, name: agent.name, email: agent.email, createdAt: agent.createdAt }; }
   private session(agent: Agent) {
     return { agent: this.publicAgent(agent), token: this.jwt.sign({ sub: agent.id, version: agent.sessionVersion }, { secret: agentSecret(), audience: 'agent', expiresIn: '12h' }) };

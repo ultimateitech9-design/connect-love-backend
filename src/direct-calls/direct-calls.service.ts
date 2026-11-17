@@ -267,6 +267,30 @@ export class DirectCallsService {
     });
   }
 
+  /** Coins earned from direct calls this month and in total, for the super-admin page. */
+  async adminStats() {
+    const sums = (since: Date | null) => {
+      const query = this.dataSource.getRepository(CoinTransaction).createQueryBuilder('tx')
+        .select('COUNT(*)', 'minutes')
+        .addSelect('COUNT(DISTINCT tx.callId)', 'paidCalls')
+        .addSelect('COALESCE(SUM(tx.grossCoins), 0)', 'coins')
+        .addSelect('COALESCE(SUM(tx.userCoins), 0)', 'receiverCoins')
+        .addSelect('COALESCE(SUM(tx.agentCoins), 0)', 'agentCoins')
+        .addSelect('COALESCE(SUM(tx.platformCoins), 0)', 'platformCoins')
+        .where("tx.type = 'call'");
+      if (since) query.andWhere('tx.createdAt >= :since', { since });
+      return query.getRawOne().then((row) => Object.fromEntries(Object.entries(row ?? {}).map(([key, value]) => [key, Number(value) || 0])));
+    };
+    const since = monthStart();
+    const [month, allTime, callsThisMonth, freeCallsThisMonth] = await Promise.all([
+      sums(since),
+      sums(null),
+      this.callRepo.count({ where: { mode: 'direct', startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(since) } }),
+      this.callRepo.count({ where: { mode: 'direct', isFreeTrial: true, startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(since) } }),
+    ]);
+    return { month: { ...month, answeredCalls: callsThisMonth, freeCalls: freeCallsThisMonth }, allTime };
+  }
+
   async setEndReason(callId: string, reason: string) {
     await this.callRepo.update(callId, { endReason: reason.slice(0, 30) });
   }
