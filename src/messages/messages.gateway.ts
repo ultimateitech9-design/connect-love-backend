@@ -172,6 +172,16 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     }
   }
 
+  /** Which of these users are online now (only those who show their status), for dots on profiles. */
+  @SubscribeMessage('presenceOf')
+  async presenceOf(@MessageBody() data: { userIds?: unknown }, @ConnectedSocket() client: Socket) {
+    const viewerId = this.getUserIdForSocket(client);
+    if (!viewerId || !Array.isArray(data?.userIds)) return { userIds: [] };
+    const ids = [...new Set(data.userIds.filter((id): id is string => typeof id === 'string' && id.length <= 64))].slice(0, 150);
+    const live = ids.filter((id) => id !== viewerId && this.isUserOnline(id));
+    return { userIds: await this.usersService.visibleOnlineUserIds(live) };
+  }
+
   /** Online people among the viewer's call partners (respects "show online status"). */
   @SubscribeMessage('callContactsOnline')
   async callContactsOnline(@ConnectedSocket() client: Socket) {
