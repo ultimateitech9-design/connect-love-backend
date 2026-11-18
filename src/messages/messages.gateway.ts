@@ -11,7 +11,7 @@ import { Server, Socket } from 'socket.io';
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
-import { VideoCallsService } from './video-calls.service';
+import { PLAN_CALLS_USED, VideoCallsService } from './video-calls.service';
 import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
 import { VideoCall } from './video-call.entity';
@@ -429,8 +429,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const callerId = this.getUserIdForSocket(client);
     if (!callerId) return { error: 'Not authenticated' };
 
+    const callType = data.callType === 'audio' ? 'audio' : 'video';
     try {
-      const callType = data.callType === 'audio' ? 'audio' : 'video';
       const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId, callType);
       const callMessage = await this.messagesService.upsertCallLog(call);
       this.emitToUser(call.callerId, 'receiveMessage', callMessage);
@@ -444,6 +444,9 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       this.server.to(client.id).emit('videoCallStarted', payload);
       return { event: 'videoCallStarted', data: payload };
     } catch (error: any) {
+      // Plan calls used up: the call goes ahead like any paid call (coins per
+      // minute, or the monthly free trial calls).
+      if (error?.message === PLAN_CALLS_USED) return this.startPaidCall(client, callerId, data.receiverId, callType);
       return { error: error?.message || 'Could not start call' };
     }
   }
@@ -457,16 +460,19 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     const callerId = this.getUserIdForSocket(client);
     if (!callerId) return { error: 'Not authenticated' };
 
+    return this.startPaidCall(client, callerId, data.receiverId, data.callType === 'audio' ? 'audio' : 'video');
+  }
+
+  private async startPaidCall(client: Socket, callerId: string, receiverId: string, callType: 'audio' | 'video') {
     try {
-      const callType = data.callType === 'audio' ? 'audio' : 'video';
-      const plan = await this.directCalls.planCall(callerId, data.receiverId, callType);
-      const call = await this.directCalls.createCall(callerId, data.receiverId, callType, plan);
+      const plan = await this.directCalls.planCall(callerId, receiverId, callType);
+      const call = await this.directCalls.createCall(callerId, receiverId, callType, plan);
       const [caller, receiver] = await Promise.all([
         this.videoCallsService.participant(call.callerId),
         this.videoCallsService.participant(call.receiverId),
       ]);
       const payload = { call, callerId, conversationId: null, callType, caller, receiver, mode: 'direct' as const };
-      this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
+      this.emitToUser(receiverId, 'incomingVideoCall', payload);
       this.server.to(client.id).emit('videoCallStarted', payload);
       return { event: 'videoCallStarted', data: payload };
     } catch (error: any) {
@@ -520,23 +526,14 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       const callMessage = await this.messagesService.upsertCallLog(call);
       this.emitToUser(call.callerId, 'messageUpdated', callMessage);
       this.emitToUser(call.receiverId, 'messageUpdated', callMessage);
-      const maxDurationMinutes = call.callType === 'video' ? await this.videoCallsService.durationMinutesForCaller(call.callerId) : null;
-      const payload = { call, receiverId, maxDurationMinutes };
+      const limitSeconds = this.videoCallsService.planCallSeconds(call);
+      const payload = { call, receiverId, maxDurationMinutes: null, billing: limitSeconds ? { isFreeTrial: true, limitSeconds } : undefined };
       this.emitToUser(data.callerId, 'videoCallAccepted', payload);
       this.server.to(client.id).emit('videoCallAccepted', payload);
       // The receiver's other tabs/devices are still ringing: tell them to stop.
       client.to(`user:${receiverId}`).emit('videoCallAnsweredElsewhere', { callId: call.id });
-      if (maxDurationMinutes) {
-        setTimeout(() => {
-          void this.videoCallsService.finish(call.id, call.callerId, 'ended').then(async (endedCall) => {
-            const endedMessage = await this.messagesService.upsertCallLog(endedCall);
-            this.emitToUser(endedCall.callerId, 'messageUpdated', endedMessage);
-            this.emitToUser(endedCall.receiverId, 'messageUpdated', endedMessage);
-            const endedPayload = { call: endedCall, endedBy: 'plan_limit' };
-            this.emitToUser(call.callerId, 'videoCallEnded', endedPayload);
-            this.emitToUser(call.receiverId, 'videoCallEnded', endedPayload);
-          }).catch(() => undefined);
-        }, maxDurationMinutes * 60_000);
+      if (limitSeconds) {
+        this.callTimers.set(call.id, [setTimeout(() => void this.endCallBySystem(call.id, 'free_limit'), limitSeconds * 1000)]);
       }
       return { event: 'videoCallAccepted', data: payload };
     } catch (error: any) {

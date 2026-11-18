@@ -15,7 +15,7 @@ export class PlanUsageService {
     return { user, limits: entitlementsFor(user) };
   }
 
-  async assertAndRecord(userId: string, action: keyof Pick<PlanEntitlements, 'likesPerDay' | 'videoCallsPerDay' | 'sharedImagesPerMonth' | 'superLikesPerMonth' | 'rewindsPerMonth' | 'firstImpressionsPerMonth' | 'boostsPerMonth'>, label: string, targetId?: string, period: boolean | 'week' = false, limitOverride?: number, minimumUsed = 0) {
+  async assertAndRecord(userId: string, action: keyof Pick<PlanEntitlements, 'likesPerDay' | 'sharedImagesPerMonth' | 'superLikesPerMonth' | 'rewindsPerMonth' | 'firstImpressionsPerMonth' | 'boostsPerMonth'>, label: string, targetId?: string, period: boolean | 'week' = false, limitOverride?: number, minimumUsed = 0) {
     const start = period === true ? dayStart() : period === 'week' ? new Date(Date.now() - 7 * 86400000) : monthStart();
     return this.usage.manager.transaction(async (manager) => {
       // Serialise usage updates per user. Without this lock, rapid clicks could

@@ -1,10 +1,14 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, MoreThan, Repository } from 'typeorm';
+import { In, IsNull, MoreThan, MoreThanOrEqual, Not, Repository } from 'typeorm';
 import { MatchRelation, MatchStatus } from '../matches/match.entity';
 import { VideoCall, VideoCallStatus, VideoCallType } from './video-call.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
 import { User } from '../users/user.entity';
+import { monthStartIndia, PLAN_CALL_SECONDS } from '../plans/plan-entitlements';
+
+/** Thrown by start() when the caller's plan calls for this month are used up. */
+export const PLAN_CALLS_USED = 'PLAN_CALLS_USED';
 
 export type CallParticipant = { id: string; name: string; photo: string | null };
 export type CallHistoryFilter = 'all' | 'missed' | 'incoming' | 'outgoing';
@@ -67,13 +71,24 @@ export class VideoCallsService implements OnApplicationBootstrap {
     if (!validReceiver || receiverId === callerId) {
       throw new ForbiddenException('Invalid receiver for this call.');
     }
-    if (callType === 'video') await this.planUsage.assertAndRecord(callerId, 'videoCallsPerDay', 'Video call', receiverId, true);
+
+    // Plan calls: a monthly number per type, each cut after a few seconds
+    // (isFreeTrial marks a time-limited call). Only answered calls count.
+    const { limits } = await this.planUsage.get(callerId);
+    const allowance = callType === 'video' ? limits.videoCallsPerMonth : limits.audioCallsPerMonth;
+    if (limits.limitedCalls) {
+      const used = await this.callRepo.count({
+        where: { callerId, mode: 'match', callType, isFreeTrial: true, startedAt: Not(IsNull()), createdAt: MoreThanOrEqual(monthStartIndia()) },
+      });
+      if (used >= allowance) throw new ForbiddenException(PLAN_CALLS_USED);
+    }
 
     return this.callRepo.save(this.callRepo.create({
       conversationId,
       callerId,
       receiverId,
       callType,
+      isFreeTrial: limits.limitedCalls,
       status: 'ringing',
     }));
   }
@@ -166,9 +181,9 @@ export class VideoCallsService implements OnApplicationBootstrap {
     return this.callRepo.save(call);
   }
 
-  async durationMinutesForCaller(callerId: string): Promise<number> {
-    const { limits } = await this.planUsage.get(callerId);
-    return limits.maxVideoCallMinutes;
+  /** Seconds a plan call to a match may last; null when unlimited. */
+  planCallSeconds(call: VideoCall): number | null {
+    return call.mode === 'match' && call.isFreeTrial ? PLAN_CALL_SECONDS[call.callType] : null;
   }
 
   async finish(callId: string, userId: string, status: VideoCallStatus = 'ended'): Promise<VideoCall> {

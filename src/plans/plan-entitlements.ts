@@ -5,7 +5,9 @@ export type PlanEntitlements = {
   messagesPerUser: number | null;
   matches: number;
   profilePhotos: number;
-  videoCallsPerDay: number;
+  /** Time-limited calls to matches per month (see PLAN_CALL_SECONDS). */
+  audioCallsPerMonth: number;
+  videoCallsPerMonth: number;
   sharedImagesPerMonth: number;
   superLikesPerMonth: number;
   rewindsPerMonth: number;
@@ -13,13 +15,17 @@ export type PlanEntitlements = {
   boostsPerMonth: number;
   voiceMessages: boolean;
   verifiedBadge: boolean;
-  maxVideoCallMinutes: number;
+  /** false: plan calls have no time limit (women). */
+  limitedCalls: boolean;
 };
 
+/** Length of each plan call. Not shown on the plan cards, only enforced. */
+export const PLAN_CALL_SECONDS = { audio: 30, video: 20 } as const;
+
 export const PLAN_ENTITLEMENTS: Record<UserPlan, PlanEntitlements> = {
-  free: { likesPerDay: 10, messagesPerUser: 10, matches: 2, profilePhotos: 2, videoCallsPerDay: 0, sharedImagesPerMonth: 0, superLikesPerMonth: 0, rewindsPerMonth: 0, firstImpressionsPerMonth: 0, boostsPerMonth: 0, voiceMessages: false, verifiedBadge: false, maxVideoCallMinutes: 0 },
-  gold: { likesPerDay: 20, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 5, videoCallsPerDay: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 60 },
-  platinum: { likesPerDay: 40, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 10, videoCallsPerDay: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, maxVideoCallMinutes: 120 },
+  free: { likesPerDay: 10, messagesPerUser: 10, matches: 2, profilePhotos: 2, audioCallsPerMonth: 0, videoCallsPerMonth: 0, sharedImagesPerMonth: 0, superLikesPerMonth: 0, rewindsPerMonth: 0, firstImpressionsPerMonth: 0, boostsPerMonth: 0, voiceMessages: false, verifiedBadge: false, limitedCalls: true },
+  gold: { likesPerDay: 20, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 5, audioCallsPerMonth: 5, videoCallsPerMonth: 5, sharedImagesPerMonth: 10, superLikesPerMonth: 5, rewindsPerMonth: 2, firstImpressionsPerMonth: 5, boostsPerMonth: 2, voiceMessages: true, verifiedBadge: true, limitedCalls: true },
+  platinum: { likesPerDay: 40, messagesPerUser: null, matches: Number.MAX_SAFE_INTEGER, profilePhotos: 10, audioCallsPerMonth: 10, videoCallsPerMonth: 10, sharedImagesPerMonth: 20, superLikesPerMonth: 10, rewindsPerMonth: 5, firstImpressionsPerMonth: 10, boostsPerMonth: 4, voiceMessages: true, verifiedBadge: true, limitedCalls: true },
 };
 
 const WOMEN_ENTITLEMENTS: PlanEntitlements = {
@@ -27,7 +33,8 @@ const WOMEN_ENTITLEMENTS: PlanEntitlements = {
   messagesPerUser: null,
   matches: Number.MAX_SAFE_INTEGER,
   profilePhotos: 10,
-  videoCallsPerDay: Number.MAX_SAFE_INTEGER,
+  audioCallsPerMonth: Number.MAX_SAFE_INTEGER,
+  videoCallsPerMonth: Number.MAX_SAFE_INTEGER,
   sharedImagesPerMonth: Number.MAX_SAFE_INTEGER,
   superLikesPerMonth: Number.MAX_SAFE_INTEGER,
   rewindsPerMonth: Number.MAX_SAFE_INTEGER,
@@ -35,7 +42,7 @@ const WOMEN_ENTITLEMENTS: PlanEntitlements = {
   boostsPerMonth: Number.MAX_SAFE_INTEGER,
   voiceMessages: true,
   verifiedBadge: false,
-  maxVideoCallMinutes: 0,
+  limitedCalls: false,
 };
 
 export function isWoman(user: Pick<User, 'gender'>): boolean {
