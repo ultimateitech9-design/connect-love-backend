@@ -231,7 +231,13 @@ export class DiscoveryService {
       query.andWhere('(' + parts.join(' OR ') + ')');
     }
     if (filters.verifiedOnly || (currentUser?.onlyShowVerifiedProfiles && !(filters.search && filters.search.trim()))) {
-      query.andWhere('user.isVerified = :verified', { verified: true });
+      // Verified = passed the photo/ID (KYC) check.
+      query.andWhere('(user.isVerified = :verified OR user.kycMatched = :verified)', { verified: true });
+    }
+    // "Looking for" is a real filter: only people with one of the chosen goals.
+    const goalFilter = (filters.goals ?? []).map((goal) => String(goal).trim()).filter(Boolean).slice(0, 10);
+    if (goalFilter.length) {
+      query.andWhere('user.relationshipGoal IN (:...goalFilter)', { goalFilter });
     }
 
     const requestedDistance = Number.isFinite(filters.maxDistance)
