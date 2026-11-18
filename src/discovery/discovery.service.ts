@@ -144,9 +144,9 @@ export class DiscoveryService {
       query.andWhere('user.id NOT IN (:...excludedQueueIds)', { excludedQueueIds });
     }
 
-    // A First Impression is a like. Once sent, that profile must never be
-    // offered to the sender again, including search and recycled-pass results.
-    query.andWhere((qb) => {
+    // An intentional name lookup can find previously actioned profiles.
+    // Recommendation queues still exclude profiles already actioned.
+    if (!filters.nameSearch) query.andWhere((qb) => {
       const sentImpression = qb.subQuery()
         .select('sentImpression.id')
         .from(FirstImpression, 'sentImpression')
@@ -159,7 +159,9 @@ export class DiscoveryService {
     const currentGender = canonicalGender(currentUser?.gender);
     const rawRequestedGender = String(filters.interestedIn || 'everyone').trim().toLowerCase();
     const requestedGender = rawRequestedGender === 'everyone' ? 'everyone' : canonicalGender(rawRequestedGender);
-    const genderGroups = requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)
+    const genderGroups = filters.nameSearch && requestedGender === 'everyone'
+      ? [Object.values(GENDER_ALIASES).flat()]
+      : requestedGender !== 'everyone' && DISCOVERABLE_GENDERS.has(requestedGender)
       ? [GENDER_ALIASES[requestedGender] || [requestedGender]]
       : defaultGenderGroups(currentGender);
     const visibleGenders = [...new Set(genderGroups.flat())];
@@ -175,11 +177,18 @@ export class DiscoveryService {
       const relationship = qb.subQuery()
         .select('relationship.id')
         .from(MatchRelation, 'relationship')
-        .where('(relationship.senderId = :currentUserId AND relationship.receiverId = user.id)')
-        .orWhere('(relationship.receiverId = :currentUserId AND relationship.senderId = user.id)')
+        .where('((relationship.senderId = :currentUserId AND relationship.receiverId = user.id) OR (relationship.receiverId = :currentUserId AND relationship.senderId = user.id))')
+        .andWhere(filters.nameSearch ? "relationship.status = 'BLOCKED'" : '1 = 1')
         .getQuery();
       return 'NOT EXISTS ' + relationship;
     });
+    if (filters.nameSearch) {
+      for (const column of ['status', 'id'] as const) {
+        query.addSelect(qb => qb.select('existing.' + column).from(MatchRelation, 'existing')
+          .where('((existing.senderId = :currentUserId AND existing.receiverId = user.id) OR (existing.receiverId = :currentUserId AND existing.senderId = user.id))')
+          .orderBy('existing.updatedAt', 'DESC').limit(1), column === 'status' ? 'searchRelationshipStatus' : 'searchRelationshipId');
+      }
+    }
 
     if (filters.search && filters.search.trim()) {
       const term = filters.search.trim().replace(/\s+/g, ' ').slice(0, 120);
@@ -302,6 +311,8 @@ export class DiscoveryService {
     rankedResult.raw.forEach((row, index) => {
       (users[index] as any).__primaryPhoto = row.primaryPhoto || null;
       (users[index] as any).__photoCount = Number(row.profilePhotoCount) || 0;
+      (users[index] as any).__relationshipStatus = row.searchRelationshipStatus || null;
+      (users[index] as any).__relationshipId = row.searchRelationshipId || null;
     });
 
     const hasMore = filters.queue && users.length > limit;
@@ -313,6 +324,7 @@ export class DiscoveryService {
       const visiblePhotos = primaryPhoto ? [primaryPhoto] : [];
       return {
         id: user.id,
+        ...(filters.nameSearch ? { relationshipStatus: (user as any).__relationshipStatus, relationshipId: (user as any).__relationshipId } : {}),
         name: user.name,
         gender: user.gender,
         birthDate: user.birthDate,
