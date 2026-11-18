@@ -154,6 +154,34 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return online;
   }
 
+  /** The receiver came online while a call to them is still ringing: ring now. */
+  private async ringPendingCalls(userId: string) {
+    try {
+      const calls = await this.videoCallsService.pendingRingsFor(userId, RING_SECONDS);
+      for (const call of calls) {
+        await this.videoCallsService.markRinging(call.id);
+        const [caller, receiver] = await Promise.all([
+          this.videoCallsService.participant(call.callerId),
+          this.videoCallsService.participant(call.receiverId),
+        ]);
+        this.emitToUser(userId, 'incomingVideoCall', { call, callerId: call.callerId, conversationId: call.conversationId, callType: call.callType, caller, receiver, mode: call.mode });
+        this.emitToUser(call.callerId, 'callRinging', { callId: call.id });
+      }
+    } catch {
+      // The client also polls /video-calls/incoming.
+    }
+  }
+
+  /** Online people among the viewer's call partners (respects "show online status"). */
+  @SubscribeMessage('callContactsOnline')
+  async callContactsOnline(@ConnectedSocket() client: Socket) {
+    const viewerId = this.getUserIdForSocket(client);
+    if (!viewerId) return { userIds: [] };
+    const partnerIds = await this.videoCallsService.recentCallPartnerIds(viewerId);
+    const live = partnerIds.filter((id) => this.isUserOnline(id));
+    return { userIds: await this.usersService.visibleOnlineUserIds(live) };
+  }
+
   private clearRingTimer(callId: string) {
     const timer = this.ringTimers.get(callId);
     if (timer) clearTimeout(timer);
@@ -201,6 +229,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.connectedUsers.set(userId, new Set([client.id]));
         await this.usersService.updatePresence(userId, true);
         await this.broadcastPresenceToMatches(userId, true);
+        await this.ringPendingCalls(userId);
       } else {
         userSockets.add(client.id);
       }
@@ -457,6 +486,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     if (!callerId) return { error: 'Not authenticated' };
 
     const callType = data.callType === 'audio' ? 'audio' : 'video';
+    const busy = await this.busyResponse(data.receiverId);
+    if (busy) return busy;
     try {
       const call = await this.videoCallsService.start(data.conversationId, callerId, data.receiverId, callType);
       const callMessage = await this.messagesService.upsertCallLog(call);
@@ -491,7 +522,20 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return this.startPaidCall(client, callerId, data.receiverId, data.callType === 'audio' ? 'audio' : 'video');
   }
 
+  /** Error returned to the caller when the other person is already on a call. */
+  private async busyResponse(receiverId: string) {
+    if (!receiverId || !this.isUserOnline(receiverId)) return null;
+    // Only calls where both people are still connected count: a call left
+    // open by a closed browser must not keep someone "busy".
+    const calls = await this.videoCallsService.busyCandidates(receiverId, RING_SECONDS);
+    if (!calls.some((call) => this.isUserOnline(call.callerId) && this.isUserOnline(call.receiverId))) return null;
+    const receiver = await this.videoCallsService.participant(receiverId);
+    return { error: `${receiver?.name ?? 'This person'} is busy on another call. Try again later.`, code: 'BUSY' };
+  }
+
   private async startPaidCall(client: Socket, callerId: string, receiverId: string, callType: 'audio' | 'video') {
+    const busy = await this.busyResponse(receiverId);
+    if (busy) return busy;
     try {
       const plan = await this.directCalls.planCall(callerId, receiverId, callType);
       const call = await this.directCalls.createCall(callerId, receiverId, callType, plan);

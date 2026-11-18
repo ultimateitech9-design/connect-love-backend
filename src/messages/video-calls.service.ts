@@ -158,6 +158,41 @@ export class VideoCallsService implements OnApplicationBootstrap {
     };
   }
 
+  /** Answered or ringing calls involving the user (the gateway checks who is online). */
+  busyCandidates(userId: string, ringSeconds: number): Promise<VideoCall[]> {
+    const ringingSince = new Date(Date.now() - ringSeconds * 1000);
+    const activeSince = new Date(Date.now() - 6 * 3600 * 1000);
+    return this.callRepo.createQueryBuilder('call')
+      .where('(call.callerId = :userId OR call.receiverId = :userId)', { userId })
+      .andWhere(
+        "((call.status = 'active' AND call.startedAt > :activeSince) OR (call.status = 'ringing' AND call.ringsReceiver = 1 AND call.createdAt > :ringingSince))",
+        { activeSince, ringingSince },
+      )
+      .getMany();
+  }
+
+  /** Calls still ringing for a user who was offline when they started. */
+  pendingRingsFor(userId: string, ringSeconds: number): Promise<VideoCall[]> {
+    return this.callRepo.find({
+      where: { receiverId: userId, status: 'ringing', ringsReceiver: false, createdAt: MoreThan(new Date(Date.now() - ringSeconds * 1000)) },
+    });
+  }
+
+  async markRinging(callId: string) {
+    await this.callRepo.update(callId, { ringsReceiver: true });
+  }
+
+  /** People the user has called or been called by recently (for online dots on the Calls page). */
+  async recentCallPartnerIds(userId: string): Promise<string[]> {
+    const rows = await this.callRepo.createQueryBuilder('call')
+      .select(['call.callerId', 'call.receiverId'])
+      .where('(call.callerId = :userId OR call.receiverId = :userId)', { userId })
+      .orderBy('call.createdAt', 'DESC')
+      .take(200)
+      .getMany();
+    return [...new Set(rows.map((call) => (call.callerId === userId ? call.receiverId : call.callerId)))];
+  }
+
   /** Marks a call that must not ring: the receiver was offline when it started. */
   async markReceiverOffline(callId: string) {
     await this.callRepo.update(callId, { ringsReceiver: false });
