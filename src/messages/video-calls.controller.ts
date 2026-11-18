@@ -16,6 +16,17 @@ export class VideoCallsController {
     return this.videoCallsService.history(req.user.userId, safeFilter, before);
   }
 
+  /** Missed calls not seen yet: drives the Calls dot and the bell. */
+  @Get('missed')
+  missed(@Request() req) {
+    return this.videoCallsService.unseenMissed(req.user.userId);
+  }
+
+  @Post('missed/seen')
+  missedSeen(@Request() req) {
+    return this.videoCallsService.markMissedSeen(req.user.userId);
+  }
+
   @Get('incoming')
   incomingCall(@Request() req) {
     return this.videoCallsService.findIncoming(req.user.userId);

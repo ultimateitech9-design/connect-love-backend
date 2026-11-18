@@ -64,6 +64,10 @@ export class VideoCall {
   @Column({ type: 'int', unsigned: true, default: 0 })
   coinsCharged: number;
 
+  /** false when the receiver was offline when the call started: it never rings for them. */
+  @Column({ type: 'boolean', default: true })
+  ringsReceiver: boolean;
+
   /** Why the server ended the call, e.g. 'free_limit' or 'coins_exhausted'. */
   @Column({ type: 'varchar', length: 30, nullable: true })
   endReason: string | null;

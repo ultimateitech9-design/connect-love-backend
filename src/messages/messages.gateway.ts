@@ -20,6 +20,9 @@ import { DirectCallsService, UPGRADE_REQUIRED } from '../direct-calls/direct-cal
 /** Grace period before a direct call is ended because a participant went offline. */
 const OFFLINE_END_DELAY_MS = 20_000;
 
+/** How long an unanswered call rings before it ends as missed. */
+const RING_SECONDS = 45;
+
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -39,6 +42,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   // Map to store connected users: userId -> Set of socketIds
   private connectedUsers = new Map<string, Set<string>>();
+  private ringTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   // Server-side timers for direct calls: free-trial cut-off or per-minute billing.
   private callTimers = new Map<string, ReturnType<typeof setTimeout>[]>();
@@ -56,6 +60,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   ) {}
 
   private clearCallTimers(callId: string) {
+    this.clearRingTimer(callId);
     for (const timer of this.callTimers.get(callId) ?? []) {
       clearTimeout(timer);
       clearInterval(timer);
@@ -131,6 +136,28 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private isUserOnline(userId: string): boolean {
     return !!this.connectedUsers.get(userId)?.size;
+  }
+
+  /**
+   * Rings the receiver only if they are online right now; an offline receiver
+   * is never rung later (the call shows up as missed instead). Unanswered
+   * calls end after RING_SECONDS.
+   */
+  private async ringReceiver(call: VideoCall, payload: Record<string, unknown>) {
+    const online = this.isUserOnline(call.receiverId);
+    if (online) this.emitToUser(call.receiverId, 'incomingVideoCall', payload);
+    else await this.videoCallsService.markReceiverOffline(call.id);
+    this.ringTimers.set(call.id, setTimeout(() => {
+      this.ringTimers.delete(call.id);
+      void this.endCallBySystem(call.id, 'no_answer');
+    }, RING_SECONDS * 1000));
+    return online;
+  }
+
+  private clearRingTimer(callId: string) {
+    const timer = this.ringTimers.get(callId);
+    if (timer) clearTimeout(timer);
+    this.ringTimers.delete(callId);
   }
 
   disconnectUser(userId: string) {
@@ -440,9 +467,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.videoCallsService.participant(call.receiverId),
       ]);
       const payload = { call, callerId, conversationId: data.conversationId, callType, caller, receiver };
-      this.emitToUser(data.receiverId, 'incomingVideoCall', payload);
-      this.server.to(client.id).emit('videoCallStarted', payload);
-      return { event: 'videoCallStarted', data: payload };
+      const receiverOnline = await this.ringReceiver(call, payload);
+      const callerPayload = { ...payload, receiverOnline };
+      this.server.to(client.id).emit('videoCallStarted', callerPayload);
+      return { event: 'videoCallStarted', data: callerPayload };
     } catch (error: any) {
       // Plan calls used up: the call goes ahead like any paid call (coins per
       // minute, or the monthly free trial calls).
@@ -472,9 +500,10 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         this.videoCallsService.participant(call.receiverId),
       ]);
       const payload = { call, callerId, conversationId: null, callType, caller, receiver, mode: 'direct' as const };
-      this.emitToUser(receiverId, 'incomingVideoCall', payload);
-      this.server.to(client.id).emit('videoCallStarted', payload);
-      return { event: 'videoCallStarted', data: payload };
+      const receiverOnline = await this.ringReceiver(call, payload);
+      const callerPayload = { ...payload, receiverOnline };
+      this.server.to(client.id).emit('videoCallStarted', callerPayload);
+      return { event: 'videoCallStarted', data: callerPayload };
     } catch (error: any) {
       const message = error?.message || 'Could not start call';
       return message === UPGRADE_REQUIRED
@@ -513,6 +542,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
     try {
       const call = await this.videoCallsService.accept(data.callId, receiverId);
+      this.clearRingTimer(call.id);
       if (call.mode === 'direct') {
         const billing = await this.startDirectCallBilling(call);
         const payload = { call, receiverId, maxDurationMinutes: null, mode: 'direct' as const, billing };

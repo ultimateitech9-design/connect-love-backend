@@ -166,6 +166,10 @@ export class User {
   @Column({ nullable: true, type: 'datetime' })
   notificationsClearedAt: Date | null;
 
+  /** Missed calls after this time show a dot on Calls and in the bell. */
+  @Column({ nullable: true, type: 'datetime' })
+  callsSeenAt: Date | null;
+
   @Column({ type: 'int', unsigned: true, default: 0 })
   coinBalance: number;
 

@@ -158,6 +158,40 @@ export class VideoCallsService implements OnApplicationBootstrap {
     };
   }
 
+  /** Marks a call that must not ring: the receiver was offline when it started. */
+  async markReceiverOffline(callId: string) {
+    await this.callRepo.update(callId, { ringsReceiver: false });
+  }
+
+  /** Missed calls since the user last opened the Calls page (at most the last 7 days). */
+  async unseenMissed(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: { id: true, callsSeenAt: true } });
+    const weekAgo = new Date(Date.now() - 7 * 86_400_000);
+    const since = user?.callsSeenAt && user.callsSeenAt > weekAgo ? user.callsSeenAt : weekAgo;
+    const ringingCutoff = new Date(Date.now() - 2 * 60 * 1000);
+    const calls = await this.callRepo.createQueryBuilder('call')
+      .where('call.receiverId = :userId', { userId })
+      .andWhere('call.startedAt IS NULL')
+      .andWhere("call.status <> 'rejected'")
+      .andWhere("(call.status <> 'ringing' OR call.createdAt < :ringingCutoff)", { ringingCutoff })
+      .andWhere('call.createdAt > :since', { since })
+      .orderBy('call.createdAt', 'DESC')
+      .take(20)
+      .getMany();
+    const callerIds = [...new Set(calls.map((call) => call.callerId))];
+    const callers = callerIds.length ? await this.userRepo.find({ where: { id: In(callerIds) }, select: { id: true, name: true } }) : [];
+    const names = new Map(callers.map((caller) => [caller.id, caller.name]));
+    return {
+      count: calls.length,
+      items: calls.map((call) => ({ id: call.id, callType: call.callType, createdAt: call.createdAt, caller: { id: call.callerId, name: names.get(call.callerId) ?? 'Someone' } })),
+    };
+  }
+
+  async markMissedSeen(userId: string) {
+    await this.userRepo.update(userId, { callsSeenAt: new Date() });
+    return { ok: true };
+  }
+
   findById(id: string): Promise<VideoCall | null> {
     return this.callRepo.findOne({ where: { id } });
   }
@@ -165,7 +199,7 @@ export class VideoCallsService implements OnApplicationBootstrap {
   async findIncoming(userId: string): Promise<(VideoCall & { callerProfile: CallParticipant | null }) | null> {
     const recentThreshold = new Date(Date.now() - 2 * 60 * 1000);
     const call = await this.callRepo.findOne({
-      where: { receiverId: userId, status: 'ringing', createdAt: MoreThan(recentThreshold) },
+      where: { receiverId: userId, status: 'ringing', ringsReceiver: true, createdAt: MoreThan(recentThreshold) },
       order: { createdAt: 'DESC' },
     });
     if (!call) return null;
@@ -176,6 +210,7 @@ export class VideoCallsService implements OnApplicationBootstrap {
     const call = await this.callRepo.findOne({ where: { id: callId } });
     if (!call) throw new NotFoundException('Call not found.');
     if (call.receiverId !== userId) throw new ForbiddenException('Only the receiver can accept this call.');
+    if (call.status !== 'ringing') throw new ForbiddenException('This call has already ended.');
     call.status = 'active';
     call.startedAt = new Date();
     return this.callRepo.save(call);
