@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards, Request, Query } from '@nestjs/common';
+import { Controller, Get, UseGuards, Request, Query, Param } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { DiscoveryService } from './discovery.service';
 
@@ -11,13 +11,18 @@ export class DiscoveryController {
   async searchProfiles(@Request() req: any, @Query() query: Record<string, string>) {
     if (!query.search?.trim()) return { items: [], hasMore: false, nextCursor: null };
     return this.discoveryService.getSuggestions(req.user.userId, {
-      nameSearch: true, queue: true, search: query.search, cursor: query.cursor,
+      nameSearch: true, queue: true, compact: query.compact === 'true', search: query.search, cursor: query.cursor,
       limit: Number(query.limit) || 12,
       ageMin: Number(query.ageMin) || undefined, ageMax: Number(query.ageMax) || undefined,
       interestedIn: query.interestedIn, maxDistance: Number(query.maxDistance) || undefined,
       verifiedOnly: query.verifiedOnly === 'true',
       interests: query.interests?.split(',').filter(Boolean).slice(0, 30),
     });
+  }
+
+  @Get('search/thumbnail/:id')
+  searchThumbnail(@Request() req: any, @Param('id') id: string) {
+    return this.discoveryService.searchThumbnail(req.user.userId, id);
   }
 
   @Get()

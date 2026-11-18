@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import sharp from 'sharp';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
@@ -9,6 +10,7 @@ import { distanceBetweenKm } from '../location/distance';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 interface DiscoveryFilters {
+  compact?: boolean;
   nameSearch?: boolean;
   interests?: string[];
   verifiedOnly?: boolean;
@@ -127,7 +129,6 @@ export class DiscoveryService {
         'user.interests',
         'user.createdAt',
       ])
-      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(user.photos, '$[0]'))", 'primaryPhoto')
       .addSelect('COALESCE(JSON_LENGTH(user.photos), 0)', 'profilePhotoCount')
       .where('user.id != :currentUserId', { currentUserId })
       // Only show active and verified users
@@ -139,6 +140,11 @@ export class DiscoveryService {
         maxBirthDate,
       });
 
+    if (filters.compact) {
+      // Search rows should not transfer full base64 photos or card biographies.
+      query.select(['user.id', 'user.name', 'user.gender', 'user.birthDate', 'user.profession', 'user.city', 'user.plan', 'user.planExpiresAt', 'user.isVerified', 'user.photosVisibleToNonMatches', 'user.showDistance', 'user.locationLatitude', 'user.locationLongitude', 'user.createdAt'])
+        .addSelect('COALESCE(JSON_LENGTH(user.photos), 0)', 'profilePhotoCount');
+    }
     const excludedQueueIds = [...new Set((filters.excludeIds || []).filter((id) => id && id !== currentUserId))].slice(0, 24);
     if (excludedQueueIds.length > 0) {
       query.andWhere('user.id NOT IN (:...excludedQueueIds)', { excludedQueueIds });
@@ -306,24 +312,44 @@ export class DiscoveryService {
         query.having('(' + clauses.join(' OR ') + ')', parameters);
       }
     }
-    const rankedResult = await query.take(filters.queue ? limit + 1 : limit).getRawAndEntities();
-    let users = rankedResult.entities;
-    rankedResult.raw.forEach((row, index) => {
-      (users[index] as any).__primaryPhoto = row.primaryPhoto || null;
-      (users[index] as any).__photoCount = Number(row.profilePhotoCount) || 0;
-      (users[index] as any).__relationshipStatus = row.searchRelationshipStatus || null;
-      (users[index] as any).__relationshipId = row.searchRelationshipId || null;
-    });
-
-    const hasMore = filters.queue && users.length > limit;
-    if (filters.queue) users = users.slice(0, limit);
+    // MySQL can carry the full JSON document through filesort even when only
+    // JSON_LENGTH is selected. Sort only IDs and numeric ranking expressions.
+    const orderKeys = new Set(Object.keys(query.expressionMap.orderBys));
+    const rank = query.clone().select(['user.id', 'user.createdAt']);
+    query.expressionMap.selects.filter(select => select.aliasName && orderKeys.has(select.aliasName))
+      .forEach(select => rank.addSelect(select.selection, select.aliasName));
+    const rankedResult = await rank.take(filters.queue ? limit + 1 : limit).getRawAndEntities();
+    const hasMore = filters.queue && rankedResult.entities.length > limit;
+    const pageUsers = filters.queue ? rankedResult.entities.slice(0, limit) : rankedResult.entities;
+    let users: User[] = [];
+    if (pageUsers.length) {
+      // Hydrate only this page via primary keys, without ORDER BY or filesort.
+      const hydrate = this.userRepo.createQueryBuilder('user')
+        .select(query.expressionMap.selects.filter(select => select.selection.startsWith('user.')).map(select => select.selection))
+        .where('user.id IN (:...pageIds)', { pageIds: pageUsers.map(user => user.id) })
+        .addSelect('COALESCE(JSON_LENGTH(user.photos), 0)', 'profilePhotoCount')
+        .setParameters(query.getParameters());
+      if (!filters.compact) hydrate.addSelect("JSON_UNQUOTE(JSON_EXTRACT(user.photos, '$[0]'))", 'primaryPhoto');
+      query.expressionMap.selects.filter(select => select.aliasName?.startsWith('searchRelationship'))
+        .forEach(select => hydrate.addSelect(select.selection, select.aliasName));
+      const hydrated = await hydrate.getRawAndEntities();
+      hydrated.raw.forEach((row, index) => Object.assign(hydrated.entities[index], {
+        __primaryPhoto: row.primaryPhoto || null,
+        __photoCount: Number(row.profilePhotoCount) || 0,
+        __relationshipStatus: row.searchRelationshipStatus || null,
+        __relationshipId: row.searchRelationshipId || null,
+      }));
+      const byId = new Map(hydrated.entities.map(user => [user.id, user]));
+      users = pageUsers.map(user => byId.get(user.id)).filter((user): user is User => Boolean(user));
+    }
     const last = users[users.length - 1];
-    const lastRaw = rankedResult.raw[users.length - 1];
+    const lastRaw = last ? rankedResult.raw.find(row => row.user_id === last.id) : undefined;
     const items = users.map(user => {
       const primaryPhoto = (user as any).__primaryPhoto ?? user.avatarUrl;
       const visiblePhotos = primaryPhoto ? [primaryPhoto] : [];
       return {
         id: user.id,
+        hasPhoto: ((user as any).__photoCount || 0) > 0,
         ...(filters.nameSearch ? { relationshipStatus: (user as any).__relationshipStatus, relationshipId: (user as any).__relationshipId } : {}),
         name: user.name,
         gender: user.gender,
@@ -361,6 +387,31 @@ export class DiscoveryService {
     });
     const values = last ? Object.keys(query.expressionMap.orderBys).map(column => column === 'user.createdAt' ? last.createdAt.toISOString() : column === 'user.id' ? last.id : Number(lastRaw[column])) : [];
     return filters.queue ? { items, hasMore, nextCursor: hasMore && last ? Buffer.from(JSON.stringify({ values })).toString('base64url') : null } : items;
+  }
+
+  async searchThumbnail(viewerId: string, userId: string) {
+    // Recheck status and blocks even when the search list came from a cache.
+    const row = await this.userRepo.createQueryBuilder('user')
+      .select("JSON_UNQUOTE(JSON_EXTRACT(user.photos, '$[0]'))", 'photo')
+      .addSelect('user.photosVisibleToNonMatches', 'visible')
+      .where('user.id = :userId AND user.status = :status AND user.role = :role', { userId, status: 'active', role: 'user' })
+      .andWhere("NOT EXISTS (SELECT 1 FROM matches blocked WHERE ((blocked.senderId = :viewerId AND blocked.receiverId = user.id) OR (blocked.receiverId = :viewerId AND blocked.senderId = user.id)) AND blocked.status = 'BLOCKED')", { viewerId })
+      .getRawOne();
+    if (!row) throw new NotFoundException('Profile is unavailable.');
+    if (!row.visible) {
+      const matched = await this.userRepo.manager.getRepository(MatchRelation).createQueryBuilder('relation')
+        .where("((relation.senderId = :viewerId AND relation.receiverId = :userId) OR (relation.receiverId = :viewerId AND relation.senderId = :userId)) AND relation.status = 'MATCHED'", { viewerId, userId }).getExists();
+      if (!matched) return { photo: null };
+    }
+    const source = String(row.photo || '');
+    if (/^https?:\/\//i.test(source) || /^\/[^/]/.test(source)) return { photo: source };
+    const match = source.match(/^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+    if (!match) return { photo: null };
+    try {
+      const thumbnail = await sharp(Buffer.from(match[1], 'base64'), { limitInputPixels: 40_000_000 })
+        .rotate().resize(112, 112, { fit: 'cover', withoutEnlargement: true }).webp({ quality: 65 }).toBuffer();
+      return { photo: 'data:image/webp;base64,' + thumbnail.toString('base64') };
+    } catch { return { photo: null }; }
   }
 
   async getPopularTags(): Promise<{ interests: string[] }> {
