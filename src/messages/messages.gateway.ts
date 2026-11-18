@@ -8,6 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
 import { VideoCallsService } from './video-calls.service';
@@ -27,7 +28,12 @@ const OFFLINE_END_DELAY_MS = 20_000;
   pingInterval: 10000,
   pingTimeout: 5000,
 })
-export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
+  private readonly visitorChanged = (ownerId: string) => {
+    this.server?.to('user:' + ownerId).emit('profileVisitorsChanged');
+  };
+  onModuleInit() { this.usersService.profileVisitorEvents.on('changed', this.visitorChanged); }
+  onModuleDestroy() { this.usersService.profileVisitorEvents.off('changed', this.visitorChanged); }
   @WebSocketServer()
   server: Server;
 

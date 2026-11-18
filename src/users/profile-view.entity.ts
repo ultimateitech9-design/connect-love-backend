@@ -13,6 +13,9 @@ export class ProfileView {
   @Column()
   viewerUserId: string;
 
+  @Column({ type: 'datetime', precision: 6, nullable: true })
+  detailViewedAt: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 }

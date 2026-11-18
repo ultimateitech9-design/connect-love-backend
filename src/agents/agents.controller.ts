@@ -22,6 +22,7 @@ export class AgentsController {
   @Get('withdrawals') @UseGuards(AgentGuard) withdrawals(@Req() req: any) { return this.payouts.withdrawals('agent', req.agent.id); }
   @Post('withdrawals') @UseGuards(AgentGuard) withdraw(@Req() req: any, @Body() body: WithdrawalRequest) { this.service.throttle(`withdraw:${req.agent.id}`, 10); return this.payouts.requestWithdrawal('agent', req.agent.id, body); }
   @Get('users') @UseGuards(AgentGuard) users(@Req() req: any, @Query() query: AgentUsersQueryDto) { return this.service.listUsers(req.agent.id, query); }
+  @Get('users/export') @UseGuards(AgentGuard) exportUsers(@Req() req: any, @Query('cursor') cursor?: string) { return this.service.exportUsers(req.agent.id, cursor); }
   @Get('users/:id') @UseGuards(AgentGuard) user(@Req() req: any, @Param('id', ParseUUIDPipe) id: string) { return this.service.userDetails(req.agent.id, id); }
   @Get('users/:id/activity') @UseGuards(AgentGuard) activity(@Req() req: any, @Param('id', ParseUUIDPipe) id: string, @Query('page') page?: string) { return this.service.userActivity(req.agent.id, id, Number(page || 1)); }
   @Post('users/:id/ban') @UseGuards(AgentGuard) ban(@Req() req: any, @Param('id', ParseUUIDPipe) id: string) { return this.service.moderateUser(req.agent.id, id, 'ban'); }

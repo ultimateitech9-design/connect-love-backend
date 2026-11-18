@@ -1,4 +1,7 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { EventEmitter } from 'node:events';
+import { createHmac } from 'node:crypto';
+import sharp from 'sharp';
 import { PayoutsService } from '../payouts/payouts.service';
 import { Agent } from '../agents/agent.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -9,7 +12,7 @@ import { ProfileView } from './profile-view.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { distanceBetweenKm } from '../location/distance';
 import { CoinTransaction } from './coin-transaction.entity';
-import { entitlementsFor } from '../plans/plan-entitlements';
+import { activePlan, entitlementsFor } from '../plans/plan-entitlements';
 
 const normalizeTags = (tags: string[]) => {
   if (!tags || !Array.isArray(tags)) return tags;
@@ -20,6 +23,7 @@ const normalizeTags = (tags: string[]) => {
 
 @Injectable()
 export class UsersService {
+  readonly profileVisitorEvents = new EventEmitter();
   constructor(
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
@@ -76,7 +80,6 @@ export class UsersService {
       this.userRepo.findOne({ where: { id: viewerId }, select: ['id', 'locationLatitude', 'locationLongitude'] }),
     ]);
     if (!user) throw new NotFoundException('User not found.');
-    await this.recordProfileView(id, viewerId);
     const distanceKm = user.showDistance && viewer
       ? distanceBetweenKm(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude)
       : null;
@@ -221,8 +224,9 @@ export class UsersService {
     }
   }
 
-  async recordProfileView(profileUserId: string, viewerUserId: string): Promise<{ recorded: boolean }> {
+  async recordProfileView(profileUserId: string, viewerUserId: string, detail = false): Promise<{ recorded: boolean }> {
     if (!viewerUserId || profileUserId === viewerUserId) return { recorded: false };
+    if (detail && !await this.canViewVisitor(profileUserId, viewerUserId)) return { recorded: false };
     const profileExists = await this.userRepo.exist({ where: { id: profileUserId } });
     if (!profileExists) throw new NotFoundException('User not found.');
 
@@ -232,17 +236,83 @@ export class UsersService {
     since.setHours(0, 0, 0, 0);
     const alreadyRecorded = await this.profileViewRepo.findOne({
       where: { profileUserId, viewerUserId, createdAt: MoreThanOrEqual(since) },
-      select: ['id'],
+      select: ['id', 'detailViewedAt'],
     });
-    if (alreadyRecorded) return { recorded: false };
+    if (alreadyRecorded) {
+      if (detail && !alreadyRecorded.detailViewedAt) {
+        await this.profileViewRepo.update(alreadyRecorded.id, { detailViewedAt: new Date() });
+        this.profileVisitorEvents.emit('changed', profileUserId);
+        return { recorded: true };
+      }
+      return { recorded: false };
+    }
 
     try {
-      await this.profileViewRepo.save(this.profileViewRepo.create({ profileUserId, viewerUserId }));
+      await this.profileViewRepo.save(this.profileViewRepo.create({ profileUserId, viewerUserId, detailViewedAt: detail ? new Date() : null }));
+      if (detail) this.profileVisitorEvents.emit('changed', profileUserId);
       return { recorded: true };
     } catch (error) {
       console.warn('Profile-view analytics unavailable.', error);
       return { recorded: false };
     }
+  }
+
+  private async canViewVisitor(ownerId: string, visitorId: string) {
+    const active = await this.userRepo.count({ where: { id: In([ownerId, visitorId]), status: 'active', role: 'user' } });
+    if (active !== 2) return false;
+    return !await this.matchRepo.createQueryBuilder('relation')
+      .where("((relation.senderId = :ownerId AND relation.receiverId = :visitorId) OR (relation.receiverId = :ownerId AND relation.senderId = :visitorId)) AND relation.status = 'BLOCKED'", { ownerId, visitorId }).getExists();
+  }
+
+  async profileVisitors(ownerId: string, requestedOffset = 0, requestedLimit = 12) {
+    const owner = await this.userRepo.findOne({ where: { id: ownerId, status: 'active' }, select: ['id', 'plan', 'planExpiresAt'] });
+    if (!owner) throw new NotFoundException('Account not found.');
+    const locked = activePlan(owner) === 'free';
+    const offset = Number.isFinite(requestedOffset) ? Math.max(0, Math.trunc(requestedOffset)) : 0;
+    const limit = Number.isFinite(requestedLimit) ? Math.min(30, Math.max(1, Math.trunc(requestedLimit))) : 12;
+    const rows = await this.profileViewRepo.createQueryBuilder('view')
+      .innerJoin(User, 'visitor', "visitor.id = view.viewerUserId AND visitor.status = 'active' AND visitor.role = 'user'")
+      .select('view.viewerUserId', 'visitorId').addSelect('MAX(view.detailViewedAt)', 'viewedAt')
+      .where('view.profileUserId = :ownerId AND view.viewerUserId <> :ownerId AND view.detailViewedAt IS NOT NULL', { ownerId })
+      .andWhere("NOT EXISTS (SELECT 1 FROM matches blocked WHERE ((blocked.senderId = :ownerId AND blocked.receiverId = view.viewerUserId) OR (blocked.receiverId = :ownerId AND blocked.senderId = view.viewerUserId)) AND blocked.status = 'BLOCKED')")
+      .groupBy('view.viewerUserId').orderBy('viewedAt', 'DESC').addOrderBy('view.viewerUserId', 'ASC')
+      .offset(offset).limit(limit + 1).getRawMany();
+    const page = rows.slice(0, limit);
+    const profiles = page.length ? await this.userRepo.createQueryBuilder('visitor')
+      .select(['visitor.id', 'visitor.name', 'visitor.photosVisibleToNonMatches'])
+      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(visitor.photos, '$[0]'))", 'photo')
+      .where('visitor.id IN (:...ids)', { ids: page.map(row => row.visitorId) }).getRawAndEntities() : { entities: [], raw: [] };
+    const byId = new Map(profiles.entities.map((user, index) => [user.id, { user, photo: profiles.raw[index].photo }]));
+    const items: { id: string; userId?: string; name?: string; photo: string | null; viewedAt: Date }[] = [];
+    for (const row of page) {
+      const profile = byId.get(row.visitorId);
+      if (!profile) continue;
+      let photo: string | null = null;
+      const source = String(profile.photo || '');
+      const encoded = source.match(/^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+      if (profile.user.photosVisibleToNonMatches && encoded) {
+        try {
+          let image = sharp(Buffer.from(encoded[1], 'base64'), { limitInputPixels: 40_000_000 }).rotate().resize(80, 80, { fit: 'cover' });
+          if (locked) image = image.blur(14);
+          photo = 'data:image/webp;base64,' + (await image.webp({ quality: 60 }).toBuffer()).toString('base64');
+        } catch { /* Keep a neutral placeholder for unavailable images. */ }
+      } else if (!locked && profile.user.photosVisibleToNonMatches && (/^https?:\/\//i.test(source) || /^\/[^/]/.test(source))) photo = source;
+      // Never send a free member the visitor's ID, name or original photo.
+      const id = createHmac('sha256', process.env.JWT_SECRET!).update(ownerId + ':' + row.visitorId).digest('hex');
+      items.push({ id, ...(locked ? {} : { userId: profile.user.id, name: profile.user.name }), photo, viewedAt: new Date(row.viewedAt) });
+    }
+    return { locked, items, hasMore: rows.length > limit, nextOffset: offset + page.length };
+  }
+
+  async profileVisitorDetails(ownerId: string, visitorId: string) {
+    const owner = await this.userRepo.findOne({ where: { id: ownerId, status: 'active' }, select: ['id', 'plan', 'planExpiresAt'] });
+    if (!owner || activePlan(owner) === 'free') throw new ForbiddenException('Activate Gold or Diamond to view profile visitors.');
+    const recorded = await this.profileViewRepo.createQueryBuilder('view')
+      .where('view.profileUserId = :ownerId AND view.viewerUserId = :visitorId AND view.detailViewedAt IS NOT NULL', { ownerId, visitorId }).getExists();
+    if (!recorded || !await this.canViewVisitor(ownerId, visitorId)) throw new NotFoundException('Visitor is unavailable.');
+    const details = await this.findProfileDetails(visitorId, ownerId);
+    await this.recordProfileView(visitorId, ownerId, true);
+    return details;
   }
 
   private compatibilityScore(owner: User, other: User): number {

@@ -180,9 +180,34 @@ export class AgentsService {
         user: agent.name, userId: user.id, activity: `Agent ${agentId} created user ${user.id}`,
         action: 'Create', module: 'Agent Users', role: 'agent',
       })));
-      return saved.map(user => ({ id: user.id, name: user.name, email: user.email }));
+      return saved.map(user => ({ id: user.id, name: user.name, email: user.email, status: user.status, onboardingCompleted: user.onboardingCompleted, createdAt: user.createdAt }));
     }));
     return { users: result, message: `${result.length} account${result.length === 1 ? '' : 's'} created. Users can sign in with their email and assigned password.` };
+  }
+
+  async exportUsers(agentId: string, cursor?: string) {
+    const query = this.users.createQueryBuilder('user').select(['user.id', 'user.createdAt'])
+      .where('user.createdByAgentId = :agentId AND user.role = :role', { agentId, role: 'user' });
+    if (cursor) {
+      let marker: { id: string; at: string };
+      try {
+        marker = JSON.parse(Buffer.from(cursor, 'base64url').toString());
+        if (typeof marker.id !== 'string' || marker.id.length !== 36 || !Number.isFinite(Date.parse(marker.at))) throw new Error();
+      } catch { throw new BadRequestException('Invalid user export cursor.'); }
+      query.andWhere('(user.createdAt < :at OR (user.createdAt = :at AND user.id < :id))', { at: marker.at, id: marker.id });
+    }
+    const ranked = await query.addSelect("DATE_FORMAT(user.createdAt, '%Y-%m-%d %H:%i:%s.%f')", 'cursorAt')
+      .orderBy('user.createdAt', 'DESC').addOrderBy('user.id', 'DESC').take(6).getRawAndEntities();
+    const page = ranked.entities;
+    const ids = page.slice(0, 5).map(user => user.id);
+    const records = ids.length ? await this.users.createQueryBuilder('user')
+      .select(['user.id', 'user.name', 'user.email', 'user.phone', 'user.birthDate', 'user.gender', 'user.city', 'user.profession', 'user.bio', 'user.photos', 'user.status', 'user.createdAt', 'user.onboardingCompleted', 'user.agentEmailChangedAt'])
+      .where('user.id IN (:...ids) AND user.createdByAgentId = :agentId AND user.role = :role', { ids, agentId, role: 'user' }).getMany() : [];
+    const byId = new Map(records.map(user => [user.id, user]));
+    const users = ids.map(id => byId.get(id)).filter((user): user is User => Boolean(user));
+    const last = page[Math.min(page.length, 5) - 1];
+    const lastRaw = last ? ranked.raw.find(row => row.user_id === last.id) : undefined;
+    return { users, nextCursor: page.length > 5 && last ? Buffer.from(JSON.stringify({ id: last.id, at: lastRaw.cursorAt })).toString('base64url') : null };
   }
 
   async userDetails(agentId: string, id: string) {

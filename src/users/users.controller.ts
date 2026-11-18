@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -42,6 +42,18 @@ export class UsersController {
   @Get('me/insights')
   getMyInsights(@Request() req: any) {
     return this.usersService.getProfileInsights(req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/profile-visitors')
+  profileVisitors(@Request() req: any, @Query('offset') offset?: string) {
+    return this.usersService.profileVisitors(req.user.userId, Number(offset) || 0);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Get('me/profile-visitors/:id/details')
+  profileVisitorDetails(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.profileVisitorDetails(req.user.userId, id);
   }
 
   /** PATCH /users/me — update the currently authenticated user's profile */
@@ -130,6 +142,12 @@ export class UsersController {
   @Post(':id/view')
   recordProfileView(@Param('id') id: string, @Request() req: any) {
     return this.usersService.recordProfileView(id, req.user.userId);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post(':id/detail-view')
+  recordProfileDetailView(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.recordProfileView(id, req.user.userId, true);
   }
 
   @UseGuards(AuthGuard('jwt'))
