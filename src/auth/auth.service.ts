@@ -363,11 +363,13 @@ export class AuthService {
   }
 
   async managementLogin(dto: LoginDto & { role: string }, context: LoginContext = {}) {
+    // Each portal accepts only its own role, matching the dashboard route
+    // guard; another role's credentials are rejected like a wrong password.
     const roleMap: Record<string, string[]> = {
-      admin: ['admin', 'super_admin'],
+      admin: ['admin'],
       'super-admin': ['super_admin'],
-      sales: ['sales', 'super_admin'],
-      support: ['support', 'admin', 'super_admin'],
+      sales: ['sales'],
+      support: ['support'],
     };
 
     const allowedRoles = roleMap[dto.role];
@@ -383,7 +385,7 @@ export class AuthService {
 
     if (!user) return this.rejectLogin(dto.email, context, 'Invalid email or password.');
     if (!allowedRoles.includes(user.role)) {
-      return this.rejectLogin(dto.email, context, 'Access denied for this management portal.');
+      return this.rejectLogin(dto.email, context, 'Invalid email or password.');
     }
 
     const password = this.decryptOrUsePlainPassword(dto.password);
