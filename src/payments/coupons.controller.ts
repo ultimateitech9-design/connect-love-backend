@@ -30,7 +30,7 @@ export class CouponsController {
     }
     if (body.applicablePlan !== undefined || !partial) {
       const plan = body.applicablePlan || 'all';
-      if (!['all', 'gold', 'platinum'].includes(plan)) throw new BadRequestException('Invalid applicable plan.');
+      if (!['all', 'gold', 'platinum', 'coins'].includes(plan)) throw new BadRequestException('Invalid applicable plan.');
       result.applicablePlan = plan;
     }
     if (body.expiresAt !== undefined) {

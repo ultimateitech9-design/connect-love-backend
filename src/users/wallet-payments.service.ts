@@ -4,7 +4,8 @@ import { Agent } from '../agents/agent.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, MoreThanOrEqual, Repository } from 'typeorm';
+import { Coupon } from '../payments/coupon.entity';
 import { CoinTransaction } from './coin-transaction.entity';
 import { User } from './user.entity';
 
@@ -51,15 +52,47 @@ export class WalletPaymentsService {
   }
   private validSignature(expected: string, received: string) { const a = Buffer.from(expected); const b = Buffer.from(received || ''); return a.length === b.length && timingSafeEqual(a, b); }
 
-  async createRechargeOrder(userId: string, amount: number) {
+  /**
+   * Checks a wallet coupon ('coins' type). The buyer pays less and still gets
+   * every coin of the pack. A checkout started in the last 30 minutes holds
+   * one use of a limited coupon.
+   */
+  private async walletCoupon(rawCode: string | undefined, manager: EntityManager, lock = false) {
+    const code = String(rawCode || '').trim().toUpperCase();
+    if (!code) return null;
+    const coupon = await manager.getRepository(Coupon).findOne({ where: { code }, ...(lock ? { lock: { mode: 'pessimistic_write' as const } } : {}) });
+    if (!coupon || !coupon.active) throw new BadRequestException('Invalid or inactive coupon code.');
+    if (coupon.applicablePlan !== 'coins') throw new BadRequestException('This coupon is not valid for coin recharges.');
+    if (coupon.expiresAt && coupon.expiresAt <= new Date()) throw new BadRequestException('This coupon has expired.');
+    if (coupon.maxUses !== null) {
+      const pending = await manager.getRepository(CoinTransaction).count({ where: { type: 'recharge', status: 'pending', couponCode: code, createdAt: MoreThanOrEqual(new Date(Date.now() - 30 * 60_000)) } });
+      if (coupon.usedCount >= coupon.maxUses) throw new BadRequestException('This coupon usage limit has been reached.');
+      if (coupon.usedCount + pending >= coupon.maxUses) throw new BadRequestException('This coupon is in use by another checkout. Try again in a few minutes.');
+    }
+    return coupon;
+  }
+
+  async validateCoupon(rawCode: string) {
+    const coupon = await this.walletCoupon(rawCode, this.dataSource.manager);
+    if (!coupon) throw new BadRequestException('Enter a coupon code.');
+    return { code: coupon.code, discountPercent: coupon.discountPercent };
+  }
+
+  async createRechargeOrder(userId: string, amount: number, couponCode?: string) {
     const coins = Number(amount); if (!Number.isInteger(coins) || coins < 10 || coins > 100000) throw new BadRequestException('Recharge between 10 and 100000 coins.');
     const user = await this.users.findOne({ where: { id: userId } }); if (!user) throw new NotFoundException('User not found.');
-    const amountPaise = coins * this.coinPricePaise();
-    const transaction = await this.transactions.save(this.transactions.create({ type: 'recharge', status: 'pending', userId, senderId: null, receiverId: null, grossCoins: coins, userCoins: coins, platformCoins: 0, amountPaise, label: 'Razorpay wallet recharge', payoutAccount: null, gatewayOrderId: null, gatewayPaymentId: null, gatewayPayoutId: null }));
+    const fullPaise = coins * this.coinPricePaise();
+    const transaction = await this.dataSource.transaction(async (manager) => {
+      const coupon = await this.walletCoupon(couponCode, manager, true);
+      // Whole rupees, so the price matches what the wallet page shows.
+      const discountPaise = coupon ? Math.min(fullPaise - 100, Math.floor((fullPaise * coupon.discountPercent) / 10000) * 100) : 0;
+      return manager.getRepository(CoinTransaction).save(manager.getRepository(CoinTransaction).create({ type: 'recharge', status: 'pending', userId, senderId: null, receiverId: null, grossCoins: coins, userCoins: coins, platformCoins: 0, amountPaise: fullPaise - discountPaise, couponCode: coupon?.code ?? null, discountPaise, label: coupon ? `Razorpay wallet recharge · coupon ${coupon.code}` : 'Razorpay wallet recharge', payoutAccount: null, gatewayOrderId: null, gatewayPaymentId: null, gatewayPayoutId: null }));
+    });
+    const amountPaise = transaction.amountPaise!;
     try {
-      const order = await this.gateway('/orders', this.credentials(), 'POST', { amount: amountPaise, currency: 'INR', receipt: transaction.id, notes: { walletTransactionId: transaction.id, userId, coins: String(coins) } });
+      const order = await this.gateway('/orders', this.credentials(), 'POST', { amount: amountPaise, currency: 'INR', receipt: transaction.id, notes: { walletTransactionId: transaction.id, userId, coins: String(coins), coupon: transaction.couponCode || '' } });
       transaction.gatewayOrderId = order.id; await this.transactions.save(transaction);
-      return { keyId: this.credentials().keyId, orderId: order.id, amount: amountPaise, currency: 'INR', coins, customer: { name: user.name, email: user.email } };
+      return { keyId: this.credentials().keyId, orderId: order.id, amount: amountPaise, originalAmount: fullPaise, discountAmount: transaction.discountPaise, currency: 'INR', coins, customer: { name: user.name, email: user.email } };
     } catch (error) { transaction.status = 'rejected'; await this.transactions.save(transaction); throw error; }
   }
 
@@ -84,6 +117,10 @@ export class WalletPaymentsService {
       if (transaction.status !== 'pending') throw new BadRequestException('This recharge can no longer be completed.');
       const user = await manager.getRepository(User).findOne({ where: { id: transaction.userId! }, lock: { mode: 'pessimistic_write' } }); if (!user) throw new NotFoundException('User not found.');
       user.coinBalance += transaction.userCoins; transaction.gatewayPaymentId = paymentId; transaction.status = 'completed'; await manager.getRepository(User).save(user); await manager.getRepository(CoinTransaction).save(transaction);
+      if (transaction.couponCode) {
+        const coupon = await manager.getRepository(Coupon).findOne({ where: { code: transaction.couponCode }, lock: { mode: 'pessimistic_write' } });
+        if (coupon) { coupon.usedCount++; if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) coupon.active = false; await manager.getRepository(Coupon).save(coupon); }
+      }
       return { success: true, coinsAdded: transaction.userCoins, coinBalance: user.coinBalance };
     });
   }

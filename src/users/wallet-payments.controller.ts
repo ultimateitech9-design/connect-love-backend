@@ -5,7 +5,8 @@ import { WalletPaymentsService } from './wallet-payments.service';
 @Controller('wallet/razorpay')
 export class WalletPaymentsController {
   constructor(private readonly wallet: WalletPaymentsService) {}
-  @Post('order') @UseGuards(AuthGuard('jwt')) order(@Req() req: any, @Body('coins') coins: number) { return this.wallet.createRechargeOrder(req.user.userId, Number(coins)); }
+  @Post('order') @UseGuards(AuthGuard('jwt')) order(@Req() req: any, @Body('coins') coins: number, @Body('couponCode') couponCode?: string) { return this.wallet.createRechargeOrder(req.user.userId, Number(coins), couponCode); }
+  @Post('coupon') @UseGuards(AuthGuard('jwt')) coupon(@Body('couponCode') couponCode: string) { return this.wallet.validateCoupon(couponCode); }
   @Post('verify') @UseGuards(AuthGuard('jwt')) verify(@Req() req: any, @Body() body: any) { return this.wallet.verifyRecharge(req.user.userId, body); }
   @Post('withdrawals') @UseGuards(AuthGuard('jwt')) withdraw(@Req() req: any, @Body() body: { coins?: number; payout?: Record<string, string> }) { return this.wallet.requestWithdrawal(req.user.userId, Number(body.coins), body.payout || {}); }
   @Post('webhook') webhook(@Req() req: any, @Headers('x-razorpay-signature') signature?: string) { return this.wallet.handleWebhook(req.rawBody, req.body, signature); }

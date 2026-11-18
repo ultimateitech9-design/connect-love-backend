@@ -50,6 +50,7 @@ export class PaymentsService {
       const pending = await (manager ? manager.getRepository(Payment) : this.paymentRepo).count({ where: { couponCode: code, status: 'pending' } });
       if (coupon.usedCount + pending >= coupon.maxUses) throw new BadRequestException('This coupon is already used or reserved by a checkout.');
     }
+    if (coupon.applicablePlan === 'coins') throw new BadRequestException('This coupon is only for wallet coin recharges.');
     if (coupon.applicablePlan !== 'all' && coupon.applicablePlan !== userPlan) throw new BadRequestException(`This coupon is not valid for the ${userPlan === 'gold' ? 'Gold' : 'Diamond'} plan.`);
     const discountPaise = Math.floor((amountPaise * coupon.discountPercent) / 100);
     return { coupon, discountPaise, finalPaise: Math.max(100, amountPaise - discountPaise) };

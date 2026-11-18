@@ -22,6 +22,9 @@ export class CoinTransaction {
   @Column({ type: 'varchar', length: 160, nullable: true }) payoutAccount: string | null;
   @Column({ type: 'text', nullable: true }) payoutDetails: string | null;
   @Column({ type: 'int', unsigned: true, nullable: true }) amountPaise: number | null;
+  /** Recharge coupon: amountPaise is what was paid after discountPaise. */
+  @Column({ type: 'varchar', length: 32, nullable: true }) couponCode: string | null;
+  @Column({ type: 'int', unsigned: true, default: 0 }) discountPaise: number;
   @Column({ type: 'varchar', length: 100, nullable: true, unique: true }) gatewayOrderId: string | null;
   @Column({ type: 'varchar', length: 100, nullable: true, unique: true }) gatewayPaymentId: string | null;
   @Column({ type: 'varchar', length: 100, nullable: true, unique: true }) gatewayPayoutId: string | null;
