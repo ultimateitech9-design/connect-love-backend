@@ -2,12 +2,14 @@ import { BadGatewayException, BadRequestException, Injectable, ServiceUnavailabl
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { request as httpsRequest } from 'https';
-import { Repository } from 'typeorm';
+import { Repository, EntityManager } from 'typeorm';
+import { BillingGateway } from './billing.gateway';
 import { Payment } from '../platform/payment.entity';
 import { User, UserPlan } from '../users/user.entity';
 import { Coupon } from './coupon.entity';
 import { ProfileBoost, type BoostPlanKey } from '../boosts/boost.entity';
 import { BOOST_PLANS } from '../boosts/boosts.service';
+import { entitlementsFor } from '../plans/plan-entitlements';
 
 const PAID_PLANS: Record<string, { name: string; userPlan: UserPlan; amountPaise: number }> = {
   premium: { name: 'Gold', userPlan: 'gold', amountPaise: 29900 },
@@ -16,20 +18,38 @@ const PAID_PLANS: Record<string, { name: string; userPlan: UserPlan; amountPaise
 
 @Injectable()
 export class PaymentsService {
+  private reconcileTimer?: ReturnType<typeof setInterval>;
+  private reconciling = false;
+  private checkedOrders = new Map<string, number>();
+  onModuleInit() {
+    this.reconcileTimer = setInterval(() => { void this.reconcileRecentPendingPayments().catch(() => undefined); }, 15000);
+    this.reconcileTimer.unref();
+  }
+  onModuleDestroy() { if (this.reconcileTimer) clearInterval(this.reconcileTimer); }
+  async membership(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'plan', 'planExpiresAt', 'isVerified', 'gender'] });
+    if (!user) throw new UnauthorizedException('User account not found.');
+    return { plan: user.plan, planExpiresAt: user.planExpiresAt, isVerified: user.isVerified, planBadge: entitlementsFor(user).verifiedBadge };
+  }
   constructor(
     @InjectRepository(Payment) private readonly paymentRepo: Repository<Payment>,
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Coupon) private readonly couponRepo: Repository<Coupon>,
     @InjectRepository(ProfileBoost) private readonly boostRepo: Repository<ProfileBoost>,
+    private readonly billing: BillingGateway,
   ) {}
 
-  private async discountFor(rawCode: string | undefined, userPlan: UserPlan, amountPaise: number) {
+  private async discountFor(rawCode: string | undefined, userPlan: UserPlan, amountPaise: number, manager?: EntityManager) {
     const code = String(rawCode || '').trim().toUpperCase();
     if (!code) return { coupon: null as Coupon | null, discountPaise: 0, finalPaise: amountPaise };
-    const coupon = await this.couponRepo.findOne({ where: { code } });
+    const coupon = await (manager ? manager.getRepository(Coupon) : this.couponRepo).findOne({ where: { code }, ...(manager ? { lock: { mode: 'pessimistic_write' as const } } : {}) });
     if (!coupon || !coupon.active) throw new BadRequestException('Invalid or inactive coupon code.');
     if (coupon.expiresAt && coupon.expiresAt <= new Date()) throw new BadRequestException('This coupon has expired.');
     if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) throw new BadRequestException('This coupon usage limit has been reached.');
+    if (coupon.maxUses !== null) {
+      const pending = await (manager ? manager.getRepository(Payment) : this.paymentRepo).count({ where: { couponCode: code, status: 'pending' } });
+      if (coupon.usedCount + pending >= coupon.maxUses) throw new BadRequestException('This coupon is already used or reserved by a checkout.');
+    }
     if (coupon.applicablePlan !== 'all' && coupon.applicablePlan !== userPlan) throw new BadRequestException(`This coupon is not valid for the ${userPlan === 'gold' ? 'Gold' : 'Diamond'} plan.`);
     const discountPaise = Math.floor((amountPaise * coupon.discountPercent) / 100);
     return { coupon, discountPaise, finalPaise: Math.max(100, amountPaise - discountPaise) };
@@ -111,9 +131,9 @@ export class PaymentsService {
     if (!plan) throw new BadRequestException('Invalid paid plan.');
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) throw new UnauthorizedException('User account not found.');
-    const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise);
-
-    const payment = await this.paymentRepo.save(this.paymentRepo.create({
+    const { payment, discount } = await this.paymentRepo.manager.transaction(async manager => {
+    const discount = await this.discountFor(couponCode, plan.userPlan, plan.amountPaise, manager);
+    const payment = await manager.save(Payment, manager.create(Payment, {
       userId,
       planName: plan.userPlan,
       amount: (discount.finalPaise / 100).toFixed(2),
@@ -124,6 +144,8 @@ export class PaymentsService {
       status: 'pending',
       gateway: 'razorpay',
     }));
+    return { payment, discount };
+    });
 
     try {
       const order = await this.razorpay('/orders', {
@@ -169,10 +191,13 @@ export class PaymentsService {
       throw new BadRequestException('Payment details do not match this order.');
     }
     if (gatewayPayment.status === 'authorized') {
-      gatewayPayment = await this.razorpay(`/payments/${paymentId}/capture`, {
+      try { gatewayPayment = await this.razorpay(`/payments/${paymentId}/capture`, {
         method: 'POST',
         body: JSON.stringify({ amount: amountPaise, currency: 'INR' }),
-      });
+      }); } catch {
+        // Automatic capture or a webhook may have won the capture race.
+        gatewayPayment = await this.razorpay(`/payments/${paymentId}`);
+      }
     }
     if (gatewayPayment.status !== 'captured') throw new BadRequestException('Payment has not been captured yet.');
     return this.activatePlan(payment, paymentId);
@@ -209,18 +234,25 @@ export class PaymentsService {
    * source of truth and a declined order is never activated.
    */
   async reconcileRecentPendingPayments() {
-    const cutoff = new Date(Date.now() - 72 * 60 * 60 * 1000);
+    if (this.reconciling) return;
+    this.reconciling = true;
+    try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const pending = await this.paymentRepo.find({
       where: { status: 'pending' },
       order: { createdAt: 'DESC' },
-      take: 10,
+      take: 200,
     });
 
     await Promise.all(pending
       .filter((payment) => payment.gatewayOrderId && payment.createdAt >= cutoff)
+      .sort((a, b) => (this.checkedOrders.get(a.id) || 0) - (this.checkedOrders.get(b.id) || 0))
+      .slice(0, 5)
       .map(async (payment) => {
-        try { await this.reconcilePendingPayment(payment); } catch { /* A gateway outage must not block the billing page. */ }
+        this.checkedOrders.set(payment.id, Date.now());
+        try { await this.reconcilePendingPayment(payment); } catch { /* Retry on a later pass. */ }
       }));
+    } finally { this.reconciling = false; }
   }
 
   private async reconcilePendingPayment(payment: Payment) {
@@ -234,15 +266,23 @@ export class PaymentsService {
       && gatewayPayment?.currency === payment.currency,
     );
     if (captured?.id) await this.activatePlan(payment, captured.id);
+    else {
+      const authorized = (response?.items || []).find((item: any) => item.status === 'authorized' && item.order_id === payment.gatewayOrderId && item.amount === expectedAmount && item.currency === payment.currency);
+      if (authorized?.id) {
+        const result = await this.razorpay('/payments/' + encodeURIComponent(authorized.id) + '/capture', { method: 'POST', body: JSON.stringify({ amount: expectedAmount, currency: payment.currency }) });
+        if (result.status === 'captured') await this.activatePlan(payment, authorized.id);
+      }
+    }
   }
 
   private async activatePlan(requestedPayment: Payment, gatewayPaymentId: string) {
-    return this.paymentRepo.manager.transaction(async (manager) => {
+    const result = await this.paymentRepo.manager.transaction(async (manager) => {
       const payment = await manager.findOne(Payment, {
         where: { id: requestedPayment.id },
         lock: { mode: 'pessimistic_write' },
       });
       if (!payment) throw new BadRequestException('Payment was not found.');
+      if (payment.status === 'refunded') throw new BadRequestException('This payment has already been refunded.');
     if (payment.status === 'successful') {
       if (payment.planName.startsWith('boost:')) {
         const boost = await manager.getRepository(ProfileBoost).findOne({ where: { userId: payment.userId, requestId: payment.id } });
@@ -275,9 +315,18 @@ export class PaymentsService {
     payment.status = 'successful';
     await manager.save(user);
     await manager.save(payment);
-    if (payment.couponCode) await manager.getRepository(Coupon).increment({ code: payment.couponCode }, 'usedCount', 1);
+    if (payment.couponCode) {
+      const coupon = await manager.findOne(Coupon, { where: { code: payment.couponCode }, lock: { mode: 'pessimistic_write' } });
+      if (coupon) {
+        coupon.usedCount++;
+        if (coupon.maxUses !== null && coupon.usedCount >= coupon.maxUses) coupon.active = false;
+        await manager.save(coupon);
+      }
+    }
     return { success: true, plan: user.plan, expiresAt };
     });
+    this.billing.changed(requestedPayment.userId, requestedPayment.id);
+    return result;
   }
 
   private safeEqual(left: string, right: string) {

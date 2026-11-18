@@ -7,6 +7,19 @@ import { DiscoveryService } from './discovery.service';
 export class DiscoveryController {
   constructor(private readonly discoveryService: DiscoveryService) {}
 
+  @Get('search')
+  async searchProfiles(@Request() req: any, @Query() query: Record<string, string>) {
+    if (!query.search?.trim()) return { items: [], hasMore: false, nextCursor: null };
+    return this.discoveryService.getSuggestions(req.user.userId, {
+      nameSearch: true, queue: true, search: query.search, cursor: query.cursor,
+      limit: Number(query.limit) || 12,
+      ageMin: Number(query.ageMin) || undefined, ageMax: Number(query.ageMax) || undefined,
+      interestedIn: query.interestedIn, maxDistance: Number(query.maxDistance) || undefined,
+      verifiedOnly: query.verifiedOnly === 'true',
+      interests: query.interests?.split(',').filter(Boolean).slice(0, 30),
+    });
+  }
+
   @Get()
   async getSuggestions(
     @Request() req: any,

@@ -9,6 +9,7 @@ import { distanceBetweenKm } from '../location/distance';
 import { FirstImpression } from '../first-impressions/first-impression.entity';
 
 interface DiscoveryFilters {
+  nameSearch?: boolean;
   interests?: string[];
   verifiedOnly?: boolean;
   cursor?: string;
@@ -111,6 +112,7 @@ export class DiscoveryService {
         'user.relationshipGoal',
         'user.zodiac',
         'user.plan',
+        'user.planExpiresAt',
         'user.isVerified',
         'user.kycMatched',
         'user.isOnline',
@@ -180,8 +182,16 @@ export class DiscoveryService {
     });
 
     if (filters.search && filters.search.trim()) {
-      const term = filters.search.trim();
-      const searchIds = filters.queue ? null : await this.searchService.searchUserIds(term, { ageMin, ageMax, limit, offset });
+      const term = filters.search.trim().replace(/\s+/g, ' ').slice(0, 120);
+      const searchIds = filters.queue || filters.nameSearch ? null : await this.searchService.searchUserIds(term, { ageMin, ageMax, limit, offset });
+      if (filters.nameSearch) {
+        const name = "LOWER(TRIM(REGEXP_REPLACE(user.name, '[[:space:]]+', ' ')))";
+        const escaped = term.toLowerCase().replace(/[!%_]/g, value => '!' + value);
+        query.andWhere(name + " LIKE :nameContains ESCAPE '!'", { nameContains: '%' + escaped + '%' })
+          .addSelect('CASE WHEN ' + name + ' = :nameExact THEN 0 WHEN ' + name + " LIKE :namePrefix ESCAPE '!' THEN 1 ELSE 2 END", 'nameMatchScore')
+          .setParameters({ nameExact: term.toLowerCase(), namePrefix: escaped + '%' })
+          .orderBy('nameMatchScore', 'ASC').addOrderBy('user.createdAt', 'DESC');
+      } else {
       if (searchIds) {
         if (searchIds.length === 0) return [];
         query.andWhere('user.id IN (:...searchIds)', { searchIds });
@@ -194,6 +204,7 @@ export class DiscoveryService {
         query.andWhere('(LOWER(user.name) LIKE :search OR LOWER(user.city) LIKE :search OR LOWER(user.profession) LIKE :search)', {
           search: `%${term.toLowerCase()}%`,
         }).skip(offset);
+      }
       }
     }
 
@@ -314,6 +325,7 @@ export class DiscoveryService {
         relationshipGoal: user.relationshipGoal,
         zodiac: user.zodiac,
         plan: user.plan,
+        planExpiresAt: user.planExpiresAt,
         isVerified: user.isVerified,
         planBadge: entitlementsFor(user).verifiedBadge,
         kycMatched: user.kycMatched,

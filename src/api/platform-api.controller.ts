@@ -880,7 +880,7 @@ export class PlatformApiController {
     // A browser can close immediately after Razorpay accepts a payment. Recheck
     // recent pending orders here, so the billing view repairs that interruption
     // even if the checkout callback was missed.
-    await this.paymentsService.reconcileRecentPendingPayments();
+    void this.paymentsService.reconcileRecentPendingPayments().catch(() => undefined);
     const plans = await this.planRepo.find({ order: { sortOrder: 'ASC' } });
     const users = await this.userRepo.find({ select: ['plan'] });
     const subscriberCounts = users.reduce<Record<string, number>>((acc, user) => {

@@ -7,11 +7,13 @@ import { CouponsController } from './coupons.controller';
 import { PaymentsController } from './payments.controller';
 import { PaymentsService } from './payments.service';
 import { ProfileBoost } from '../boosts/boost.entity';
+import { AuthModule } from '../auth/auth.module';
+import { BillingGateway } from './billing.gateway';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Payment, User, Coupon, ProfileBoost])],
+  imports: [AuthModule, TypeOrmModule.forFeature([Payment, User, Coupon, ProfileBoost])],
   controllers: [PaymentsController, CouponsController],
-  providers: [PaymentsService],
+  providers: [PaymentsService, BillingGateway],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

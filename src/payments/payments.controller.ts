@@ -1,10 +1,16 @@
-import { Body, Controller, Headers, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { PaymentsService } from './payments.service';
 
 @Controller('payments/razorpay')
 export class PaymentsController {
   constructor(private readonly paymentsService: PaymentsService) {}
+
+  @Get('membership')
+  @UseGuards(AuthGuard('jwt'))
+  membership(@Req() request: any) {
+    return this.paymentsService.membership(request.user.userId);
+  }
 
   @Post('order')
   @UseGuards(AuthGuard('jwt'))
