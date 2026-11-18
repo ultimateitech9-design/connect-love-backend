@@ -44,7 +44,9 @@ export class MatchesService {
       // base64 photo made the response tens of MB for users with many matches.
       photos: user.photos?.length ? [user.photos[0]] : [],
       bio: user.bio,
-      isOnline: user.isOnline,
+      isOnline: user.showOnlineStatus !== false && user.status === 'active' && user.isOnline,
+      showOnlineStatus: user.showOnlineStatus,
+      status: user.status,
     };
   }
 
@@ -56,8 +58,8 @@ export class MatchesService {
       .leftJoin('match.sender', 'sender')
       .leftJoin('match.receiver', 'receiver')
       .addSelect([
-        'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos', 'sender.isOnline',
-        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos', 'receiver.isOnline',
+        'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos', 'sender.isOnline', 'sender.showOnlineStatus', 'sender.status',
+        'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos', 'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.status',
       ]);
   }
 
@@ -135,6 +137,14 @@ export class MatchesService {
       ],
       relations: ['sender', 'receiver'],
     });
+  }
+
+  async presenceRecipients(userId: string) {
+    return this.matchesRepository.createQueryBuilder('relation')
+      .select(['relation.id', 'relation.senderId', 'relation.receiverId'])
+      .where('(relation.senderId = :userId OR relation.receiverId = :userId)', { userId })
+      .andWhere('relation.status = :status', { status: MatchStatus.MATCHED })
+      .getMany();
   }
 
   async findAllByStatus(userId: string, status: MatchStatus): Promise<any[]> {

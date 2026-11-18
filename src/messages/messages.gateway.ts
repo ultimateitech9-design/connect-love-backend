@@ -13,7 +13,6 @@ import { MessagesService } from './messages.service';
 import { VideoCallsService } from './video-calls.service';
 import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
-import { MatchStatus } from '../matches/match.entity';
 import { VideoCall } from './video-call.entity';
 import { DirectCallsService, UPGRADE_REQUIRED } from '../direct-calls/direct-calls.service';
 
@@ -145,6 +144,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       });
       userId = payload.sub || payload.userId;
       if (!userId || !await this.usersService.isActiveAccount(userId)) throw new Error('Account is not active');
+      client.data.userId = userId;
     } catch {
       client.disconnect(true);
       return;
@@ -171,6 +171,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       } else {
         userSockets.add(client.id);
       }
+      client.emit('presenceReady');
     }
   }
 
@@ -203,8 +204,8 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
 
   private async broadcastPresenceToMatches(userId: string, isOnline: boolean, lastSeen?: Date) {
     try {
-      const activeMatches = await this.matchesService.findAllByStatus(userId, MatchStatus.MATCHED);
-      const payload = { userId, isOnline, lastSeen };
+      const activeMatches = await this.matchesService.presenceRecipients(userId);
+      const payload = await this.usersService.visiblePresence(userId, isOnline, lastSeen);
 
       activeMatches.forEach(match => {
         const otherId = match.senderId === userId ? match.receiverId : match.senderId;
@@ -218,6 +219,21 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     } catch (error) {
       console.error('Error broadcasting presence', error);
     }
+  }
+
+  @SubscribeMessage('onlineFriendsSnapshot')
+  async onlineFriendsSnapshot(@ConnectedSocket() client: Socket) {
+    const viewerId = this.getUserIdForSocket(client);
+    if (!viewerId) return { userIds: [] };
+    const matches = await this.matchesService.presenceRecipients(viewerId);
+    const friendIds = [...new Set(matches.map(match => match.senderId === viewerId ? match.receiverId : match.senderId))];
+    if (!friendIds.length) return { userIds: [] };
+    // Actual Socket.IO room membership is authoritative. Persisted isOnline
+    // flags can survive a crashed server or an interrupted disconnect.
+    const connected = await this.server.in(friendIds.map(id => 'user:' + id)).fetchSockets();
+    const friends = new Set(friendIds);
+    const liveIds = [...new Set(connected.map(socket => socket.data.userId).filter((id): id is string => typeof id === 'string' && friends.has(id)))];
+    return { userIds: await this.usersService.visibleOnlineUserIds(liveIds) };
   }
 
   @SubscribeMessage('sendMessage')

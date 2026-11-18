@@ -193,6 +193,20 @@ export class UsersService {
     return { message: 'Your account has been deactivated. Sign in again whenever you want to reactivate it.' };
   }
 
+  async visiblePresence(userId: string, isOnline: boolean, lastSeen?: Date) {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'showOnlineStatus', 'status'] });
+    const visible = Boolean(user?.showOnlineStatus && user.status === 'active');
+    return { userId, isOnline: visible && isOnline, lastSeen: visible ? lastSeen : undefined };
+  }
+  async visibleOnlineUserIds(ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    const users = await this.userRepo.createQueryBuilder('user').select(['user.id'])
+      .where('user.id IN (:...ids)', { ids })
+      .andWhere('user.status = :status', { status: 'active' })
+      .andWhere('user.showOnlineStatus = :visible', { visible: true }).getMany();
+    return users.map(user => user.id);
+  }
+
   async updatePresence(userId: string, isOnline: boolean): Promise<void> {
     const updateData: Partial<User> = { isOnline };
     if (!isOnline) {
