@@ -1,8 +1,10 @@
+import { renderEmail, SITE_URL } from '../mail/email-layout';
 import {
   ConflictException,
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -21,6 +23,7 @@ const OTP_MAX_SENDS_PER_HOUR = 5;
 
 @Injectable()
 export class RegistrationOtpService {
+  private readonly logger = new Logger(RegistrationOtpService.name);
   private transporter: nodemailer.Transporter | null = null;
 
   constructor(
@@ -120,15 +123,13 @@ export class RegistrationOtpService {
         from: fromAddress,
         to: email,
         subject: `${otp} is your Connect Love verification code`,
-        text: `Your Connect Love verification code is ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes. Never share this code with anyone.`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
-            <h1 style="font-size:24px;margin:0 0 12px;color:#e11d48">Connect Love</h1>
-            <p style="font-size:16px;line-height:1.6">Use this verification code to finish creating your account:</p>
-            <div style="font-size:34px;font-weight:800;letter-spacing:8px;text-align:center;padding:20px;margin:22px 0;background:#fff1f2;border-radius:14px;color:#be123c">${otp}</div>
-            <p style="font-size:14px;line-height:1.6;color:#596273">This code expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone. If you did not request this code, you can ignore this email.</p>
-          </div>
-        `,
+        ...renderEmail({
+          preheader: `Your verification code is ${otp}`,
+          title: 'Verify your email',
+          paragraphs: ['Use this code to finish creating your Connect Love account.'],
+          highlight: { label: 'Verification code', value: otp, large: true },
+          note: `This code expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone. If you did not request it, you can ignore this email.`,
+        }),
       });
     } catch {
       await this.otpRepo.delete({ email });
@@ -184,16 +185,14 @@ export class RegistrationOtpService {
       await this.mailer().sendMail({
         from: fromAddress,
         to: email,
-        subject: `${otp} is your ConnectLove password reset code`,
-        text: `Your ConnectLove password reset code is ${otp}. It expires in ${OTP_EXPIRY_MINUTES} minutes. Never share this code with anyone.`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:28px;color:#172033">
-            <h1 style="font-size:24px;margin:0 0 12px;color:#e11d48">ConnectLove</h1>
-            <p style="font-size:16px;line-height:1.6">Use this code to reset your account password:</p>
-            <div style="font-size:34px;font-weight:800;letter-spacing:8px;text-align:center;padding:20px;margin:22px 0;background:#fff1f2;border-radius:14px;color:#be123c">${otp}</div>
-            <p style="font-size:14px;line-height:1.6;color:#596273">This code expires in ${OTP_EXPIRY_MINUTES} minutes. If you did not request a password reset, you can ignore this email.</p>
-          </div>
-        `,
+        subject: `${otp} is your Connect Love password reset code`,
+        ...renderEmail({
+          preheader: `Your password reset code is ${otp}`,
+          title: 'Reset your password',
+          paragraphs: ['Use this code to reset your Connect Love password.'],
+          highlight: { label: 'Reset code', value: otp, large: true },
+          note: `This code expires in ${OTP_EXPIRY_MINUTES} minutes. Never share it with anyone. If you did not ask to reset your password, you can ignore this email.`,
+        }),
       });
     } catch {
       await this.otpRepo.delete({ email });
@@ -234,5 +233,33 @@ export class RegistrationOtpService {
 
     await this.otpRepo.delete({ email });
     return email;
+  }
+
+  /** Welcome email for a new account. Never throws: signup has already succeeded. */
+  sendWelcomeEmail(email: string, name: string) {
+    void (async () => {
+      try {
+        const firstName = name.trim().split(/\s+/)[0] || 'there';
+        await this.mailer().sendMail({
+          from: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
+          to: email,
+          subject: `Welcome to Connect Love, ${firstName}!`,
+          ...renderEmail({
+            preheader: 'Your account is ready. Complete your profile and start meeting people.',
+            title: 'Welcome to Connect Love',
+            greeting: `Hi ${firstName},`,
+            paragraphs: [
+              'Your Connect Love account is ready. We are happy to have you here.',
+              'Add a few clear photos and finish your profile so people can get to know you. Complete profiles get many more matches.',
+              'Then discover people near you, like the ones you are interested in, and start chatting when you match.',
+            ],
+            button: { label: 'Open Connect Love', url: `${SITE_URL}/user/discover` },
+            note: 'Stay safe: never share money, OTPs or bank details with someone you met online. Report anyone who makes you feel uncomfortable.',
+          }),
+        });
+      } catch (error) {
+        this.logger.warn(`Welcome email to ${email} failed: ${String(error)}`);
+      }
+    })();
   }
 }

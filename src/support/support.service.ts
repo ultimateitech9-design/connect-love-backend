@@ -1,3 +1,4 @@
+import { renderEmail, SITE_URL } from '../mail/email-layout';
 import { Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -34,37 +35,27 @@ export class SupportService {
     return this.transporter;
   }
 
-  private escapeHtml(value: string) {
-    return value.replace(/[&<>"']/g, (character) => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
-    })[character] || character);
-  }
-
   private async sendResolutionEmail(ticket: Contact) {
     const recipient = ticket.email.trim().toLowerCase();
-    const name = this.escapeHtml(ticket.name.trim() || 'Customer');
-    const subject = this.escapeHtml(ticket.subject.trim());
     const fromAddress = process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim();
     try {
       await this.mailer().sendMail({
         from: fromAddress,
         to: recipient,
         subject: `Your Connect Love support request #${ticket.id} has been resolved`,
-        text: `Hello ${ticket.name.trim() || 'Customer'},\n\nYour support request #${ticket.id} (${ticket.subject}) has been resolved by the Connect Love support team.\n\nIf you still need help, please submit a new request through Contact Us.\n\nRegards,\nConnect Love Support`,
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:28px;color:#172033">
-            <h1 style="font-size:24px;margin:0 0 18px;color:#e11d48">Connect Love Support</h1>
-            <p style="font-size:16px;line-height:1.6">Hello ${name},</p>
-            <p style="font-size:16px;line-height:1.6">Your support request has been resolved by our team.</p>
-            <div style="margin:22px 0;padding:18px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
-              <div style="font-size:13px;color:#64748b">Ticket #${ticket.id}</div>
-              <div style="font-size:16px;font-weight:700;margin-top:6px">${subject}</div>
-              <div style="font-size:14px;color:#059669;margin-top:8px">Status: Resolved</div>
-            </div>
-            <p style="font-size:14px;line-height:1.6;color:#596273">If you still need help, please submit a new request through the Contact Us form.</p>
-            <p style="font-size:14px;line-height:1.6">Regards,<br><strong>Connect Love Support</strong></p>
-          </div>
-        `,
+        ...renderEmail({
+          preheader: `Ticket #${ticket.id} has been resolved`,
+          title: 'Your support request is resolved',
+          greeting: `Hello ${ticket.name.trim() || 'there'},`,
+          paragraphs: ['Our support team has resolved your request.'],
+          details: [
+            { label: 'Ticket', value: `#${ticket.id}` },
+            { label: 'Subject', value: ticket.subject.trim() },
+            { label: 'Status', value: 'Resolved' },
+          ],
+          button: { label: 'Open Connect Love', url: SITE_URL },
+          note: 'Still need help? Send us a new request from the Contact Us page.',
+        }),
       });
     } catch {
       throw new ServiceUnavailableException('The resolution email could not be sent. Please check the email service and try again.');

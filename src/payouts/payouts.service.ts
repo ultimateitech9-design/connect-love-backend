@@ -1,3 +1,4 @@
+import { renderEmail } from '../mail/email-layout';
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
@@ -294,15 +295,27 @@ export class PayoutsService {
       const rupees = `₹${((tx.amountPaise ?? tx.grossCoins * 100) / 100).toLocaleString('en-IN')}`;
       const paid = tx.status === 'completed';
       const subject = paid ? `Your ConnectLove withdrawal of ${rupees} has been paid` : 'Your ConnectLove withdrawal could not be processed';
-      const text = paid
-        ? `Hi ${owner.name},\n\nWe have sent ${rupees} (${tx.grossCoins} coins) to ${destination || 'your account'}. Depending on your bank it can take a few hours to show up.\n\nThank you,\nConnectLove`
-        : `Hi ${owner.name},\n\nYour withdrawal request of ${rupees} (${tx.grossCoins} coins) to ${destination || 'your account'} could not be processed. The ${tx.grossCoins} coins have been returned to your earnings. Please check your account details and try again, or contact support.\n\nConnectLove`;
+      const email = renderEmail(paid
+        ? {
+          preheader: `${rupees} is on its way to your account`,
+          title: 'Your withdrawal has been paid',
+          greeting: `Hi ${owner.name},`,
+          paragraphs: ['We have sent your money. Depending on your bank it can take a few hours to show up.'],
+          highlight: { label: 'Amount paid', value: rupees },
+          details: [{ label: 'Coins', value: String(tx.grossCoins) }, { label: 'Sent to', value: destination || 'Your account' }],
+        }
+        : {
+          preheader: 'Your coins have been returned to your earnings',
+          title: 'Your withdrawal could not be processed',
+          greeting: `Hi ${owner.name},`,
+          paragraphs: [`We could not complete this withdrawal, so the ${tx.grossCoins} coins have been returned to your earnings. Please check your account details and try again, or contact support.`],
+          details: [{ label: 'Amount', value: rupees }, { label: 'Account', value: destination || 'Your account' }],
+        });
       await mailer.sendMail({
         from: process.env.SMTP_FROM?.trim() || process.env.SMTP_USER?.trim(),
         to: owner.email,
         subject,
-        text,
-        html: `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto"><h1 style="color:#e11d48">ConnectLove</h1>${text.split('\n\n').map((part) => `<p>${part.replace(/\n/g, '<br>')}</p>`).join('')}</div>`,
+        ...email,
       });
     } catch (error) {
       this.logger.warn(`Withdrawal email for ${transactionId} failed: ${String(error)}`);

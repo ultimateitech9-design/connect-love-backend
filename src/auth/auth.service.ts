@@ -197,6 +197,7 @@ export class AuthService {
       emailVerifiedAt: new Date(),
     });
     const saved = await this.userRepo.save(user);
+    this.registrationOtpService.sendWelcomeEmail(saved.email, saved.name);
     const { password: _, ...safe } = saved as any;
     return { message: 'Account created successfully', user: safe };
   }
@@ -286,6 +287,7 @@ export class AuthService {
         emailVerifiedAt: new Date(),
       }));
       isNewUser = true;
+      this.registrationOtpService.sendWelcomeEmail(user.email, user.name);
     }
 
     const session = await this.startSession(user, context);
