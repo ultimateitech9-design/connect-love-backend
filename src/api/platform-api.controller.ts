@@ -20,6 +20,7 @@ import { UserActivityService } from '../users/user-activity.service';
 import { AdminAccountsService } from '../admin/admin-accounts.service';
 import { AdminAgentStatusDto } from '../admin/admin-agent-status.dto';
 import { PaymentsService } from '../payments/payments.service';
+import { MessagesGateway } from '../messages/messages.gateway';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -288,6 +289,7 @@ export class PlatformApiController {
     private readonly userActivity: UserActivityService,
     private readonly adminAccounts: AdminAccountsService,
     private readonly paymentsService: PaymentsService,
+    private readonly messagesGateway: MessagesGateway,
   ) {}
 
   private async creationOrigins(users: User[]) {
@@ -716,10 +718,14 @@ export class PlatformApiController {
     if (body.photos !== undefined) {
       if (body.photos.length > 10) throw new BadRequestException('Maximum 10 profile photos allowed.');
       for (const photo of body.photos) {
-        if (photo.length > 1500000 || (!user.photos?.includes(photo) && !/^(https?:\/\/\S+|\/[^\s]*|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*)$/.test(photo))) throw new BadRequestException('Upload a valid JPG, PNG or WebP photo, or use a valid photo URL.');
+        if (user.photos?.includes(photo)) continue;
+        if (photo.length > 1500000 || !/^(https?:\/\/\S+|\/[^\s]*|data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/]+=*)$/.test(photo)) throw new BadRequestException('Upload a valid JPG, PNG or WebP photo, or use a valid photo URL.');
       }
     }
-    const primaryPhotoChanged = body.photos !== undefined && (body.photos[0] || null) !== (user.photos?.[0] || null);
+    const currentPhotos = user.photos || [];
+    const photosChanged = body.photos !== undefined &&
+      (body.photos.length !== currentPhotos.length || body.photos.some((photo, index) => photo !== currentPhotos[index]));
+    const primaryPhotoChanged = photosChanged && (body.photos?.[0] || null) !== (currentPhotos[0] || null);
     const plan = ['free', 'gold', 'platinum'].includes(String(body.plan)) ? body.plan : undefined;
     const status = ['active', 'suspended', 'banned', 'pending_verification'].includes(String(body.status)) ? body.status : undefined;
     const role = ['user', 'admin', 'super_admin', 'sales', 'support'].includes(String(body.role)) ? body.role : undefined;
@@ -750,9 +756,42 @@ export class PlatformApiController {
       user.kycMatchScore = null; user.kycVerifiedAt = null;
     }
     const saved = await this.userRepo.save(user);
+    if (photosChanged) this.messagesGateway.notifyProfilePhotosChanged(id);
     await this.audit('Users', 'Update', `Updated user profile ${saved.email}`);
     const { password: _, ...safe } = saved as any;
     return { success: true, user: safe };
+  }
+
+  @Post('users/:id/photos/remove')
+  @Roles('super_admin')
+  async removeUserPhoto(@Param('id', ParseUUIDPipe) id: string, @Body('photo') photo: unknown) {
+    if (typeof photo !== 'string' || !photo) throw new BadRequestException('Select a photo to remove.');
+
+    const result = await this.userRepo.manager.transaction(async manager => {
+      const repo = manager.getRepository(User);
+      const user = await repo.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
+      if (!user) throw new NotFoundException('User not found.');
+      const current = user.photos || [];
+      const photos = current.filter(source => source !== photo);
+      const changed = photos.length !== current.length;
+      if (changed) {
+        user.photos = photos;
+        if (current[0] === photo) {
+          user.isVerified = false;
+          user.kycMatched = false;
+          user.kycLivePhoto = null;
+          user.kycMatchScore = null;
+          user.kycVerifiedAt = null;
+        }
+        await repo.save(user);
+      }
+      return { changed, photos, avatarUrl: photos[0] || null, isVerified: user.isVerified };
+    });
+    if (result.changed) {
+      this.messagesGateway.notifyProfilePhotosChanged(id);
+      await this.audit('Users', 'Update', 'Removed a profile photo from user ' + id);
+    }
+    return result;
   }
 
   @Patch('users/:id/status')

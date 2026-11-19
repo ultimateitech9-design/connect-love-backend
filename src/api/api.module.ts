@@ -15,10 +15,12 @@ import { RolesGuard } from '../auth/roles.guard';
 import { UserActivityService } from '../users/user-activity.service';
 import { AdminAccountsService } from '../admin/admin-accounts.service';
 import { PaymentsModule } from '../payments/payments.module';
+import { MessagesModule } from '../messages/messages.module';
 
 @Module({
   imports: [
     PaymentsModule,
+    MessagesModule,
     TypeOrmModule.forFeature([
       User,
       Contact,

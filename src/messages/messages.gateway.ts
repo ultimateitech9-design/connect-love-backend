@@ -32,6 +32,10 @@ const RING_SECONDS = 45;
   pingTimeout: 5000,
 })
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
+  notifyProfilePhotosChanged(userId: string) {
+    this.server?.to('member-profile-updates').emit('profilePhotosChanged');
+    this.server?.to('user:' + userId).emit('ownProfilePhotosChanged');
+  }
   private readonly visitorChanged = (ownerId: string) => {
     this.server?.to('user:' + ownerId).emit('profileVisitorsChanged');
   };
@@ -234,6 +238,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
         } catch { next(new Error('Unable to verify account')); client.disconnect(true); }
       });
       await client.join(`user:${userId}`);
+      await client.join('member-profile-updates');
       const userSockets = this.connectedUsers.get(userId);
       if (!userSockets || userSockets.size === 0) {
         this.connectedUsers.set(userId, new Set([client.id]));
