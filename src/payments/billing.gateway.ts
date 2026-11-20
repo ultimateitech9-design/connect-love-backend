@@ -1,9 +1,10 @@
 import { WebSocketGateway, WebSocketServer, OnGatewayConnection } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
 import { Server, Socket } from 'socket.io';
+import { isAllowedOrigin } from '../common/cors';
 import { TokenBlacklistService } from '../auth/token-blacklist.service';
 
-@WebSocketGateway({ namespace: '/billing', cors: { origin: true, credentials: true } })
+@WebSocketGateway({ namespace: '/billing', cors: { origin: (origin, callback) => callback(null, isAllowedOrigin(origin)), credentials: true } })
 export class BillingGateway implements OnGatewayConnection {
   @WebSocketServer() server: Server;
   constructor(private readonly jwt: JwtService, private readonly blacklist: TokenBlacklistService) {}

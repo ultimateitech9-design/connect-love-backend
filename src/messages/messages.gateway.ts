@@ -8,6 +8,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { isAllowedOrigin } from '../common/cors';
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
@@ -25,11 +26,12 @@ const RING_SECONDS = 45;
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: (origin, callback) => callback(null, isAllowedOrigin(origin)),
+    credentials: true,
   },
   maxHttpBufferSize: 12 * 1024 * 1024,
   pingInterval: 10000,
-  pingTimeout: 5000,
+  pingTimeout: 20000,
 })
 export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
   notifyProfilePhotosChanged(userId: string) {
@@ -39,8 +41,17 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly visitorChanged = (ownerId: string) => {
     this.server?.to('user:' + ownerId).emit('profileVisitorsChanged');
   };
-  onModuleInit() { this.usersService.profileVisitorEvents.on('changed', this.visitorChanged); }
-  onModuleDestroy() { this.usersService.profileVisitorEvents.off('changed', this.visitorChanged); }
+  private readonly matchChanged = (match: { id: string; senderId: string; receiverId: string }) => {
+    this.server?.to(`user:${match.receiverId}`).to(`user:${match.senderId}`).emit('matchChanged', match);
+  };
+  onModuleInit() {
+    this.usersService.profileVisitorEvents.on('changed', this.visitorChanged);
+    this.matchesService.matchEvents.on('changed', this.matchChanged);
+  }
+  onModuleDestroy() {
+    this.usersService.profileVisitorEvents.off('changed', this.visitorChanged);
+    this.matchesService.matchEvents.off('changed', this.matchChanged);
+  }
   @WebSocketServer()
   server: Server;
 

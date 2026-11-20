@@ -1,15 +1,28 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter } from 'node:events';
 import { MatchRelation, MatchStatus } from './match.entity';
 import { Message } from '../messages/message.entity';
 import { User } from '../users/user.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
-import { activePlan, isWoman } from '../plans/plan-entitlements';
+import { activePlan, isWoman, entitlementsFor } from '../plans/plan-entitlements';
 import { dayStart } from '../plans/plan-entitlements';
 
 @Injectable()
 export class MatchesService {
+  readonly matchEvents = new EventEmitter();
+
+  private async saveAndPublishMatch(match: MatchRelation): Promise<MatchRelation> {
+    const saved = await this.matchesRepository.save(match);
+    // Only publish committed data; never include private profile fields.
+    this.matchEvents.emit('changed', {
+      id: saved.id, senderId: saved.senderId, receiverId: saved.receiverId,
+      status: saved.status, createdAt: saved.createdAt, isSuperLike: saved.isSuperLike,
+    });
+    return saved;
+  }
+
   constructor(
     @InjectRepository(MatchRelation)
     private matchesRepository: Repository<MatchRelation>,
@@ -63,12 +76,12 @@ export class MatchesService {
       ]);
   }
 
-  private async enrichMatches(matches: MatchRelation[], userId: string): Promise<any[]> {
+  private async enrichMatches(matches: MatchRelation[], userId: string, includeMessages = true, lightweightPlan = false): Promise<any[]> {
     if (matches.length === 0) return [];
 
     // Fetch message metadata for every conversation in one query. The old code
     // executed two queries per match, which made this endpoint increasingly slow.
-    const messageSummary = await this.msgRepo
+    const messageSummary = includeMessages ? await this.msgRepo
       .createQueryBuilder('message')
       .select('message.conversationId', 'conversationId')
       .addSelect('MAX(message.createdAt)', 'lastMessageTime')
@@ -85,7 +98,7 @@ export class MatchesService {
       .where('message.conversationId IN (:...matchIds)', { matchIds: matches.map((match) => match.id) })
       .setParameters({ userId, isRead: false })
       .groupBy('message.conversationId')
-      .getRawMany<{ conversationId: string; lastMessageTime: string | Date | null; unreadCount: string; lastMessage: string | null }>();
+      .getRawMany<{ conversationId: string; lastMessageTime: string | Date | null; unreadCount: string; lastMessage: string | null }>() : [];
 
     const summaries = new Map(messageSummary.map((row) => [row.conversationId, row]));
     const enriched = matches.map((match) => {
@@ -99,7 +112,10 @@ export class MatchesService {
         unreadCount: Number(summary?.unreadCount || 0),
       };
     });
-    const { limits } = await this.planUsage.get(userId);
+    if (!enriched.some(match => match.status === MatchStatus.MATCHED)) {
+      return enriched.map(match => ({ ...match, locked: false }));
+    }
+    const { limits } = !includeMessages || lightweightPlan ? await this.dashboardPlan(userId) : await this.planUsage.get(userId);
 
     // The first matches a member unlocked remain open. Newer matches above the
     // plan allowance are retained but locked, rather than displacing an older
@@ -118,9 +134,9 @@ export class MatchesService {
         .take(limits.matches)
         .getMany();
     const allowedMatchedIds = new Set(unlockedRows.map((match) => match.id));
-    const sorted = enriched.sort(
+    const sorted = includeMessages ? enriched.sort(
       (a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime(),
-    );
+    ) : enriched;
     return sorted.map((match) => {
       const locked = match.status === MatchStatus.MATCHED && !allowedMatchedIds.has(match.id);
       if (!locked) return { ...match, locked: false };
@@ -166,13 +182,8 @@ export class MatchesService {
     return this.enrichMatches(matches, userId);
   }
 
-  async findForFilter(
-    userId: string,
-    filter?: 'active' | 'sent' | 'received' | 'blocked' | 'messages',
-    limit = 12,
-    offset = 0,
-  ): Promise<any[]> {
-    const query = this.matchesWithProfilesQuery()
+  private filterQuery(userId: string, filter?: 'active' | 'sent' | 'received' | 'blocked' | 'messages') {
+    const query = this.matchesRepository.createQueryBuilder('match')
       .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId });
 
     if (filter === 'messages') {
@@ -201,17 +212,79 @@ export class MatchesService {
       });
     }
 
+    return query;
+  }
+
+  async dashboardPage(userId: string, filter: 'active' | 'sent' | 'received' | 'blocked', page = 0, pageSize = 20, kind?: 'normal' | 'super') {
+    if (!['active', 'sent', 'received', 'blocked'].includes(filter)) throw new BadRequestException('Invalid match tab.');
+    page = Number.isFinite(page) ? Math.min(1_000_000, Math.max(0, Math.trunc(page))) : 0;
+    pageSize = Number.isFinite(pageSize) ? Math.min(100, Math.max(1, Math.trunc(pageSize))) : 20;
+    const query = this.filterQuery(userId, filter);
+    if (filter === 'sent' && kind) query.andWhere('match.isSuperLike = :isSuperLike', { isSuperLike: kind === 'super' });
+    // Page the small relation rows BEFORE fetching profiles or evaluating access.
+    const rows = await query.orderBy('match.createdAt', 'DESC').addOrderBy('match.id', 'DESC')
+      .take(pageSize + 1).skip(page * pageSize).getMany();
+    const hasMore = rows.length > pageSize;
+    const matches = rows.slice(0, pageSize);
+    if (!matches.length) return { items: [], page, pageSize, hasMore };
+    const peerIds = [...new Set(matches.map(match => match.senderId === userId ? match.receiverId : match.senderId))];
+    // Only the counterparty and their first photo are needed on a dashboard card.
+    const profiles = await this.userRepo.createQueryBuilder('peer')
+      .select('peer.id', 'id').addSelect('peer.name', 'name').addSelect('peer.birthDate', 'birthDate')
+      .addSelect('peer.bio', 'bio').addSelect('peer.status', 'status')
+      .addSelect('peer.isOnline', 'isOnline').addSelect('peer.showOnlineStatus', 'showOnlineStatus')
+      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(peer.photos, '$[0]'))", 'photo')
+      .where('peer.id IN (:...peerIds)', { peerIds }).getRawMany();
+    const peers = new Map(profiles.map(row => [row.id, this.userRepo.create({
+      id: row.id, name: row.name, birthDate: row.birthDate, bio: row.bio, status: row.status,
+      isOnline: Boolean(Number(row.isOnline)), showOnlineStatus: row.showOnlineStatus == null || Boolean(Number(row.showOnlineStatus)),
+      photos: row.photo && row.photo !== 'null' ? [row.photo] : [],
+    })]));
+    for (const match of matches) {
+      if (match.senderId !== userId) match.sender = peers.get(match.senderId)!;
+      if (match.receiverId !== userId) match.receiver = peers.get(match.receiverId)!;
+    }
+    const enriched = await this.enrichMatches(matches, userId, false);
+    const items = filter === 'received' ? await this.applyReceivedAccess(enriched, userId, true) : enriched;
+    return { items, page, pageSize, hasMore };
+  }
+
+  async findForFilter(
+    userId: string,
+    filter?: 'active' | 'sent' | 'received' | 'blocked' | 'messages',
+    limit = 12,
+    offset = 0,
+    compact = false,
+  ): Promise<any[]> {
+    const query = this.filterQuery(userId, filter);
+    if (!compact) query.leftJoin('match.sender', 'sender').leftJoin('match.receiver', 'receiver').addSelect([
+      'sender.id', 'sender.name', 'sender.birthDate', 'sender.bio', 'sender.photos', 'sender.isOnline', 'sender.showOnlineStatus', 'sender.status',
+      'receiver.id', 'receiver.name', 'receiver.birthDate', 'receiver.bio', 'receiver.photos', 'receiver.isOnline', 'receiver.showOnlineStatus', 'receiver.status',
+    ]);
+
     // Each dashboard tab renders a small page only. Loading every related
     // profile (and its photo) made accounts with many requests unnecessarily
     // slow to open.
     const matches = await query
       .orderBy('match.createdAt', 'DESC')
+      .addOrderBy('match.id', 'DESC')
       .take(Math.min(Math.max(limit, 1), 100))
       .skip(Math.max(offset, 0))
       .getMany();
-    const enriched = await this.enrichMatches(matches, userId);
+    const enriched = await this.enrichMatches(matches, userId, filter === 'active' || filter === 'messages' || !filter, compact);
     if (filter !== 'received') return enriched;
-    const { user, limits } = await this.planUsage.get(userId);
+    return this.applyReceivedAccess(enriched, userId, compact);
+  }
+
+  private async dashboardPlan(userId: string) {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'gender', 'plan', 'planExpiresAt'] });
+    if (!user) throw new NotFoundException('User not found.');
+    return { user, limits: entitlementsFor(user) };
+  }
+
+  private async applyReceivedAccess(enriched: any[], userId: string, lightweight = false) {
+    if (!enriched.length) return enriched;
+    const { user, limits } = lightweight ? await this.dashboardPlan(userId) : await this.planUsage.get(userId);
     if (activePlan(user) !== 'free' || isWoman(user)) return enriched;
 
     // Free members can still see and accept incoming likes until their two
@@ -237,29 +310,17 @@ export class MatchesService {
   }
 
   async getSummary(userId: string) {
-    const count = (status: MatchStatus, field?: 'senderId' | 'receiverId') => {
-      const where: any = { status };
-      if (field) where[field] = userId;
-      if (field) return this.matchesRepository.count({ where });
-      const query = this.matchesRepository.createQueryBuilder('match')
-        .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
-        .andWhere('match.status = :status', { status });
-      if (status === MatchStatus.MATCHED) {
-        query.andWhere(`COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')`);
-      }
-      return query.getCount();
-    };
-
-    const [active, sent, received, blocked] = await Promise.all([
-      count(MatchStatus.MATCHED),
-      count(MatchStatus.PENDING, 'senderId'),
-      count(MatchStatus.PENDING, 'receiverId'),
-      this.matchesRepository.createQueryBuilder('match')
-        .where('match.status = :status', { status: MatchStatus.BLOCKED })
-        .andWhere('(match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId))', { userId })
-        .getCount(),
-    ]);
-    return { active, sent, received, blocked };
+    const visible = "COALESCE(match.hiddenFromChatForUserIds, '') NOT LIKE CONCAT('%', CHAR(34), :userId, CHAR(34), '%')";
+    const row = await this.matchesRepository.createQueryBuilder('match')
+      .select(`SUM(CASE WHEN match.status = :matched AND ${visible} THEN 1 ELSE 0 END)`, 'active')
+      .addSelect('SUM(CASE WHEN match.status = :pending AND match.senderId = :userId THEN 1 ELSE 0 END)', 'sent')
+      .addSelect('SUM(CASE WHEN match.status = :pending AND match.senderId = :userId AND match.isSuperLike = true THEN 1 ELSE 0 END)', 'sentSuper')
+      .addSelect('SUM(CASE WHEN match.status = :pending AND match.receiverId = :userId THEN 1 ELSE 0 END)', 'received')
+      .addSelect('SUM(CASE WHEN match.status = :blocked AND (match.blockedByUserId = :userId OR (match.blockedByUserId IS NULL AND match.senderId = :userId)) THEN 1 ELSE 0 END)', 'blocked')
+      .where('(match.senderId = :userId OR match.receiverId = :userId)', { userId })
+      .setParameters({ matched: MatchStatus.MATCHED, pending: MatchStatus.PENDING, blocked: MatchStatus.BLOCKED })
+      .getRawOne();
+    return { active: Number(row?.active || 0), sent: Number(row?.sent || 0), sentSuper: Number(row?.sentSuper || 0), received: Number(row?.received || 0), blocked: Number(row?.blocked || 0) };
   }
 
   async create(senderId: string, receiverId: string, isSuperLike: boolean = false): Promise<MatchRelation> {
@@ -287,7 +348,7 @@ export class MatchesService {
       match.receiverId = receiverId;
       match.status = MatchStatus.DECLINED;
       match.isSuperLike = false;
-      return this.matchesRepository.save(match);
+      return this.saveAndPublishMatch(match);
     }
 
     // Retrying the same outgoing like (for example after login or a double
@@ -311,17 +372,17 @@ export class MatchesService {
         await this.assertMatchCapacity(senderId);
         existing.status = MatchStatus.MATCHED;
         existing.isSuperLike = existing.isSuperLike || isSuperLike;
-        return this.matchesRepository.save(existing);
+        return this.saveAndPublishMatch(existing);
       }
 
       existing.senderId = senderId;
       existing.receiverId = receiverId;
       existing.status = MatchStatus.PENDING;
       existing.isSuperLike = existing.isSuperLike || isSuperLike;
-      return this.matchesRepository.save(existing);
+      return this.saveAndPublishMatch(existing);
     }
 
-    return this.matchesRepository.save(
+    return this.saveAndPublishMatch(
       this.matchesRepository.create({
         senderId,
         receiverId,
@@ -335,7 +396,7 @@ export class MatchesService {
     const match = await this.matchesRepository.findOne({ where: { id } });
     if (match) {
       match.status = status;
-      return this.matchesRepository.save(match);
+      return this.saveAndPublishMatch(match);
     }
     return null;
   }
@@ -354,7 +415,7 @@ export class MatchesService {
     match.statusBeforeBlock = match.status;
     match.blockedByUserId = blockerUserId;
     match.status = MatchStatus.BLOCKED;
-    return this.matchesRepository.save(match);
+    return this.saveAndPublishMatch(match);
   }
 
   async unblockMatch(id: string, userId: string): Promise<MatchRelation> {
@@ -371,7 +432,7 @@ export class MatchesService {
     match.status = match.statusBeforeBlock || MatchStatus.MATCHED;
     match.blockedByUserId = null;
     match.statusBeforeBlock = null;
-    return this.matchesRepository.save(match);
+    return this.saveAndPublishMatch(match);
   }
   async respond(id: string, action: 'accept' | 'decline', userId?: string): Promise<MatchRelation> {
     const match = await this.matchesRepository.findOne({ where: { id } });
@@ -385,11 +446,11 @@ export class MatchesService {
       // their allowance, enrichMatches keeps this new match blurred for them.
       if (userId) await this.assertMatchCapacity(userId);
       match.status = MatchStatus.MATCHED;
-      return this.matchesRepository.save(match);
+      return this.saveAndPublishMatch(match);
     }
 
     match.status = MatchStatus.DECLINED;
-    return this.matchesRepository.save(match);
+    return this.saveAndPublishMatch(match);
   }
 
   async delete(id: string, userId?: string): Promise<{ deleted: boolean }> {
@@ -398,7 +459,9 @@ export class MatchesService {
       if (userId && match.senderId !== userId && match.receiverId !== userId) {
         throw new ForbiddenException('You are not part of this match.');
       }
+      const removed = { id: match.id, senderId: match.senderId, receiverId: match.receiverId, status: 'DELETED', createdAt: match.createdAt };
       await this.matchesRepository.remove(match);
+      this.matchEvents.emit('changed', removed);
     }
     return { deleted: true };
   }
@@ -413,7 +476,9 @@ export class MatchesService {
       throw new BadRequestException('Only pending requests can be deleted.');
     }
 
+    const removed = { id: match.id, senderId: match.senderId, receiverId: match.receiverId, status: 'DELETED', createdAt: match.createdAt };
     await this.matchesRepository.remove(match);
+    this.matchEvents.emit('changed', removed);
     return { deleted: true };
   }
 
@@ -426,7 +491,9 @@ export class MatchesService {
 
     await this.planUsage.assertAndRecord(senderId, 'rewindsPerMonth', 'Profile rewind', receiverId);
 
+    const removed = { id: match.id, senderId: match.senderId, receiverId: match.receiverId, status: 'DELETED', createdAt: match.createdAt };
     await this.matchesRepository.remove(match);
+    this.matchEvents.emit('changed', removed);
     return { deleted: true };
   }
 
