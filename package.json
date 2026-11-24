@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail -n api,kyc -c magenta,yellow \"npm run dev:api\" \"npm run dev:kyc\"",
     "predev:api": "node scripts/ensure-local-db.js",
-    "dev:api": "echo Backend API server: http://localhost:5002 && nodemon --watch src -e ts,json --exec \"nest start\"",
+    "dev:api": "nodemon --watch src -e ts,json --exec \"nest start\"",
     "dev:kyc": "python -m uvicorn app:app --app-dir face-service --host 127.0.0.1 --port 8001",
     "install:kyc": "python -m pip install -r face-service/requirements.txt",
     "build": "nest build",

@@ -23,7 +23,7 @@ async function run() {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(value => sessionStorage.setItem('connectlove_agent_token', value), token);
-  await page.goto('http://localhost:3002/agent/dashboard', { waitUntil: 'networkidle', timeout: 120000 });
+  await page.goto('http://localhost:3009/coordinator/dashboard', { waitUntil: 'networkidle', timeout: 120000 });
   await page.getByRole('button', { name: 'Create accounts', exact: true }).last().click();
   await page.waitForFunction(() => { const panel = document.querySelector('.ag-create-panel'); return panel && Math.abs(panel.getBoundingClientRect().top - 24) < 4; });
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));

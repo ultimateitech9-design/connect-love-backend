@@ -39,7 +39,7 @@ export default function Page() { const [open, setOpen] = useState(true); return 
   const admin = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   await admin.addCookies(['management_token','management_client_token','management_role'].map(name => ({ name, value: name === 'management_role' ? 'super_admin' : token(ids.admin), domain: 'localhost', path: '/' })));
   const adminPage = await admin.newPage(); currentPage = adminPage; adminPage.setDefaultTimeout(60000);
-  await adminPage.goto('http://localhost:3002/super-admin', { waitUntil: 'networkidle', timeout: 120000 });
+  await adminPage.goto('http://localhost:3009/super-admin', { waitUntil: 'networkidle', timeout: 120000 });
   await adminPage.getByRole('button', { name: /^Registered Agents \d/ }).click();
   await adminPage.getByRole('heading', { name: 'Registered Agents', exact: true }).waitFor();
   await adminPage.getByRole('textbox', { name: 'Search accounts' }).fill(prefix);
@@ -48,7 +48,7 @@ export default function Page() { const [open, setOpen] = useState(true); return 
   await adminPage.getByRole('link', { name: 'View created users' }).click();
   await adminPage.getByText(`${prefix} A`, { exact: true }).waitFor();
   assert.equal(await adminPage.getByText(`${prefix} B`, { exact: true }).count(), 0);
-  await adminPage.goto('http://localhost:3002/super-admin', { waitUntil: 'networkidle' });
+  await adminPage.goto('http://localhost:3009/super-admin', { waitUntil: 'networkidle' });
   await adminPage.getByRole('button', { name: /^Active Users \d/ }).click();
   await adminPage.getByRole('heading', { name: 'Active Users & Agents' }).waitFor();
   await adminPage.getByRole('textbox', { name: 'Search accounts' }).fill(prefix);
@@ -95,7 +95,7 @@ export default function Page() { const [open, setOpen] = useState(true); return 
       } else { HTMLMediaElement.prototype.setSinkId = undefined; media.selectAudioOutput = undefined; }
     }, { token: token(id), match: ids.match, other: { id: other, name: `${prefix} ${other === ids.a ? 'A' : 'B'}` }, support });
     const page = await context.newPage(); page.setDefaultTimeout(60000); pages.push(page);
-    await page.goto(`http://localhost:3002/${routeName}`, { waitUntil: 'networkidle', timeout: 120000 });
+    await page.goto(`http://localhost:3009/${routeName}`, { waitUntil: 'networkidle', timeout: 120000 });
     await page.getByText('Ready for call', { exact: true }).waitFor();
   }
   const [a, b] = pages; currentPage = a;

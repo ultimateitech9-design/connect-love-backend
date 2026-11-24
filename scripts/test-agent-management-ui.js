@@ -30,7 +30,7 @@ async function run() {
   assert.equal(ready.status, 200, 'Local API must be ready before browser checks');
   assert.ok((await ready.json()).users.some(user => user.id === ownId));
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto('http://localhost:3002/super-admin/user-360', { waitUntil: 'networkidle', timeout: 120000 });
+  await page.goto('http://localhost:3009/super-admin/user-360', { waitUntil: 'networkidle', timeout: 120000 });
   await page.getByPlaceholder('Search ID, name or email...').fill(`${prefix} Own`);
   await page.getByText(`${prefix} Own`, { exact: true }).first().waitFor();
   await page.getByRole('heading', { name: `${prefix} Own`, exact: true }).waitFor();
@@ -48,13 +48,13 @@ async function run() {
   for (let i = 0; i < 50 && await photoCount() !== 0; i++) await new Promise(resolve => setTimeout(resolve, 100));
   assert.equal(await photoCount(), 0);
   console.log('PASS: Super Admin User 360 agent origin and real photo upload/remove/save');
-  await page.goto('http://localhost:3002/super-admin/users', { waitUntil: 'networkidle', timeout: 120000 });
+  await page.goto('http://localhost:3009/super-admin/users', { waitUntil: 'networkidle', timeout: 120000 });
   await page.getByLabel('Registration source', { exact: true }).selectOption('agent');
   await page.getByPlaceholder('Search by name or email').fill(prefix);
   await page.getByText(`${prefix} Own`, { exact: true }).waitFor();
   assert.equal(await page.getByText(`${prefix} Friend`, { exact: true }).count(), 0);
   console.log('PASS: Super Admin agent-created users filter');
-  await page.goto('http://localhost:3002/agent/dashboard', { waitUntil: 'networkidle', timeout: 120000 });
+  await page.goto('http://localhost:3009/coordinator/dashboard', { waitUntil: 'networkidle', timeout: 120000 });
   await page.getByRole('button', { name: `${prefix} Own`, exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'User details', exact: true });
   await dialog.getByRole('heading', { name: 'Friends & call activity', exact: true }).waitFor();

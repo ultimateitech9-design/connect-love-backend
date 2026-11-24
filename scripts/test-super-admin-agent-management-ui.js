@@ -24,7 +24,7 @@ async function run() {
   await context.addCookies(['management_token', 'management_client_token', 'management_role'].map(name => ({ name, value: name === 'management_role' ? 'super_admin' : adminToken, domain: 'localhost', path: '/' })));
   page = await context.newPage(); page.setDefaultTimeout(45000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  async function openAgents() { await page.goto('http://localhost:3002/super-admin/agents', { waitUntil: 'networkidle', timeout: 120000 }); await page.getByRole('textbox', { name: 'Search accounts' }).fill(prefix); await page.getByRole('button', { name: `View agent ${prefix} Owner`, exact: true }).waitFor(); }
+  async function openAgents() { await page.goto('http://localhost:3009/super-admin/agents', { waitUntil: 'networkidle', timeout: 120000 }); await page.getByRole('textbox', { name: 'Search accounts' }).fill(prefix); await page.getByRole('button', { name: `View agent ${prefix} Owner`, exact: true }).waitFor(); }
   await openAgents();
   await page.getByRole('button', { name: `View agent ${prefix} Owner`, exact: true }).click();
   let dialog = page.getByRole('dialog', { name: 'Agent details', exact: true });
