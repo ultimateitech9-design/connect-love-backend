@@ -14,6 +14,8 @@ import { randomUUID } from 'crypto';
 import { RegistrationOtpService } from './registration-otp.service';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto';
 import { UserEmail } from '../users/user-email.entity';
+import { ReferralsService } from '../referrals/referrals.service';
+import { isWoman } from '../plans/plan-entitlements';
 
 export interface LoginContext {
   ipAddress?: string;
@@ -32,6 +34,7 @@ export class AuthService {
     private readonly userEmailRepo: Repository<UserEmail>,
     private readonly jwtService: JwtService,
     private readonly registrationOtpService: RegistrationOtpService,
+    private readonly referrals: ReferralsService,
   ) {}
 
   private decryptOrUsePlainPassword(password: string): string {
@@ -179,6 +182,8 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists.');
     }
 
+    const referralCode = dto.referralCode && isWoman({ gender: dto.gender || '' }) ? dto.referralCode : undefined;
+    if (referralCode) await this.referrals.validateInvite(referralCode, dto.gender);
     await this.registrationOtpService.verify(email, dto.otp);
 
     const hashed = await bcrypt.hash(dto.password, 12);
@@ -195,8 +200,13 @@ export class AuthService {
       planExpiresAt: null,
       status: 'active',
       emailVerifiedAt: new Date(),
+      referralWelcomePending: isWoman({ gender: dto.gender || '' }),
     });
-    const saved = await this.userRepo.save(user);
+    const saved = await this.userRepo.manager.transaction(async manager => {
+      const savedUser = await manager.getRepository(User).save(user);
+      if (referralCode) await this.referrals.attachToSignup(manager, referralCode, savedUser);
+      return savedUser;
+    });
     this.registrationOtpService.sendWelcomeEmail(saved.email, saved.name);
     const { password: _, ...safe } = saved as any;
     return { message: 'Account created successfully', user: safe };
@@ -222,6 +232,7 @@ export class AuthService {
       return this.rejectLogin(email, context, 'This account is not active. Please contact support.');
     }
 
+    await this.referrals.recordActivity(user.id, true);
     const session = await this.startSession(user, context);
     const token = this.signUserToken(user, session.sessionId);
 
@@ -284,12 +295,14 @@ export class AuthService {
         planExpiresAt: null,
         status: 'active',
         onboardingCompleted: false,
+        referralWelcomePending: true,
         emailVerifiedAt: new Date(),
       }));
       isNewUser = true;
       this.registrationOtpService.sendWelcomeEmail(user.email, user.name);
     }
 
+    await this.referrals.recordActivity(user.id, true);
     const session = await this.startSession(user, context);
     const token = this.signUserToken(user, session.sessionId);
 

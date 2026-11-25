@@ -12,6 +12,7 @@ import { AuditLog } from '../platform/audit-log.entity';
 import { EmailRegistrationOtp } from './email-registration-otp.entity';
 import { RegistrationOtpService } from './registration-otp.service';
 import { UserEmail } from '../users/user-email.entity';
+import { ReferralsModule } from '../referrals/referrals.module';
 
 dotenv.config();
 
@@ -22,6 +23,7 @@ if (!jwtSecret) {
 
 @Module({
   imports: [
+    ReferralsModule,
     TypeOrmModule.forFeature([User, AuditLog, EmailRegistrationOtp, UserEmail]),
     PassportModule,
     JwtModule.register({

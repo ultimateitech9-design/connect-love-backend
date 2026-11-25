@@ -1,9 +1,12 @@
 import { renderEmail } from '../mail/email-layout';
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, IsNull, LessThanOrEqual, Repository } from 'typeorm';
+import { ReferralReward } from '../referrals/referral.entity';
+import { REFERRAL_MIN_WITHDRAWAL_PAISE, REFERRAL_REWARD_PAISE } from '../referrals/referral-policy';
+import { isWoman } from '../plans/plan-entitlements';
 import { User } from '../users/user.entity';
 import { Agent } from '../agents/agent.entity';
 import { CoinTransaction } from '../users/coin-transaction.entity';
@@ -178,6 +181,33 @@ export class PayoutsService {
 
   // --- Withdrawals ----------------------------------------------------------
 
+  async requestReferralWithdrawal(userId: string, request: { requestId: string; amountPaise: number; accountId?: string }) {
+    if (!Number.isInteger(request.amountPaise) || request.amountPaise < REFERRAL_MIN_WITHDRAWAL_PAISE || request.amountPaise > 100000000 || request.amountPaise % REFERRAL_REWARD_PAISE) {
+      throw new BadRequestException('Minimum referral withdrawal is ₹1,000, in multiples of ₹100.');
+    }
+    const payout = await this.payoutFor('user', userId, request);
+    return this.dataSource.transaction(async manager => {
+      const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
+      if (!user || !isWoman(user) || user.role !== 'user' || user.status !== 'active') throw new ForbiddenException('Referral withdrawals are available to women members only.');
+      const transactions = manager.getRepository(CoinTransaction);
+      const existing = await transactions.findOneBy({ id: request.requestId });
+      if (existing) {
+        if (existing.userId !== userId || existing.walletSource !== 'referral' || existing.amountPaise !== request.amountPaise) throw new BadRequestException('Withdrawal request ID already used.');
+        return { id: existing.id, status: existing.status, amountPaise: existing.amountPaise };
+      }
+      const rewards = manager.getRepository(ReferralReward);
+      const available = await rewards.find({ where: { userId, withdrawalId: IsNull(), unlockAt: LessThanOrEqual(new Date()) }, order: { unlockAt: 'ASC', id: 'ASC' }, lock: { mode: 'pessimistic_write' } });
+      const count = request.amountPaise / 10000;
+      if (available.length < count) throw new BadRequestException('Only rewards whose 30-day lock has ended can be withdrawn.');
+      const tx = await transactions.save(transactions.create({ id: request.requestId, type: 'withdrawal', walletSource: 'referral', status: 'pending', userId,
+        receiverId: userId, grossCoins: 0, userCoins: 0, platformCoins: 0, amountPaise: request.amountPaise,
+        label: 'Women referral rewards withdrawal (INR)', payoutAccount: payout.method === 'upi' ? payout.upiId : payout.accountNumber,
+        payoutDetails: JSON.stringify(payout) }));
+      await rewards.update({ id: In(available.slice(0, count).map(row => row.id)), withdrawalId: IsNull() }, { withdrawalId: tx.id });
+      return { id: tx.id, status: tx.status, amountPaise: tx.amountPaise };
+    });
+  }
+
   /**
    * Takes the coins from the owner's earned balance right away and records a
    * pending withdrawal; the super admin pays it manually and marks it paid,
@@ -245,16 +275,16 @@ export class PayoutsService {
       // Gifts and calls record the payer as senderId.
       const sent = tx.senderId === userId;
       let coins: number;
-      let wallet: 'coins' | 'earnings';
+      let wallet: 'coins' | 'earnings' | 'referral';
       switch (tx.type) {
         case 'recharge': coins = tx.grossCoins; wallet = 'coins'; break;
         case 'admin_credit': coins = tx.userCoins || tx.grossCoins; wallet = 'coins'; break;
-        case 'withdrawal': coins = -tx.grossCoins; wallet = 'earnings'; break;
+        case 'withdrawal': coins = -tx.grossCoins; wallet = tx.walletSource === 'referral' ? 'referral' : 'earnings'; break;
         case 'gift':
         case 'call': coins = sent ? -tx.grossCoins : tx.userCoins; wallet = sent ? 'coins' : 'earnings'; break;
         default: coins = -tx.grossCoins; wallet = 'coins';
       }
-      return { id: tx.id, type: tx.type, status: tx.status, label: tx.label, coins, wallet, createdAt: tx.createdAt };
+      return { id: tx.id, type: tx.type, status: tx.status, label: tx.label, coins, wallet, amountPaise: tx.amountPaise, createdAt: tx.createdAt };
     });
   }
 
@@ -302,13 +332,13 @@ export class PayoutsService {
           greeting: `Hi ${owner.name},`,
           paragraphs: ['We have sent your money. Depending on your bank it can take a few hours to show up.'],
           highlight: { label: 'Amount paid', value: rupees },
-          details: [{ label: 'Coins', value: String(tx.grossCoins) }, { label: 'Sent to', value: destination || 'Your account' }],
+          details: [{ label: tx.walletSource === 'referral' ? 'Referral rewards' : 'Coins', value: tx.walletSource === 'referral' ? rupees : String(tx.grossCoins) }, { label: 'Sent to', value: destination || 'Your account' }],
         }
         : {
-          preheader: 'Your coins have been returned to your earnings',
+          preheader: tx.walletSource === 'referral' ? 'Your referral rewards have been returned' : 'Your coins have been returned to your earnings',
           title: 'Your withdrawal could not be processed',
           greeting: `Hi ${owner.name},`,
-          paragraphs: [`We could not complete this withdrawal, so the ${tx.grossCoins} coins have been returned to your earnings. Please check your account details and try again, or contact support.`],
+          paragraphs: [tx.walletSource === 'referral' ? `We could not complete this withdrawal, so ${rupees} has been returned to your referral wallet. Please check your account details and try again.` : `We could not complete this withdrawal, so the ${tx.grossCoins} coins have been returned to your earnings. Please check your account details and try again, or contact support.`],
           details: [{ label: 'Amount', value: rupees }, { label: 'Account', value: destination || 'Your account' }],
         });
       await mailer.sendMail({
@@ -337,6 +367,7 @@ export class PayoutsService {
         return {
           id: row.id,
           coins: row.grossCoins,
+          walletSource: row.walletSource,
           amountPaise: row.amountPaise,
           status: row.status,
           createdAt: row.createdAt,

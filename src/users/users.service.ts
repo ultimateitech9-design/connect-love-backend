@@ -12,6 +12,8 @@ import { ProfileView } from './profile-view.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { distanceBetweenKm } from '../location/distance';
 import { CoinTransaction } from './coin-transaction.entity';
+import { AdminWithdrawalsQueryDto } from './dto/admin-withdrawals-query.dto';
+import { ReferralReward } from '../referrals/referral.entity';
 import { activePlan, entitlementsFor } from '../plans/plan-entitlements';
 
 const normalizeTags = (tags: string[]) => {
@@ -471,6 +473,62 @@ export class UsersService {
     }));
   }
 
+  async adminWithdrawals(query: AdminWithdrawalsQueryDto) {
+    const page = query.page || 1, limit = query.limit || 25;
+    const configuredValue = Number(process.env.COIN_WITHDRAWAL_VALUE_PAISE || 100);
+    const valuePaise = Number.isInteger(configuredValue) && configuredValue > 0 ? configuredValue : 100;
+    const base = this.coinTransactionRepo.createQueryBuilder('tx')
+      .leftJoin(User, 'member', 'member.id = tx.userId')
+      .leftJoin(Agent, 'agent', 'agent.id = tx.agentId')
+      .where('tx.type = :type', { type: 'withdrawal' });
+    if (query.source && query.source !== 'all') base.andWhere('tx.walletSource = :source', { source: query.source });
+    if (query.search?.trim()) base.andWhere(`(LOCATE(:search, tx.id) > 0 OR LOCATE(:search, member.name) > 0 OR LOCATE(:search, member.email) > 0
+      OR LOCATE(:search, member.phone) > 0 OR LOCATE(:search, agent.name) > 0 OR LOCATE(:search, agent.email) > 0 OR LOCATE(:search, tx.payoutAccount) > 0)`, { search: query.search.trim() });
+    const amountSql = `COALESCE(NULLIF(tx.amountPaise, 0), tx.grossCoins * ${valuePaise})`;
+    const totals = await base.clone().select('COUNT(*)', 'total')
+      .addSelect("SUM(CASE WHEN tx.status = 'pending' THEN 1 ELSE 0 END)", 'pending')
+      .addSelect("SUM(CASE WHEN tx.status = 'completed' THEN 1 ELSE 0 END)", 'paid')
+      .addSelect("SUM(CASE WHEN tx.status = 'rejected' THEN 1 ELSE 0 END)", 'rejected')
+      .addSelect(`SUM(CASE WHEN tx.status = 'pending' THEN ${amountSql} ELSE 0 END)`, 'pendingPaise').getRawOne();
+    const scoped = base.clone();
+    if (query.status && query.status !== 'all') scoped.andWhere('tx.status = :status', { status: query.status });
+    const [rows, total] = await scoped.orderBy("CASE WHEN tx.status = 'pending' THEN 0 ELSE 1 END", 'ASC')
+      .addOrderBy('tx.createdAt', 'DESC').addOrderBy('tx.id', 'DESC').offset((page - 1) * limit).limit(limit).getManyAndCount();
+    const ids = [...new Set(rows.map(row => row.userId).filter((id): id is string => Boolean(id)))];
+    const members = ids.length ? await this.userRepo.createQueryBuilder('u')
+      .select(['u.id', 'u.name', 'u.email', 'u.phone', 'u.gender', 'u.birthDate', 'u.city', 'u.profession', 'u.status'])
+      .where('u.id IN (:...ids)', { ids }).getMany() : [];
+    // Return only the primary photo for this small page, not every full-size image.
+    const photos = ids.length ? await this.userRepo.createQueryBuilder('u').select('u.id', 'id')
+      .addSelect("JSON_UNQUOTE(JSON_EXTRACT(u.photos, '$[0]'))", 'photo').where('u.id IN (:...ids)', { ids }).getRawMany() : [];
+    const agentIds = [...new Set(rows.map(row => row.agentId).filter((id): id is string => Boolean(id)))];
+    const agents = agentIds.length ? await this.dataSource.getRepository(Agent).find({ where: { id: In(agentIds) }, select: ['id', 'name', 'email'] }) : [];
+    return { page, limit, total, hasMore: page * limit < total,
+      summary: { total: Number(totals.total || 0), pending: Number(totals.pending || 0), paid: Number(totals.paid || 0), rejected: Number(totals.rejected || 0), pendingPaise: Number(totals.pendingPaise || 0) },
+      items: rows.map(row => {
+        const member = members.find(user => user.id === row.userId);
+        let payout: Record<string, string> = {};
+        try { const parsed = row.payoutDetails ? JSON.parse(row.payoutDetails) : {}; if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) payout = parsed; } catch {}
+        // Older withdrawals stored just one account string. Keep it visible
+        // without borrowing details from a different, subsequently saved account.
+        if (!payout.method && row.payoutAccount) {
+          if (row.payoutAccount.includes('@')) payout = { method: 'upi', upiId: row.payoutAccount };
+          else payout = { method: 'bank', accountNumber: row.payoutAccount };
+        }
+        const photo = photos.find(user => user.id === row.userId)?.photo;
+        return { id: row.id, status: row.status, walletSource: row.walletSource || 'coins', coins: row.grossCoins,
+          amountPaise: row.amountPaise && row.amountPaise > 0 ? row.amountPaise : row.grossCoins * valuePaise,
+          amountEstimated: !(row.amountPaise && row.amountPaise > 0), createdAt: row.createdAt, label: row.label,
+          user: member ? { id: member.id, name: member.name, email: member.email, phone: member.phone, gender: member.gender,
+            age: member.age, city: member.city, profession: member.profession, status: member.status, photo: photo && photo !== 'null' ? photo : null } : null,
+          agent: agents.find(agent => agent.id === row.agentId) || null,
+          payout: { method: payout.method || null, accountHolder: payout.accountHolder || null, bankName: payout.bankName || null,
+            accountNumber: payout.accountNumber || null, ifsc: payout.ifsc || null, upiId: payout.upiId || null },
+        };
+      }),
+    };
+  }
+
   async creditGiftCoins(userId: string, amount: number, note: string, adminId: string) {
     const targetId = userId.trim();
     const coins = Number(amount);
@@ -518,7 +576,9 @@ export class UsersService {
       const transaction = await repository.findOne({ where: { id }, lock: { mode: 'pessimistic_write' } });
       if (!transaction || transaction.type !== 'withdrawal') throw new NotFoundException('Withdrawal request not found.');
       if (transaction.status !== 'pending') throw new BadRequestException('This withdrawal request is already processed.');
-      if (status === 'rejected' && transaction.userId) {
+      if (status === 'rejected' && transaction.walletSource === 'referral') {
+        await manager.getRepository(ReferralReward).update({ withdrawalId: transaction.id }, { withdrawalId: null });
+      } else if (status === 'rejected' && transaction.userId) {
         const user = await manager.getRepository(User).findOne({ where: { id: transaction.userId }, lock: { mode: 'pessimistic_write' } });
         if (user) {
           user.earnedCoinBalance += transaction.grossCoins;

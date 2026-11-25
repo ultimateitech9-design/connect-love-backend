@@ -21,6 +21,7 @@ import { AdminAccountsService } from '../admin/admin-accounts.service';
 import { AdminAgentStatusDto } from '../admin/admin-agent-status.dto';
 import { PaymentsService } from '../payments/payments.service';
 import { MessagesGateway } from '../messages/messages.gateway';
+import sharp from 'sharp';
 
 export class CreatePlatformUserDto {
   @IsString()
@@ -660,6 +661,24 @@ export class PlatformApiController {
         ? `Free plan is now active for ${saved.name}.`
         : `${planName} is active for ${saved.name} until ${expiresAt.toISOString()}.`,
     };
+  }
+
+  @Get('users/:id/avatar')
+  @Roles('super_admin')
+  async userAvatar(@Param('id', ParseUUIDPipe) id: string) {
+    const row = await this.userRepo.createQueryBuilder('user')
+      .select("JSON_UNQUOTE(JSON_EXTRACT(user.photos, '$[0]'))", 'photo')
+      .where('user.id = :id', { id }).getRawOne();
+    if (!row) throw new NotFoundException('User not found.');
+    const source = String(row.photo || '');
+    if (/^https?:\/\//i.test(source) || /^\/[^/]/.test(source)) return { photo: source };
+    const encoded = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(source);
+    if (!encoded) return { photo: null };
+    try {
+      const image = await sharp(Buffer.from(encoded[1], 'base64'), { limitInputPixels: 40000000 })
+        .rotate().resize(80, 80, { fit: 'cover', withoutEnlargement: true }).webp({ quality: 68 }).toBuffer();
+      return { photo: `data:image/webp;base64,${image.toString('base64')}` };
+    } catch { return { photo: null }; }
   }
 
   @Get('users/:id')
@@ -1592,6 +1611,7 @@ export class PlatformApiController {
       { name: 'Transactions', icon: 'WalletCards', route: '/super-admin/transactions', access: true, actions: [{ label: 'View', allowed: true }] },
       { name: 'Reports', icon: 'Flag', route: '/super-admin/reports', access: true, actions: [{ label: 'Moderate', allowed: true }] },
       { name: 'Campaigns', icon: 'Bell', route: '/super-admin/notifications', access: true, actions: [{ label: 'Manage', allowed: true }] },
+      { name: 'Email Send', icon: 'Mail', route: '/super-admin/email-send', access: true, actions: [{ label: 'Send', allowed: true }] },
       { name: 'Security', icon: 'Lock', route: '/super-admin/security', access: true, actions: [{ label: 'Audit', allowed: true }] },
       { name: 'Settings', icon: 'Settings', route: '/super-admin/settings', access: true, actions: [{ label: 'Configure', allowed: true }] },
       { name: 'Roles & Permissions', icon: 'KeyRound', route: '/super-admin/roles', access: true, actions: [{ label: 'Manage', allowed: true }] },

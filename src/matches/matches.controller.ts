@@ -1,4 +1,4 @@
-import { Controller, Delete, Get, Post, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Delete, Get, Post, Patch, Param, Body, Query, UseGuards, Request, ParseUUIDPipe } from '@nestjs/common';
 import { MatchesService } from './matches.service';
 import { MatchStatus } from './match.entity';
 import { AuthGuard } from '@nestjs/passport';
@@ -22,6 +22,14 @@ export class MatchesController {
   @Get('summary')
   async getSummary(@Request() req) {
     return this.matchesService.getSummary(req.user.userId);
+  }
+
+  @Get('celebrations')
+  celebrations(@Request() req) { return this.matchesService.celebrationSnapshot(req.user.userId); }
+
+  @Get(':id/profile')
+  getProfile(@Param('id', ParseUUIDPipe) id: string, @Request() req) {
+    return this.matchesService.profileForMatch(id, req.user.userId);
   }
 
   @Post('swipe')

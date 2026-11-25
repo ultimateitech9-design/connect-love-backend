@@ -29,6 +29,7 @@ export type EmailContent = {
   greeting?: string;
   /** Plain-text paragraphs (escaped). */
   paragraphs: string[];
+  image?: { src: string; alt: string };
   /** A highlighted box, e.g. an OTP code or an amount. */
   highlight?: { label: string; value: string; large?: boolean };
   /** Key/value rows, e.g. ticket or payout details. */
@@ -84,7 +85,7 @@ export function renderEmail(content: EmailContent): { html: string; text: string
     <tr><td style="background:#ffffff;border-radius:22px;padding:30px 24px;box-shadow:0 6px 24px rgba(225,29,72,0.08)">
       <h1 style="margin:0 0 18px;font-size:24px;line-height:1.3;color:${TEXT}">${escapeHtml(content.title)}</h1>
       ${content.greeting ? `<p style="margin:0 0 16px;font-size:16px;line-height:1.65;color:${TEXT}">${escapeHtml(content.greeting)}</p>` : ''}
-      ${paragraphs}${highlight}${details}${button}${note}
+      ${paragraphs}${content.image ? `<img src="${escapeHtml(content.image.src)}" alt="${escapeHtml(content.image.alt)}" width="552" style="display:block;width:100%;max-width:552px;height:auto;margin:16px 0;border-radius:12px">` : ''}${highlight}${details}${button}${note}
     </td></tr>
 
     <tr><td style="padding:22px 0 0">

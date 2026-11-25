@@ -1,3 +1,4 @@
+import { ReferralReward } from '../referrals/referral.entity';
 import { BadGatewayException, BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { PayoutsService } from '../payouts/payouts.service';
 import { Agent } from '../agents/agent.entity';
@@ -130,7 +131,7 @@ export class WalletPaymentsService {
     return this.payouts.requestWithdrawal('user', userId, { coins: amount, payout });
   }
 
-  private async rejectWithdrawal(id: string) { await this.dataSource.transaction(async (manager) => { const tx = await manager.getRepository(CoinTransaction).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } }); if (!tx || tx.status !== 'pending') return; const user = tx.userId ? await manager.getRepository(User).findOne({ where: { id: tx.userId }, lock: { mode: 'pessimistic_write' } }) : null; if (user) { user.earnedCoinBalance += tx.grossCoins; await manager.getRepository(User).save(user); } else if (tx.agentId) { const agent = await manager.getRepository(Agent).findOne({ where: { id: tx.agentId }, lock: { mode: 'pessimistic_write' } }); if (agent) { agent.earnedCoinBalance += tx.grossCoins; await manager.getRepository(Agent).save(agent); } } tx.status = 'rejected'; await manager.getRepository(CoinTransaction).save(tx); }); }
+  private async rejectWithdrawal(id: string) { await this.dataSource.transaction(async (manager) => { const tx = await manager.getRepository(CoinTransaction).findOne({ where: { id }, lock: { mode: 'pessimistic_write' } }); if (!tx || tx.status !== 'pending') return; const user = tx.userId ? await manager.getRepository(User).findOne({ where: { id: tx.userId }, lock: { mode: 'pessimistic_write' } }) : null; if (tx.walletSource === 'referral') { await manager.getRepository(ReferralReward).update({ withdrawalId: tx.id }, { withdrawalId: null }); } else if (user) { user.earnedCoinBalance += tx.grossCoins; await manager.getRepository(User).save(user); } else if (tx.agentId) { const agent = await manager.getRepository(Agent).findOne({ where: { id: tx.agentId }, lock: { mode: 'pessimistic_write' } }); if (agent) { agent.earnedCoinBalance += tx.grossCoins; await manager.getRepository(Agent).save(agent); } } tx.status = 'rejected'; await manager.getRepository(CoinTransaction).save(tx); }); }
 
   async handleWebhook(raw: Buffer | undefined, body: any, signature?: string) {
     const secret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim(); if (!secret || !raw || !signature) throw new BadRequestException('Webhook verification is not configured.');

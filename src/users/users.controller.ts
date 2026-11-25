@@ -5,6 +5,7 @@ import { UpdateProfileDto } from './dto/update-profile.dto';
 import { Roles, RolesGuard } from '../auth/roles.guard';
 import { EmailManagementService } from './email-management.service';
 import { EmailDto, EmailOtpDto, OtpDto } from './dto/email-management.dto';
+import { AdminWithdrawalsQueryDto } from './dto/admin-withdrawals-query.dto';
 
 @Controller('users')
 export class UsersController {
@@ -85,6 +86,13 @@ export class UsersController {
   @Post('me/coins/withdraw')
   requestWithdrawal(@Request() req: any, @Body() body: { amount?: number; payoutAccount?: string }) {
     return this.usersService.requestWithdrawal(req.user.userId, Number(body.amount), String(body.payoutAccount || ''));
+  }
+
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('super_admin')
+  @Get('admin/withdrawals')
+  getWithdrawals(@Query() query: AdminWithdrawalsQueryDto) {
+    return this.usersService.adminWithdrawals(query);
   }
 
   @UseGuards(AuthGuard('jwt'), RolesGuard)

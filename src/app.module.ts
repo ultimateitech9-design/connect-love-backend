@@ -24,6 +24,7 @@ import { FirstImpressionsModule } from './first-impressions/first-impressions.mo
 import { PlansModule } from './plans/plans.module';
 import { WebrtcModule } from './webrtc/webrtc.module';
 import { AgentsModule } from './agents/agents.module';
+import { AdminEmailModule } from './admin-email/admin-email.module';
 
 dotenv.config();
 
@@ -71,6 +72,7 @@ dotenv.config();
     FirstImpressionsModule,
     PlansModule,
     AgentsModule,
+    AdminEmailModule,
   ],
   controllers: [HealthController],
 })

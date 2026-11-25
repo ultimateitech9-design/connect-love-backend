@@ -24,6 +24,8 @@ import { Coupon } from './payments/coupon.entity';
 import { UserEmail } from './users/user-email.entity';
 import { UserEmailChallenge } from './users/user-email-challenge.entity';
 import { Agent, AgentEmailChallenge } from './agents/agent.entity';
+import { AdminEmailCampaign, AdminEmailRecipient } from './admin-email/admin-email.entity';
+import { Referral, ReferralActivity, ReferralCode, ReferralReward } from './referrals/referral.entity';
 
 dotenv.config();
 
@@ -59,6 +61,9 @@ export default new DataSource({
     UserEmailChallenge,
     Agent,
     AgentEmailChallenge,
+    AdminEmailCampaign,
+    AdminEmailRecipient,
+    Referral, ReferralActivity, ReferralCode, ReferralReward,
   ],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,

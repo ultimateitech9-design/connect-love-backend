@@ -134,6 +134,9 @@ export class User {
   @Column({ default: false })
   onboardingCompleted: boolean;
 
+  @Column({ default: false })
+  referralWelcomePending: boolean;
+
   // ─── Settings & Presence ──────────────────────────────────────────────────
 
   @Column({ default: false })

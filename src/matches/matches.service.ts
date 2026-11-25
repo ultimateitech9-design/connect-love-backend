@@ -8,17 +8,18 @@ import { User } from '../users/user.entity';
 import { PlanUsageService } from '../plans/plan-usage.service';
 import { activePlan, isWoman, entitlementsFor } from '../plans/plan-entitlements';
 import { dayStart } from '../plans/plan-entitlements';
+import { distanceBetweenKm } from '../location/distance';
 
 @Injectable()
 export class MatchesService {
   readonly matchEvents = new EventEmitter();
 
-  private async saveAndPublishMatch(match: MatchRelation): Promise<MatchRelation> {
+  private async saveAndPublishMatch(match: MatchRelation, newlyMatched = false): Promise<MatchRelation> {
     const saved = await this.matchesRepository.save(match);
     // Only publish committed data; never include private profile fields.
     this.matchEvents.emit('changed', {
       id: saved.id, senderId: saved.senderId, receiverId: saved.receiverId,
-      status: saved.status, createdAt: saved.createdAt, isSuperLike: saved.isSuperLike,
+      status: saved.status, createdAt: saved.createdAt, isSuperLike: saved.isSuperLike, newlyMatched,
     });
     return saved;
   }
@@ -282,6 +283,50 @@ export class MatchesService {
     return { user, limits: entitlementsFor(user) };
   }
 
+  async profileForMatch(id: string, viewerId: string) {
+    const match = await this.matchesRepository.findOneBy({ id });
+    if (!match || (match.senderId !== viewerId && match.receiverId !== viewerId)) {
+      throw new NotFoundException('Profile not found in your matches.');
+    }
+    if (match.status === MatchStatus.DECLINED) throw new NotFoundException('This request is no longer available.');
+    const blocked = match.status === MatchStatus.BLOCKED;
+    if (blocked && (match.blockedByUserId || match.senderId) !== viewerId) {
+      throw new NotFoundException('This profile is unavailable.');
+    }
+    let access = await this.enrichMatches([match], viewerId, false);
+    if (match.status === MatchStatus.PENDING && match.receiverId === viewerId) {
+      access = await this.applyReceivedAccess(access, viewerId, true);
+    }
+    if (access[0].locked) throw new ForbiddenException('Activate a plan to view this profile.');
+    const targetId = match.senderId === viewerId ? match.receiverId : match.senderId;
+    const [user, viewer] = await Promise.all([
+      this.userRepo.findOne({ where: { id: targetId, role: 'user' } }),
+      this.userRepo.findOne({ where: { id: viewerId }, select: ['id', 'locationLatitude', 'locationLongitude'] }),
+    ]);
+    if (!user || user.status !== 'active') throw new NotFoundException('This profile is no longer available.');
+    const matched = match.status === MatchStatus.MATCHED;
+    const canSeePhotos = user.photosVisibleToNonMatches !== false || matched
+      || (blocked && match.statusBeforeBlock === MatchStatus.MATCHED);
+    const showOnlineStatus = !blocked && user.showOnlineStatus !== false;
+    return {
+      matchId: match.id,
+      relationship: blocked ? 'blocked' : matched ? 'matched' : match.senderId === viewerId ? 'pending' : 'received',
+      isSuperLike: match.isSuperLike,
+      since: match.createdAt,
+      profile: {
+        id: user.id, name: user.name, age: user.age, gender: user.gender,
+        city: user.city, bio: user.bio, profession: user.profession, height: user.height,
+        religion: user.religion, relationshipGoal: user.relationshipGoal, zodiac: user.zodiac,
+        interests: user.interests || [], hobbies: user.hobbies || [], personality: user.personalityWords || [],
+        photos: canSeePhotos ? user.photos || [] : [], photosHidden: !canSeePhotos,
+        isVerified: user.isVerified, showOnlineStatus,
+        isOnline: showOnlineStatus && user.isOnline,
+        distanceKm: !blocked && user.showDistance && viewer
+          ? distanceBetweenKm(viewer.locationLatitude, viewer.locationLongitude, user.locationLatitude, user.locationLongitude) : null,
+      },
+    };
+  }
+
   private async applyReceivedAccess(enriched: any[], userId: string, lightweight = false) {
     if (!enriched.length) return enriched;
     const { user, limits } = lightweight ? await this.dashboardPlan(userId) : await this.planUsage.get(userId);
@@ -372,7 +417,7 @@ export class MatchesService {
         await this.assertMatchCapacity(senderId);
         existing.status = MatchStatus.MATCHED;
         existing.isSuperLike = existing.isSuperLike || isSuperLike;
-        return this.saveAndPublishMatch(existing);
+        return this.saveAndPublishMatch(existing, true);
       }
 
       existing.senderId = senderId;
@@ -440,17 +485,27 @@ export class MatchesService {
     if (userId && match.receiverId !== userId) {
       throw new ForbiddenException('Only the receiver can respond to this match request.');
     }
+    if (action !== 'accept' && action !== 'decline') throw new BadRequestException('Invalid match response.');
+    if (match.status === MatchStatus.MATCHED && action === 'accept') return match;
+    if (match.status === MatchStatus.DECLINED && action === 'decline') return match;
+    if (match.status !== MatchStatus.PENDING) throw new BadRequestException('This request is no longer pending.');
 
     if (action === 'accept') {
       // The receiver is the actor here. If the other member has exhausted
       // their allowance, enrichMatches keeps this new match blurred for them.
       if (userId) await this.assertMatchCapacity(userId);
       match.status = MatchStatus.MATCHED;
-      return this.saveAndPublishMatch(match);
+      return this.saveAndPublishMatch(match, true);
     }
 
     match.status = MatchStatus.DECLINED;
     return this.saveAndPublishMatch(match);
+  }
+
+  async celebrationSnapshot(userId: string) {
+    const rows = await this.filterQuery(userId, 'active').select(['match.id'])
+      .orderBy('match.updatedAt', 'DESC').addOrderBy('match.id', 'DESC').take(100).getMany();
+    return { ids: rows.map(row => row.id) };
   }
 
   async delete(id: string, userId?: string): Promise<{ deleted: boolean }> {

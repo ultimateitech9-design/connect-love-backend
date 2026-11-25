@@ -10,10 +10,15 @@ import {
   MaxLength,
   MinLength,
   Max,
+  Matches,
   Min,
 } from 'class-validator';
 
 export class RegisterDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/^[a-f0-9]{24}$/)
+  referralCode?: string;
   @IsString()
   @MinLength(2)
   name: string;
