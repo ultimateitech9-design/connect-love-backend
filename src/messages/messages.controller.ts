@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Body, Param, Delete, Patch, Query, UseGuards, Request } from '@nestjs/common';
 import { MessagesService } from './messages.service';
+import { MessagesGateway } from './messages.gateway';
 import { AuthGuard } from '@nestjs/passport';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('messages')
 export class MessagesController {
-  constructor(private readonly messagesService: MessagesService) {}
+  constructor(private readonly messagesService: MessagesService, private readonly gateway: MessagesGateway) {}
 
   @Post('batch-delete')
   async batchDelete(@Request() req, @Body('messageIds') messageIds: string[]) {
@@ -37,7 +38,8 @@ export class MessagesController {
     @Body('content') content: string,
     @Body('replyToMessageId') replyToMessageId?: string,
   ) {
-    return this.messagesService.create(conversationId, req.user.userId, receiverId, content || text, replyToMessageId);
+    const message = await this.messagesService.create(conversationId, req.user.userId, receiverId, content || text, replyToMessageId);
+    return this.gateway.publishMessage(message);
   }
 
   @Delete(':id')

@@ -12,6 +12,7 @@ import { isAllowedOrigin } from '../common/cors';
 import { OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { MessagesService } from './messages.service';
+import { Message } from './message.entity';
 import { PLAN_CALLS_USED, VideoCallsService } from './video-calls.service';
 import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
@@ -324,6 +325,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     return { userIds: await this.usersService.visibleOnlineUserIds(liveIds) };
   }
 
+  /** Both transports publish saved messages to every connected participant tab. */
+  async publishMessage(message: Message) {
+    const forReceiver = await this.messagesService.forViewer(message, message.receiverId);
+    const forSender = {
+      ...message,
+      deliveryStatus: this.isUserOnline(message.receiverId) ? 'delivered' : 'sent',
+    };
+    this.emitToUser(message.receiverId, 'receiveMessage', forReceiver);
+    this.emitToUser(message.senderId, 'receiveMessage', forSender);
+    return forSender;
+  }
+
   @SubscribeMessage('sendMessage')
   async handleSendMessage(
     @MessageBody() data: { conversationId: string; receiverId: string; content: string; replyToMessageId?: string },
@@ -339,17 +352,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
       return { error: error?.message || 'Could not send message' };
     }
 
-    const messageForSender = {
-      ...savedMessage,
-      deliveryStatus: this.isUserOnline(data.receiverId) ? 'delivered' : 'sent',
-    };
-
-    // Emit to recipient if online
-    this.emitToUser(data.receiverId, 'receiveMessage', await this.messagesService.forViewer(savedMessage, data.receiverId));
-    
-    // Emit back to sender (optional, can be optimistic on client)
-    this.server.to(client.id).emit('receiveMessage', messageForSender);
-
+    const messageForSender = await this.publishMessage(savedMessage);
     return { event: 'messageSent', data: messageForSender };
   }
 
