@@ -2,11 +2,10 @@ import { BadRequestException, ForbiddenException, Injectable, Logger } from '@ne
 import { DataSource, EntityManager, In, Not, IsNull } from 'typeorm';
 import { randomBytes, randomUUID } from 'crypto';
 import { User } from '../users/user.entity';
-import { isWoman } from '../plans/plan-entitlements';
 import { CoinTransaction } from '../users/coin-transaction.entity';
 import { Referral, ReferralActivity, ReferralCode, ReferralReward } from './referral.entity';
 
-import { REFERRAL_REWARD_PAISE, REFERRAL_HOLD_DAYS, REFERRAL_MIN_WITHDRAWAL_PAISE } from './referral-policy';
+import { referralGroup, referralRewardPaise, REFERRAL_HOLD_DAYS, REFERRAL_MIN_WITHDRAWAL_PAISE, REFERRAL_WITHDRAWAL_STEP_PAISE } from './referral-policy';
 const HOLD_MS = REFERRAL_HOLD_DAYS * 86400000;
 
 @Injectable()
@@ -17,22 +16,23 @@ export class ReferralsService {
 
   async eligible(manager: EntityManager, id: string) {
     const user = await manager.getRepository(User).findOneBy({ id });
-    if (!user || user.role !== 'user' || user.status !== 'active' || !isWoman(user)) {
-      throw new ForbiddenException('Referral rewards are available to women members only.');
+    if (!user || user.role !== 'user' || user.status !== 'active' || !referralGroup(user.gender)) {
+      throw new ForbiddenException('Referral rewards are available to active men and women members.');
     }
     return user;
   }
 
   async validateInvite(code: string, gender?: string, manager = this.db.manager) {
-    if (!isWoman({ gender: gender || '' })) throw new BadRequestException('This referral is for women only. Remove the invitation to register without a referral.');
     const invite = await manager.getRepository(ReferralCode).findOneBy({ code });
     if (!invite) throw new BadRequestException('This referral link is invalid.');
-    await this.eligible(manager, invite.userId);
+    const inviter = await this.eligible(manager, invite.userId);
+    if (referralGroup(inviter.gender) !== referralGroup(gender)) return null;
     return invite;
   }
 
   async attachToSignup(manager: EntityManager, code: string, user: User) {
     const invite = await this.validateInvite(code, user.gender, manager);
+    if (!invite) return; // Different-gender signups can register without rewards.
     if (invite.userId === user.id) throw new BadRequestException('You cannot refer yourself.');
     if (!user.emailVerifiedAt) throw new BadRequestException('Verify your email to earn referral rewards.');
     const now = new Date();
@@ -42,10 +42,13 @@ export class ReferralsService {
   }
 
   private async initialRewards(manager: EntityManager, referral: Referral, earnedAt: Date) {
+    const member = await manager.getRepository(User).findOneByOrFail({ id: referral.referredId });
+    const amountPaise = referralRewardPaise(member.gender);
+    if (!amountPaise) throw new BadRequestException('This member is not eligible for referral rewards.');
     const unlockAt = new Date(earnedAt.getTime() + HOLD_MS);
     await manager.getRepository(ReferralReward).insert([
-      { id: randomUUID(), referralId: referral.id, userId: referral.referrerId, kind: 'invitation', amountPaise: REFERRAL_REWARD_PAISE, unlockAt },
-      { id: randomUUID(), referralId: referral.id, userId: referral.referredId, kind: 'welcome', amountPaise: REFERRAL_REWARD_PAISE, unlockAt },
+      { id: randomUUID(), referralId: referral.id, userId: referral.referrerId, kind: 'invitation', amountPaise, unlockAt },
+      { id: randomUUID(), referralId: referral.id, userId: referral.referredId, kind: 'welcome', amountPaise, unlockAt },
     ]);
   }
 
@@ -61,8 +64,9 @@ export class ReferralsService {
     const rows = await this.db.getRepository(Referral).find({ where: { referrerId: userId }, order: { createdAt: 'DESC', id: 'DESC' }, skip: page * 50, take: 51 });
     const referrals = rows.slice(0, 50);
     const names = referrals.length ? await this.db.getRepository(User).find({ where: { id: In(referrals.map(row => row.referredId)) }, select: ['id', 'name'] }) : [];
+    const earned = referrals.length ? await this.db.getRepository(ReferralReward).find({ where: { referralId: In(referrals.map(row => row.id)), userId, kind: 'invitation' } }) : [];
     return { items: referrals.map(row => ({ id: row.id, memberName: names.find(user => user.id === row.referredId)?.name || 'Member', registeredAt: row.createdAt,
-      rewardPaise: row.qualifiedAt ? REFERRAL_REWARD_PAISE : 0, unlockAt: row.qualifiedAt ? new Date(row.qualifiedAt.getTime() + HOLD_MS) : null })), hasMore: rows.length > 50, nextPage: page + 1 };
+      rewardPaise: earned.find(reward => reward.referralId === row.id)?.amountPaise || 0, unlockAt: row.qualifiedAt ? new Date(row.qualifiedAt.getTime() + HOLD_MS) : null })), hasMore: rows.length > 50, nextPage: page + 1 };
   }
 
   /** Called after real password/Google authentication and on authenticated app use.
@@ -76,9 +80,9 @@ export class ReferralsService {
         const referral = await manager.getRepository(Referral).findOne({ where: { referredId: userId }, lock: { mode: 'pessimistic_write' } });
         if (!referral) return;
         const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
-        if (!user || !isWoman(user) || user.role !== 'user' || user.status !== 'active' || !user.emailVerifiedAt) return;
+        if (!user || !referralGroup(user.gender) || user.role !== 'user' || user.status !== 'active' || !user.emailVerifiedAt) return;
         const inviter = await manager.getRepository(User).findOne({ where: { id: referral.referrerId }, lock: { mode: 'pessimistic_write' } });
-        if (!inviter || !isWoman(inviter) || inviter.role !== 'user' || inviter.status !== 'active') return;
+        if (!inviter || referralGroup(inviter.gender) !== referralGroup(user.gender) || inviter.role !== 'user' || inviter.status !== 'active') return;
         const rewards = manager.getRepository(ReferralReward);
         if (!referral.qualifiedAt) {
           referral.qualifiedAt = now;
@@ -90,9 +94,10 @@ export class ReferralsService {
         await manager.getRepository(ReferralActivity).createQueryBuilder().insert().values({ referralId: referral.id, activeDate: day }).orIgnore().execute();
         const activeDays = await manager.getRepository(ReferralActivity).countBy({ referralId: referral.id });
         if (activeDays >= 30 && !await rewards.existsBy({ referralId: referral.id, userId, kind: 'activity_bonus' })) {
-          // The bonus belongs only to the invited woman. It shares the original
+          // The bonus belongs only to the invited member. It shares the original
           // 30-day hold, so earning it does not restart a second 30-day lock.
-          await rewards.insert({ id: randomUUID(), referralId: referral.id, userId, kind: 'activity_bonus', amountPaise: REFERRAL_REWARD_PAISE,
+          const welcome = await rewards.findOneByOrFail({ referralId: referral.id, userId, kind: 'welcome' });
+          await rewards.insert({ id: randomUUID(), referralId: referral.id, userId, kind: 'activity_bonus', amountPaise: welcome.amountPaise,
             unlockAt: new Date(referral.qualifiedAt.getTime() + HOLD_MS) });
         }
       });
@@ -106,7 +111,7 @@ export class ReferralsService {
   }
 
   async summary(userId: string) {
-    await this.eligible(this.db.manager, userId);
+    const member = await this.eligible(this.db.manager, userId);
     let code = await this.db.getRepository(ReferralCode).findOneBy({ userId });
     if (!code) {
       await this.db.getRepository(ReferralCode).createQueryBuilder().insert().values({ userId, code: randomBytes(12).toString('hex') }).orIgnore().execute();
@@ -126,7 +131,7 @@ export class ReferralsService {
     const accounts = await this.accounts(userId);
     const successfulReferrals = await this.db.getRepository(Referral).countBy({ referrerId: userId, qualifiedAt: Not(IsNull()) });
     return {
-      code: code.code, sharePath: `/register?ref=${code.code}`, rewardPaise: REFERRAL_REWARD_PAISE, holdDays: REFERRAL_HOLD_DAYS,
+      code: code.code, sharePath: `/register?ref=${code.code}`, rewardPaise: referralRewardPaise(member.gender), referralGroup: referralGroup(member.gender), withdrawalStepPaise: REFERRAL_WITHDRAWAL_STEP_PAISE, holdDays: REFERRAL_HOLD_DAYS,
       minimumWithdrawalPaise: REFERRAL_MIN_WITHDRAWAL_PAISE, successfulReferrals,
       referrals: accounts.items, referralsHasMore: accounts.hasMore, referralsNextPage: accounts.nextPage,
       availablePaise: sum(available), lockedPaise: sum(locked), totalEarnedPaise: sum(rewards), invitedCount: invited,

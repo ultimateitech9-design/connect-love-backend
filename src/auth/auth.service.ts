@@ -15,7 +15,7 @@ import { RegistrationOtpService } from './registration-otp.service';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto';
 import { UserEmail } from '../users/user-email.entity';
 import { ReferralsService } from '../referrals/referrals.service';
-import { isWoman } from '../plans/plan-entitlements';
+import { referralGroup } from '../referrals/referral-policy';
 
 export interface LoginContext {
   ipAddress?: string;
@@ -182,8 +182,7 @@ export class AuthService {
       throw new ConflictException('An account with this email already exists.');
     }
 
-    const referralCode = dto.referralCode && isWoman({ gender: dto.gender || '' }) ? dto.referralCode : undefined;
-    if (referralCode) await this.referrals.validateInvite(referralCode, dto.gender);
+    const referralCode = dto.referralCode && await this.referrals.validateInvite(dto.referralCode, dto.gender) ? dto.referralCode : undefined;
     await this.registrationOtpService.verify(email, dto.otp);
 
     const hashed = await bcrypt.hash(dto.password, 12);
@@ -200,7 +199,7 @@ export class AuthService {
       planExpiresAt: null,
       status: 'active',
       emailVerifiedAt: new Date(),
-      referralWelcomePending: isWoman({ gender: dto.gender || '' }),
+      referralWelcomePending: Boolean(referralGroup(dto.gender)),
     });
     const saved = await this.userRepo.manager.transaction(async manager => {
       const savedUser = await manager.getRepository(User).save(user);

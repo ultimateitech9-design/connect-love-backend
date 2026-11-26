@@ -8,7 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { ReferralsService } from '../referrals/referrals.service';
-import { isWoman } from '../plans/plan-entitlements';
+import { referralGroup } from '../referrals/referral-policy';
 
 dotenv.config();
 
@@ -43,7 +43,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (typeof payload.sub !== 'string' || !payload.sub) throw new UnauthorizedException('Invalid account session.');
     const user = await this.users.findOne({ where: { id: payload.sub }, select: ['id', 'email', 'plan', 'role', 'status', 'gender'] });
     if (!user || user.status !== 'active') throw new UnauthorizedException('This account is no longer active.');
-    if (user.role === 'user' && isWoman(user)) await this.referrals.recordActivity(user.id);
+    if (user.role === 'user' && referralGroup(user.gender)) await this.referrals.recordActivity(user.id);
     return { userId: user.id, email: user.email, plan: user.plan, role: user.role };
   }
 }

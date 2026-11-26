@@ -27,8 +27,8 @@ async function run(){
  payouts.notifyWithdrawalStatus=async()=>{};
  const invite=await referral.summary(woman.id);
  assert.match(invite.code,/^[a-f0-9]{24}$/);assert.equal((await referral.summary(woman.id)).code,invite.code);
- await assert.rejects(referral.summary(man.id),/women/);
- await assert.rejects(referral.validateInvite(invite.code,'male'),/women only/);
+ const maleInvite=await referral.summary(man.id);assert.equal(maleInvite.rewardPaise,5000);assert.equal(maleInvite.referralGroup,'men');
+ assert.equal(await referral.validateInvite(invite.code,'male'),null,'cross-gender invitation does not award money');
  await assert.rejects(referral.validateInvite('0'.repeat(24),'female'),/invalid/);
  const otp={verify:async()=>{},sendWelcomeEmail:()=>{}};
  const audit={create:v=>v,save:async v=>({...v,id:v.id||randomUUID()})};
@@ -38,7 +38,7 @@ async function run(){
  assert.equal(signup.user.referralWelcomePending,true);
  await referral.dismissWelcome(referredId);assert.equal((await users.findOneBy({id:referredId})).referralWelcomePending,false,'welcome dismissal persists on the account');
  const maleSignup=await auth.register({name:'Male via invitation',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'male',otp:'123456',referralCode:invite.code});
- assert.equal(maleSignup.user.referralWelcomePending,false);assert.equal(await refs.countBy({referredId:maleSignup.user.id}),0,'men can register but cannot qualify for a referral');
+ assert.equal(maleSignup.user.referralWelcomePending,true);assert.equal(await refs.countBy({referredId:maleSignup.user.id}),0,'male signup through female link earns neither reward');
  assert.equal(await refs.count(),1);assert.equal(await rewards.count(),2,'verified female registration credits both accounts');
  await assert.rejects(db.transaction(m=>referral.attachToSignup(m,invite.code,{id:referredId,gender:'female',emailVerifiedAt:new Date()})),/Duplicate entry/);
  await assert.rejects(auth.login({email:signup.user.email,password:'WrongPassword'}),/Invalid email or password/);
@@ -90,14 +90,43 @@ async function run(){
  const competing=await Promise.allSettled([1,2].map(()=>payouts.requestReferralWithdrawal(woman.id,{requestId:randomUUID(),amountPaise:100000,accountId:inviterAccount.id})));
  assert.equal(competing.filter(result=>result.status==='fulfilled').length,1,'two different simultaneous requests cannot overdraw one reward');
  assert.equal(competing.filter(result=>result.status==='rejected').length,1);
- await users.update({id:woman.id},{gender:'male'});await assert.rejects(referral.validateInvite(invite.code,'female'),/women/);
+ await users.update({id:woman.id},{gender:'male'});assert.equal(await referral.validateInvite(invite.code,'female'),null);
+ assert((await referral.accounts(woman.id)).items.every(row=>row.rewardPaise===10000),'changing gender never rewrites historical reward values');
  const maleAccount=await payouts.createAccount('user',man.id,{method:'upi',upiId:'male-test@upi'});
- await assert.rejects(payouts.requestReferralWithdrawal(man.id,{requestId:randomUUID(),amountPaise:100000,accountId:maleAccount.id}),/women/);
+ await assert.rejects(payouts.requestReferralWithdrawal(man.id,{requestId:randomUUID(),amountPaise:100000,accountId:maleAccount.id}),/30-day lock/);
  assert.equal(await rewards.count(),37);assert.equal(await refs.count(),18);
  await creditSignups((await referral.summary(referredId)).code,43);
  const firstPage=await referral.accounts(referredId,0),secondPage=await referral.accounts(referredId,1);
  assert.equal(firstPage.items.length,50);assert.equal(firstPage.hasMore,true);assert.equal(secondPage.items.length,1);assert.equal(secondPage.hasMore,false);
  assert.equal(new Set([...firstPage.items,...secondPage.items].map(row=>row.id)).size,51,'all referred accounts are accessible across pages');
- console.log('PASS: verified-signup attribution/credit, welcome popup flag, per-account rewards, minimum withdrawal, women-only checks, self/referral reuse protection, 30-day lock, 30 distinct India dates, invitee-only bonus, concurrent idempotent payouts, overdraw prevention, rejection restoration and coin isolation. No real users, emails or money affected.');
+ // Men use the same transactional flow with half-size credits and bonus.
+ const invitedMan=await auth.register({name:'Invited man',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'male',otp:'123456',referralCode:maleInvite.code});
+ assert.equal(invitedMan.user.referralWelcomePending,true);
+ let maleRewards=await rewards.findBy({userId:invitedMan.user.id});assert.equal(maleRewards.length,1);assert.equal(maleRewards[0].amountPaise,5000);
+ assert.equal((await rewards.findOneBy({userId:man.id,kind:'invitation'})).amountPaise,5000);
+ const maleRelation=await refs.findOneBy({referredId:invitedMan.user.id});
+ await activity.insert(Array.from({length:29},(_,i)=>({referralId:maleRelation.id,activeDate:indiaDay(new Date(Date.now()-(i+1)*86400000))})));
+ await Promise.all([referral.recordActivity(invitedMan.user.id,true),referral.recordActivity(invitedMan.user.id,true)]);
+ maleRewards=await rewards.findBy({userId:invitedMan.user.id});assert.equal(maleRewards.length,2);assert(maleRewards.every(row=>row.amountPaise===5000));
+ assert.equal(await rewards.countBy({userId:man.id,kind:'activity_bonus'}),0);
+ for(let i=0;i<20;i++)await db.transaction(async manager=>{
+  const next=await manager.getRepository(User).save(manager.getRepository(User).create({id:randomUUID(),name:'Male referral',email:`${randomUUID()}@example.test`,password:'unused',gender:'male',role:'user',status:'active',emailVerifiedAt:new Date()}));
+  await referral.attachToSignup(manager,maleInvite.code,next);
+ });
+ const maleSummary=await referral.summary(man.id);assert.equal(maleSummary.lockedPaise,105000);assert.equal(maleSummary.availablePaise,0);assert(maleSummary.referrals.every(row=>row.rewardPaise===5000));
+ await assert.rejects(payouts.requestReferralWithdrawal(man.id,{requestId:randomUUID(),amountPaise:105000,accountId:maleAccount.id}),/30-day lock/);
+ await rewards.update({userId:man.id},{unlockAt:new Date(Date.now()-1000)});
+ const maleRequest={requestId:randomUUID(),amountPaise:105000,accountId:maleAccount.id};
+ const malePaid=await payouts.requestReferralWithdrawal(man.id,maleRequest);
+ assert.equal((await rewards.findBy({withdrawalId:malePaid.id})).reduce((sum,row)=>sum+row.amountPaise,0),105000,'21 male credits reserve exactly the requested amount');
+ assert.equal((await referral.summary(man.id)).availablePaise,0);
+ await userService.updateWithdrawalStatus(malePaid.id,'rejected');assert.equal((await referral.summary(man.id)).availablePaise,105000);
+ assert.equal((await users.findOneBy({id:man.id})).earnedCoinBalance,0);
+ // Simulate a historical higher-value credit alongside new men's credits.
+ const historical=await rewards.findOneBy({userId:man.id,kind:'invitation'});await rewards.update({id:historical.id},{amountPaise:10000});
+ const mixed=await payouts.requestReferralWithdrawal(man.id,{...maleRequest,requestId:randomUUID()});
+ assert.equal((await rewards.findBy({withdrawalId:mixed.id})).reduce((sum,row)=>sum+row.amountPaise,0),105000);
+ assert.equal((await referral.summary(man.id)).availablePaise,5000,'mixed-size rewards cannot overdraw or disappear');
+ console.log('PASS: women ₹100 each and men ₹50 each, same-gender verified signup, male welcome flag, historical amounts, 30-day holds, invitee-only activity bonus, 21-credit male withdrawal, mixed-size payouts, concurrency, rejection refunds, minimum withdrawal and coin isolation. No real users, emails or money affected.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(!db.isInitialized)return;for(const suffix of ['referral_rewards','referral_activity','referrals','referral_codes','coin_transactions','payout_accounts','agents','users']){const table=prefix+suffix;if(!/^test_ref_[a-f0-9]{12}_[a-z_]+$/.test(table))throw new Error('Unsafe cleanup');await db.query(`DROP TABLE IF EXISTS \`${table}\``);}await db.destroy();});

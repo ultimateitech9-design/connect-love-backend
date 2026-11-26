@@ -5,8 +5,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 import { DataSource, In, IsNull, LessThanOrEqual, Repository } from 'typeorm';
 import { ReferralReward } from '../referrals/referral.entity';
-import { REFERRAL_MIN_WITHDRAWAL_PAISE, REFERRAL_REWARD_PAISE } from '../referrals/referral-policy';
-import { isWoman } from '../plans/plan-entitlements';
+import { REFERRAL_MIN_WITHDRAWAL_PAISE, REFERRAL_WITHDRAWAL_STEP_PAISE, referralGroup } from '../referrals/referral-policy';
 import { User } from '../users/user.entity';
 import { Agent } from '../agents/agent.entity';
 import { CoinTransaction } from '../users/coin-transaction.entity';
@@ -182,13 +181,13 @@ export class PayoutsService {
   // --- Withdrawals ----------------------------------------------------------
 
   async requestReferralWithdrawal(userId: string, request: { requestId: string; amountPaise: number; accountId?: string }) {
-    if (!Number.isInteger(request.amountPaise) || request.amountPaise < REFERRAL_MIN_WITHDRAWAL_PAISE || request.amountPaise > 100000000 || request.amountPaise % REFERRAL_REWARD_PAISE) {
-      throw new BadRequestException('Minimum referral withdrawal is ₹1,000, in multiples of ₹100.');
+    if (!Number.isInteger(request.amountPaise) || request.amountPaise < REFERRAL_MIN_WITHDRAWAL_PAISE || request.amountPaise > 100000000 || request.amountPaise % REFERRAL_WITHDRAWAL_STEP_PAISE) {
+      throw new BadRequestException('Minimum referral withdrawal is ₹1,000, in multiples of ₹50.');
     }
     const payout = await this.payoutFor('user', userId, request);
     return this.dataSource.transaction(async manager => {
       const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
-      if (!user || !isWoman(user) || user.role !== 'user' || user.status !== 'active') throw new ForbiddenException('Referral withdrawals are available to women members only.');
+      if (!user || !referralGroup(user.gender) || user.role !== 'user' || user.status !== 'active') throw new ForbiddenException('Referral withdrawals are available to active men and women members.');
       const transactions = manager.getRepository(CoinTransaction);
       const existing = await transactions.findOneBy({ id: request.requestId });
       if (existing) {
@@ -197,13 +196,20 @@ export class PayoutsService {
       }
       const rewards = manager.getRepository(ReferralReward);
       const available = await rewards.find({ where: { userId, withdrawalId: IsNull(), unlockAt: LessThanOrEqual(new Date()) }, order: { unlockAt: 'ASC', id: 'ASC' }, lock: { mode: 'pessimistic_write' } });
-      const count = request.amountPaise / 10000;
-      if (available.length < count) throw new BadRequestException('Only rewards whose 30-day lock has ended can be withdrawn.');
+      // Select actual stored amounts: historical ₹100 credits and new ₹50
+      // credits must never be treated as equal-sized rewards.
+      let remaining = request.amountPaise;
+      const selected = available.sort((a, b) => b.amountPaise - a.amountPaise).filter(reward => {
+        if (reward.amountPaise <= 0 || reward.amountPaise > remaining) return false;
+        remaining -= reward.amountPaise;
+        return true;
+      });
+      if (remaining !== 0) throw new BadRequestException('Only rewards whose 30-day lock has ended can be withdrawn. Choose an amount matching your unlocked rewards.');
       const tx = await transactions.save(transactions.create({ id: request.requestId, type: 'withdrawal', walletSource: 'referral', status: 'pending', userId,
         receiverId: userId, grossCoins: 0, userCoins: 0, platformCoins: 0, amountPaise: request.amountPaise,
-        label: 'Women referral rewards withdrawal (INR)', payoutAccount: payout.method === 'upi' ? payout.upiId : payout.accountNumber,
+        label: 'Referral rewards withdrawal (INR)', payoutAccount: payout.method === 'upi' ? payout.upiId : payout.accountNumber,
         payoutDetails: JSON.stringify(payout) }));
-      await rewards.update({ id: In(available.slice(0, count).map(row => row.id)), withdrawalId: IsNull() }, { withdrawalId: tx.id });
+      await rewards.update({ id: In(selected.map(row => row.id)), withdrawalId: IsNull() }, { withdrawalId: tx.id });
       return { id: tx.id, status: tx.status, amountPaise: tx.amountPaise };
     });
   }
