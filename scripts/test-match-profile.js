@@ -44,6 +44,11 @@ async function run(){
   assert((await service.celebrationSnapshot(viewer.id)).ids.includes(pending.id));
   await matches.update({id:pending.id},{status:MatchStatus.MATCHED});
   assert.equal((await service.profileForMatch(pending.id,viewer.id)).relationship,'matched','status comes from current relationship');
+  // A late pass from either user's old Discover card cannot erase acceptance.
+  await service.swipe(viewer.id,p2.id,'pass');
+  await service.swipe(p2.id,viewer.id,'pass');
+  assert.equal((await matches.findOneBy({id:pending.id})).status,MatchStatus.MATCHED);
+  assert.equal((await service.profileForMatch(pending.id,p2.id)).relationship,'matched');
   await matches.update({id:active.id},{status:MatchStatus.BLOCKED,blockedByUserId:viewer.id,statusBeforeBlock:MatchStatus.MATCHED});
   result=await service.profileForMatch(active.id,viewer.id);assert.equal(result.relationship,'blocked');assert.equal(result.profile.showOnlineStatus,false);
   await assert.rejects(service.respond(active.id,'accept',peer.id),/no longer pending/);

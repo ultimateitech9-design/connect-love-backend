@@ -387,6 +387,10 @@ export class MatchesService {
       throw new BadRequestException('This profile is blocked.');
     }
 
+    // A stale Discover card must never undo an accepted match. Ending a match
+    // uses the explicit block/unmatch controls, not a delayed pass swipe.
+    if (existing?.status === MatchStatus.MATCHED) return existing;
+
     if (action === 'pass') {
       const match = existing || this.matchesRepository.create({ senderId, receiverId });
       match.senderId = senderId;
@@ -398,7 +402,6 @@ export class MatchesService {
 
     // Retrying the same outgoing like (for example after login or a double
     // click) is idempotent and must not consume another daily like.
-    if (existing?.status === MatchStatus.MATCHED) return existing;
     if (existing?.status === MatchStatus.PENDING && existing.senderId === senderId) return existing;
 
     if (isSuperLike) await this.planUsage.assertAndRecord(senderId, 'superLikesPerMonth', 'Super Like', receiverId);

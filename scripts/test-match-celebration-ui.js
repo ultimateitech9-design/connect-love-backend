@@ -54,6 +54,13 @@ async function run(){
  const description=a.locator('p').filter({hasText:'liked each other'});
  assert.equal(await description.evaluate(el=>getComputedStyle(el).color),'rgb(51, 65, 85)','middle text stays readable in dark mode');
  await pageA.screenshot({path:path.join(os.tmpdir(),'connect-love-match-popup.png')});
+ // An old Discover pass arriving after acceptance must not break either profile.
+ await api(ids[0],'/matches/swipe',{receiverId:ids[1],action:'pass'});
+ for(const id of ids.slice(0,2)){
+  const response=await fetch(`${base}/matches/${first.id}/profile`,{headers:{Authorization:`Bearer ${token(id)}`}});
+  assert.equal(response.status,200,'accepted match profile remains available to both members');
+  assert.equal((await response.json()).relationship,'matched');
+ }
  await b.getByLabel('Close match popup').click();
  const second=await api(ids[0],'/matches/swipe',{receiverId:ids[2],action:'like'});
  await api(ids[2],'/matches/respond',{matchId:second.id,action:'accept'});
