@@ -26,7 +26,7 @@ async function run(){
  const referral=new ReferralsService(db),payouts=new PayoutsService(db,db.getRepository(PayoutAccount));
  payouts.notifyWithdrawalStatus=async()=>{};
  const invite=await referral.summary(woman.id);
- assert.match(invite.code,/^[a-f0-9]{24}$/);assert.equal((await referral.summary(woman.id)).code,invite.code);
+ assert.match(invite.code,/^inviter-[a-f0-9]{6}$/);assert.equal((await referral.summary(woman.id)).code,invite.code);
  const maleInvite=await referral.summary(man.id);assert.equal(maleInvite.rewardPaise,5000);assert.equal(maleInvite.referralGroup,'men');
  assert.equal(await referral.validateInvite(invite.code,'male'),null,'cross-gender invitation does not award money');
  await assert.rejects(referral.validateInvite('0'.repeat(24),'female'),/invalid/);
@@ -127,6 +127,33 @@ async function run(){
  const mixed=await payouts.requestReferralWithdrawal(man.id,{...maleRequest,requestId:randomUUID()});
  assert.equal((await rewards.findBy({withdrawalId:mixed.id})).reduce((sum,row)=>sum+row.amountPaise,0),105000);
  assert.equal((await referral.summary(man.id)).availablePaise,5000,'mixed-size rewards cannot overdraw or disappear');
+ // Old shared links remain aliases when members open the new named link.
+ const legacyMember=await users.save(users.create({...woman,id:randomUUID(),name:'Suraj Rajput',email:`${randomUUID()}@example.test`}));
+ const oldCode=require('node:crypto').randomBytes(12).toString('hex');
+ const codes=db.getRepository(ReferralCode);
+ await codes.insert({userId:legacyMember.id,code:oldCode,legacyCode:null});
+ const [namedA,namedB]=await Promise.all([referral.summary(legacyMember.id),referral.summary(legacyMember.id)]);
+ assert.match(namedA.code,/^suraj-[a-f0-9]{6}$/);assert.equal(namedA.code,namedB.code,'concurrent conversion has one stable result');
+ assert.equal((await codes.findOneBy({userId:legacyMember.id})).legacyCode,oldCode);
+ assert.equal((await referral.validateInvite(oldCode,'female')).userId,legacyMember.id);
+ assert.equal((await referral.validateInvite(namedA.code,'female')).userId,legacyMember.id);
+ await users.update({id:legacyMember.id},{name:'Renamed member'});assert.equal((await referral.summary(legacyMember.id)).code,namedA.code,'profile rename cannot invalidate a shared link');
+ const legacySignup=await auth.register({name:'Old link signup',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'female',otp:'123456',referralCode:oldCode});
+ assert.equal((await refs.findOneBy({referredId:legacySignup.user.id})).referrerId,legacyMember.id);
+ assert.equal((await rewards.findOneBy({userId:legacySignup.user.id,kind:'welcome'})).amountPaise,10000);
+ assert.equal((await rewards.findOneBy({userId:legacyMember.id,kind:'invitation'})).amountPaise,10000);
+ const crypto=require('node:crypto'),originalRandom=crypto.randomBytes;
+ const twin=await users.save(users.create({...woman,id:randomUUID(),name:'Suraj Kumar',email:`${randomUUID()}@example.test`}));
+ let randomCalls=0;
+ try {
+  crypto.randomBytes=size=>size===3&&randomCalls++===0?Buffer.from(namedA.code.split('-')[1],'hex'):originalRandom(size);
+  const unique=await referral.summary(twin.id);assert.notEqual(unique.code,namedA.code);assert.match(unique.code,/^suraj-[a-f0-9]{6}$/);assert(randomCalls>=2,'a real unique-index collision retries safely');
+ } finally {crypto.randomBytes=originalRandom;}
+ const {newReferralCode,REFERRAL_CODE_PATTERN}=require('../dist/referrals/referral-code');
+ assert.match(newReferralCode('Süràj'),/^suraj-/);assert.match(newReferralCode('!!!'),/^member-/);
+ assert(REFERRAL_CODE_PATTERN.test(namedA.code));assert(REFERRAL_CODE_PATTERN.test(oldCode));assert(!REFERRAL_CODE_PATTERN.test('suraj-123&admin=true'));
+ const {validateSync}=require('class-validator'),{RegisterDto}=require('../dist/auth/dto/register.dto');
+ assert(!validateSync(Object.assign(new RegisterDto(),{referralCode:namedA.code})).some(error=>error.property==='referralCode'),'HTTP signup validator accepts the named code');
  console.log('PASS: women ₹100 each and men ₹50 each, same-gender verified signup, male welcome flag, historical amounts, 30-day holds, invitee-only activity bonus, 21-credit male withdrawal, mixed-size payouts, concurrency, rejection refunds, minimum withdrawal and coin isolation. No real users, emails or money affected.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(!db.isInitialized)return;for(const suffix of ['referral_rewards','referral_activity','referrals','referral_codes','coin_transactions','payout_accounts','agents','users']){const table=prefix+suffix;if(!/^test_ref_[a-f0-9]{12}_[a-z_]+$/.test(table))throw new Error('Unsafe cleanup');await db.query(`DROP TABLE IF EXISTS \`${table}\``);}await db.destroy();});

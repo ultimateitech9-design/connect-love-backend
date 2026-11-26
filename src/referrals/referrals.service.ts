@@ -1,9 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { DataSource, EntityManager, In, Not, IsNull } from 'typeorm';
-import { randomBytes, randomUUID } from 'crypto';
+import { randomUUID } from 'crypto';
 import { User } from '../users/user.entity';
 import { CoinTransaction } from '../users/coin-transaction.entity';
 import { Referral, ReferralActivity, ReferralCode, ReferralReward } from './referral.entity';
+import { LEGACY_REFERRAL_CODE, newReferralCode } from './referral-code';
 
 import { referralGroup, referralRewardPaise, REFERRAL_HOLD_DAYS, REFERRAL_MIN_WITHDRAWAL_PAISE, REFERRAL_WITHDRAWAL_STEP_PAISE } from './referral-policy';
 const HOLD_MS = REFERRAL_HOLD_DAYS * 86400000;
@@ -23,7 +24,7 @@ export class ReferralsService {
   }
 
   async validateInvite(code: string, gender?: string, manager = this.db.manager) {
-    const invite = await manager.getRepository(ReferralCode).findOneBy({ code });
+    const invite = await manager.getRepository(ReferralCode).findOne({ where: [{ code }, { legacyCode: code }] });
     if (!invite) throw new BadRequestException('This referral link is invalid.');
     const inviter = await this.eligible(manager, invite.userId);
     if (referralGroup(inviter.gender) !== referralGroup(gender)) return null;
@@ -110,13 +111,32 @@ export class ReferralsService {
     }
   }
 
+  private async shareCode(member: User): Promise<ReferralCode> {
+    const codes = this.db.getRepository(ReferralCode);
+    // The DB unique constraints, not just randomness, guarantee one distinct
+    // code per account, including concurrent requests and same-name members.
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const current = await codes.findOneBy({ userId: member.id });
+      if (current && !LEGACY_REFERRAL_CODE.test(current.code)) return current;
+      try {
+        const code = newReferralCode(member.name);
+        if (current) {
+          await codes.update({ userId: member.id, code: current.code }, { code, legacyCode: current.legacyCode || current.code });
+        } else {
+          await codes.insert({ userId: member.id, code, legacyCode: null });
+        }
+        const saved = await codes.findOneBy({ userId: member.id });
+        if (saved && !LEGACY_REFERRAL_CODE.test(saved.code)) return saved;
+      } catch (error: any) {
+        if ((error?.driverError?.code || error?.code) !== 'ER_DUP_ENTRY') throw error;
+      }
+    }
+    throw new ServiceUnavailableException('Your invitation link could not be created. Please try again.');
+  }
+
   async summary(userId: string) {
     const member = await this.eligible(this.db.manager, userId);
-    let code = await this.db.getRepository(ReferralCode).findOneBy({ userId });
-    if (!code) {
-      await this.db.getRepository(ReferralCode).createQueryBuilder().insert().values({ userId, code: randomBytes(12).toString('hex') }).orIgnore().execute();
-      code = await this.db.getRepository(ReferralCode).findOneByOrFail({ userId });
-    }
+    const code = await this.shareCode(member);
     const [rewards, invited, ownReferral, withdrawals] = await Promise.all([
       this.db.getRepository(ReferralReward).find({ where: { userId }, order: { createdAt: 'DESC' } }),
       this.db.getRepository(Referral).countBy({ referrerId: userId }),

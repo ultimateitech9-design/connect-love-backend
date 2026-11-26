@@ -13,11 +13,12 @@ import {
   Matches,
   Min,
 } from 'class-validator';
+import { REFERRAL_CODE_PATTERN } from '../../referrals/referral-code';
 
 export class RegisterDto {
   @IsOptional()
   @IsString()
-  @Matches(/^[a-f0-9]{24}$/)
+  @Matches(REFERRAL_CODE_PATTERN)
   referralCode?: string;
   @IsString()
   @MinLength(2)

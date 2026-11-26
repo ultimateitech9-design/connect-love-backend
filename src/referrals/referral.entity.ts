@@ -4,6 +4,8 @@ import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, PrimaryGenerate
 export class ReferralCode {
   @PrimaryColumn({ type: 'varchar', length: 36 }) userId: string;
   @Column({ type: 'varchar', length: 24, unique: true }) code: string;
+  @Index('UQ_referral_legacy_code', { unique: true })
+  @Column({ type: 'varchar', length: 24, nullable: true }) legacyCode: string | null;
 }
 
 @Entity('referrals')
