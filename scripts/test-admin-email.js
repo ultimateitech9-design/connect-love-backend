@@ -11,7 +11,7 @@ const { User } = require('../dist/users/user.entity');
 const { AuditLog } = require('../dist/platform/audit-log.entity');
 const { AdminEmailCampaign, AdminEmailRecipient } = require('../dist/admin-email/admin-email.entity');
 const { AdminEmailService } = require('../dist/admin-email/admin-email.service');
-const { SendAdminEmailDto, EmailRecipientsQueryDto, FailedEmailsQueryDto } = require('../dist/admin-email/admin-email.dto');
+const { SendAdminEmailDto, EmailRecipientsQueryDto, FailedEmailsQueryDto, RetryFailedEmailsDto } = require('../dist/admin-email/admin-email.dto');
 
 if (process.env.NODE_ENV === 'production' || !['localhost', '127.0.0.1'].includes(process.env.DB_HOST || 'localhost')) throw new Error('Local database only.');
 const prefix = `test_em_${randomUUID().replaceAll('-', '').slice(0, 12)}_`;
@@ -116,8 +116,9 @@ async function run() {
   await deliveries.insert({ id: randomUUID(), campaignId: interrupted.id, userId: randomUUID(), name: 'Former member', email: 'former@example.test', status: 'failed', error: 'Test failure' });
   const failures = await service.failures({ gender: 'all', page: 1 });
   assert.equal(failures.total, 54, 'only failed attempts are listed, not pending or successful deliveries');
-  assert.equal(failures.failures.length, 50);
-  assert.equal((await service.failures({ gender: 'all', page: 2 })).failures.length, 4);
+  assert.equal(failures.limit, 10);
+  assert.equal(failures.failures.length, 10);
+  assert.equal((await service.failures({ gender: 'all', page: 6 })).failures.length, 4);
   const failedWomen = await service.failures({ gender: 'female', page: 1 });
   assert.equal(failedWomen.total, 52, 'women filter normalizes gender aliases');
   assert(failedWomen.failures.every(row => ['female', ' WOMEN '].includes(row.gender)));
@@ -129,6 +130,31 @@ async function run() {
   assert.equal(former.total, 1); assert.equal(former.failures[0].gender, null, 'deleted members remain visible in all failed emails');
   assert.equal((await service.failures({ gender: 'all', search: dto.subject, page: 1 })).total, 54, 'campaign subjects are searchable');
   assert((await validate(plainToInstance(FailedEmailsQueryDto, { gender: 'invalid', page: 0 }))).length >= 2);
+  const excluded = (await deliveries.findOneBy({ campaignId: interrupted.id, userId: women[0].id })).id;
+  const retryDto = { requestId: randomUUID(), selections: [
+    { gender: 'female', search: '', selectAll: true, excludedIds: [excluded] },
+    { gender: 'male', search: '', selectAll: true },
+  ] };
+  const beforeJobs = await jobs.count();
+  await jobs.update(interrupted.id, { imageBase64: 'original-photo' });
+  const retryResults = await Promise.all([service.retryFailures(retryDto, admin.id), service.retryFailures(retryDto, admin.id)]);
+  assert.equal(retryResults.filter(result => !result.alreadyQueued).length, 1, 'concurrent resends queue exactly one batch');
+  assert.equal(retryResults.find(result => !result.alreadyQueued).total, 52, 'all pages and both genders selected, exclusion applied');
+  assert.equal(await jobs.count(), beforeJobs + 2, 'each original campaign keeps its own message');
+  assert.equal((await service.failures({ gender: 'all', page: 1 })).total, 54, 'original failure history is preserved');
+  const newJobs = await jobs.createQueryBuilder('c').addSelect('c.imageBase64').where('c.id NOT IN (:...ids)', { ids: [a.id, manual.id, interrupted.id, inactiveCampaign.id] }).getMany();
+  assert.equal(newJobs.reduce((sum, job) => sum + job.total, 0), 52);
+  assert(newJobs.some(job => job.imageBase64 === 'original-photo'), 'resend preserves original campaign photo');
+  assert(newJobs.every(job => job.subject === dto.subject && job.message === dto.message));
+  const retried = await deliveries.find({ where: { campaignId: require('typeorm').In(newJobs.map(job => job.id)) } });
+  assert(retried.every(row => row.status === 'pending' && row.userId !== women[0].id && row.userId !== other.id), 'sent recipients and excluded failures are not queued');
+  assert.equal((await service.retryFailures(retryDto, admin.id)).alreadyQueued, true, 'repeated request does not resend again');
+  const sentRecipient = await deliveries.findOneBy({ campaignId: manual.id, userId: other.id });
+  await assert.rejects(service.retryFailures({ requestId: randomUUID(), selections: [{ gender: 'male', selectAll: false, ids: [sentRecipient.id] }] }, admin.id), /no longer available/);
+  await assert.rejects(service.retryFailures({ requestId: randomUUID(), selections: [{ gender: 'female', selectAll: false, ids: [failedMen.failures[0].id] }] }, admin.id), /no longer available/);
+  await assert.rejects(service.retryFailures({ requestId: randomUUID(), selections: [{ gender: 'female', search: 'nothing-matches', selectAll: true }] }, admin.id), /Select at least one/);
+  assert((await validate(plainToInstance(RetryFailedEmailsDto, { requestId: randomUUID(), selections: [{ gender: 'all', selectAll: 'yes', ids: ['bad'] }] }))).length);
+  console.log('PASS: original-content resend across both genders and all pages, exclusions, sent-recipient protection, concurrent request deduplication, preserved history and retry validation. No real emails sent.');
   console.log('PASS: paginated failed-email history, women/men filters, saved recipient details, campaign search, deleted members, and query validation.');
   console.log('PASS: gender and 7-day inactive filters, pagination, all-page selection, exclusions, idempotency, image validation, private delivery, HTML escaping, concurrent claims, failures, crash recovery, DTO validation. No real emails sent.');
 }

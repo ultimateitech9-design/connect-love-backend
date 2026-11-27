@@ -1,4 +1,4 @@
-import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 
 export class EmailAudienceDto {
@@ -14,6 +14,20 @@ export class FailedEmailsQueryDto {
   @IsOptional() @IsIn(['all', 'female', 'male']) gender: 'all' | 'female' | 'male' = 'all';
   @IsOptional() @IsString() @MaxLength(100) search = '';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000000) page = 1;
+}
+
+export class RetryEmailSelectionDto {
+  @IsIn(['female', 'male']) gender: 'female' | 'male';
+  @IsOptional() @IsString() @MaxLength(100) search = '';
+  @IsBoolean() selectAll: boolean;
+  @IsOptional() @IsArray() @ArrayMaxSize(20000) @ArrayUnique() @IsUUID('all', { each: true }) ids: string[] = [];
+  @IsOptional() @IsArray() @ArrayMaxSize(20000) @ArrayUnique() @IsUUID('all', { each: true }) excludedIds: string[] = [];
+}
+
+export class RetryFailedEmailsDto {
+  @IsUUID() requestId: string;
+  @IsArray() @ArrayMinSize(1) @ArrayMaxSize(2) @ArrayUnique((selection: RetryEmailSelectionDto) => selection.gender)
+  @ValidateNested({ each: true }) @Type(() => RetryEmailSelectionDto) selections: RetryEmailSelectionDto[];
 }
 
 export class SendAdminEmailDto extends EmailAudienceDto {

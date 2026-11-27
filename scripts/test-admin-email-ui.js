@@ -24,6 +24,8 @@ async function run() {
     assert.equal((await request(path,member.id)).status,403);
   }
   assert.equal((await request('/campaigns',member.id,{method:'POST',body:'{}'})).status,403);
+  assert.equal((await request('/failures/retry',member.id,{method:'POST',body:'{}'})).status,403);
+  assert.equal((await request('/failures/retry',admin.id,{method:'POST',body:'{}'})).status,400);
   assert.equal((await request('/campaigns',admin.id,{method:'POST',body:'{}'})).status,400);
   const allowed=await request('/recipients?audience=female',admin.id);
   assert.equal(allowed.status,200);
@@ -40,17 +42,22 @@ async function run() {
   const men=[{id:randomUUID(),name:'Test Man',email:'man@example.test',gender:'male'}];
   const inactive=[women[0],men[0]];
   const failedEmails = [...women, ...men].map(user => ({ ...user, subject: 'Test failed campaign', error: 'Test server rejection', attemptedAt: new Date().toISOString(), createdAt: new Date().toISOString() }));
-  let submitted, mockResult;
+  let submitted, mockResult, retried;
   await page.route('**/api/admin-email/**',async route=>{
     const req=route.request(),url=new URL(req.url());
     const respond=value=>route.fulfill({json:value,headers:{'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Headers':'*'}});
     if(req.method()==='OPTIONS') return respond({});
+    if(url.pathname.endsWith('/failures/retry') && req.method()==='POST') {
+      retried=req.postDataJSON();
+      const total=retried.selections.reduce((sum,selection)=>sum+(selection.selectAll?(selection.gender==='female'?52:1)-selection.excludedIds.length:selection.ids.length),0);
+      return respond({total,alreadyQueued:false});
+    }
     if(url.pathname.endsWith('/failures')) {
       const gender=url.searchParams.get('gender');
       const search=url.searchParams.get('search')||'';
       const filtered=failedEmails.filter(row=>(gender==='all'||row.gender===gender)&&`${row.name} ${row.email} ${row.subject}`.includes(search));
       const current=Number(url.searchParams.get('page')||1);
-      return respond({failures:filtered.slice((current-1)*50,current*50),total:filtered.length,page:current,limit:50});
+      return respond({failures:filtered.slice((current-1)*10,current*10),total:filtered.length,page:current,limit:10});
     }
     if(req.method()==='POST') {
       assert(url.pathname.endsWith('/campaigns'));
@@ -59,6 +66,7 @@ async function run() {
       return respond(mockResult);
     }
     if(url.pathname.endsWith('/recipients')) {
+      assert(!url.searchParams.get('audience')?.startsWith('failed_'), 'failed options use the failures endpoint');
       let users=url.searchParams.get('audience')==='inactive'?inactive:url.searchParams.get('audience')==='female'?women:url.searchParams.get('audience')==='male'?men:[...women,...men];
       const search=url.searchParams.get('search')||'';
       users=users.filter(u=>`${u.name} ${u.email}`.includes(search));
@@ -70,6 +78,7 @@ async function run() {
   });
   await page.goto(`${origin}/super-admin/email-send`,{waitUntil:'domcontentloaded'});
   await page.getByRole('heading',{name:'Email Send',exact:true}).waitFor();
+  await page.waitForFunction(() => document.querySelector('input[aria-label="Select all matching users"]')?.disabled === false);
   await page.getByLabel('Recipient filter',{exact:true}).selectOption('female');
   await page.getByText('Select all 52 matching users',{exact:true}).waitFor();
   await page.getByLabel('Select all matching users').check();
@@ -113,22 +122,45 @@ async function run() {
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth), 'mobile layout fits viewport');
   const failuresSection=page.getByRole('region',{name:'Women - Failed emails',exact:true});
   const menFailuresSection=page.getByRole('region',{name:'Men - Failed emails',exact:true});
+  assert.equal(await failuresSection.count(),0, 'failed lists are hidden for the normal recipient filters');
+  await page.getByLabel('Recipient filter',{exact:true}).selectOption('failed_female');
   await failuresSection.getByText('52 failed emails',{exact:true}).waitFor();
-  await menFailuresSection.getByText('1 failed emails',{exact:true}).waitFor();
+  assert.equal(await menFailuresSection.count(),0);
+  assert.equal(await page.getByRole('region',{name:'Compose email',exact:true}).count(),0);
+  assert.equal(await failuresSection.locator('tbody tr').count(),10, 'ten failed entries per page');
   assert.equal(await failuresSection.getByText(men[0].email,{exact:true}).count(),0);
+  await failuresSection.getByLabel('Select all failed emails',{exact:true}).check();
+  await page.getByText('52 failed entries selected',{exact:true}).waitFor();
   await failuresSection.getByLabel('Next failed emails page',{exact:true}).click();
-  await failuresSection.getByText(women[50].email,{exact:true}).waitFor();
-  await menFailuresSection.getByText(men[0].email,{exact:true}).waitFor();
-  assert.equal(await menFailuresSection.getByText(women[0].email,{exact:true}).count(),0);
+  await failuresSection.getByText(women[10].email,{exact:true}).waitFor();
+  await failuresSection.getByLabel(`Select failed email ${women[10].email}`,{exact:true}).uncheck();
+  await page.getByText('51 failed entries selected',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Resend selected (51)',exact:true}).click();
+  await page.getByText('51 emails queued for resend. Check Recent emails for delivery status.',{exact:true}).waitFor();
+  assert.equal(retried.selections.length,1);
+  assert(retried.selections.every(selection=>selection.selectAll));
+  assert.deepEqual(retried.selections.find(selection=>selection.gender==='female').excludedIds,[women[10].id]);
   await failuresSection.getByLabel('Search failed emails',{exact:true}).fill('not-found@example.test');
   await failuresSection.getByText('No failed emails found.',{exact:true}).waitFor();
-  await menFailuresSection.getByText(men[0].email,{exact:true}).waitFor();
   await failuresSection.getByLabel('Search failed emails',{exact:true}).fill(women[0].email);
   await failuresSection.getByText('1 failed emails',{exact:true}).waitFor();
   await failuresSection.getByRole('button',{name:'Refresh failed emails',exact:true}).click();
   await failuresSection.getByText('Test server rejection',{exact:true}).waitFor();
+  await page.getByLabel('Recipient filter',{exact:true}).selectOption('failed_male');
+  await menFailuresSection.getByText('1 failed emails',{exact:true}).waitFor();
+  assert.equal(await failuresSection.count(),0);
+  await menFailuresSection.getByLabel(`Select failed email ${men[0].email}`,{exact:true}).check();
+  await page.getByRole('button',{name:'Resend selected (1)',exact:true}).click();
+  await page.getByText('1 emails queued for resend. Check Recent emails for delivery status.',{exact:true}).waitFor();
+  assert.equal(retried.selections.length,1);
+  assert.equal(retried.selections[0].gender,'male');
+  assert.deepEqual(retried.selections[0].ids,[men[0].id]);
+  await page.getByLabel('Recipient filter',{exact:true}).selectOption('all');
+  await page.getByRole('region',{name:'Compose email',exact:true}).waitFor();
+  assert.equal(await menFailuresSection.count(),0);
+  await page.getByText('0 selected',{exact:true}).waitFor();
   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth), 'failed email table scrolls inside its mobile container');
-  console.log('PASS: separate women/men failed-email lists, independent pagination and search, empty state and manual refresh.');
+  console.log('PASS: women/men failures in main recipient filter, 10 per page, select-all with exclusions, resends, search, refresh and reset when switching filters.');
   console.log('PASS: browser gender filters, all-page selection, exclusions, photo upload/preview, send payload, result, history, filter reset, search and mobile layout. All sends intercepted.');
 }
 run().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{await browser?.close();await db?.end();});

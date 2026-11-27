@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { DataSource, In, Repository } from 'typeorm';
 import { isEmail } from 'class-validator';
 import * as nodemailer from 'nodemailer';
@@ -9,7 +9,7 @@ import { User } from '../users/user.entity';
 import { AuditLog } from '../platform/audit-log.entity';
 import { renderEmail } from '../mail/email-layout';
 import { AdminEmailCampaign, AdminEmailRecipient } from './admin-email.entity';
-import { EmailAudienceDto, EmailRecipientsQueryDto, FailedEmailsQueryDto, SendAdminEmailDto } from './admin-email.dto';
+import { EmailAudienceDto, EmailRecipientsQueryDto, FailedEmailsQueryDto, RetryFailedEmailsDto, SendAdminEmailDto } from './admin-email.dto';
 
 const GENDERS = {
   female: ['female', 'woman', 'women', 'girl', 'ladies', 'f'],
@@ -97,8 +97,7 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
     return { users, total, page, limit: 50, smtpConfigured: this.smtpConfigured() };
   }
 
-  async failures(query: FailedEmailsQueryDto) {
-    const page = query.page || 1;
+  private failedAudience(query: Pick<FailedEmailsQueryDto, 'gender' | 'search'>) {
     // Keep the original recipient email/name even if the member is edited or deleted.
     const qb = this.deliveries.createQueryBuilder('r')
       .leftJoin(User, 'u', 'u.id = r.userId')
@@ -110,14 +109,82 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
     if (query.search?.trim()) {
       qb.andWhere('(LOCATE(:search, r.name) > 0 OR LOCATE(:search, r.email) > 0 OR LOCATE(:search, c.subject) > 0)', { search: query.search.trim() });
     }
+    return qb;
+  }
+
+  async failures(query: FailedEmailsQueryDto) {
+    const page = query.page || 1;
+    const limit = 10;
+    const qb = this.failedAudience(query);
     const total = await qb.getCount();
     const failures = await qb.select('r.id', 'id').addSelect('r.userId', 'userId')
       .addSelect('r.name', 'name').addSelect('r.email', 'email').addSelect('u.gender', 'gender')
       .addSelect('r.campaignId', 'campaignId').addSelect('c.subject', 'subject')
       .addSelect('r.error', 'error').addSelect('r.attemptedAt', 'attemptedAt').addSelect('r.createdAt', 'createdAt')
       .orderBy('r.createdAt', 'DESC').addOrderBy('r.id', 'DESC')
-      .offset((page - 1) * 50).limit(50).getRawMany();
-    return { failures, total, page, limit: 50 };
+      .offset((page - 1) * limit).limit(limit).getRawMany();
+    return { failures, total, page, limit };
+  }
+
+  async retryFailures(dto: RetryFailedEmailsDto, createdBy: string) {
+    // The first retry campaign stores the request key. Repeated submissions
+    // return before re-evaluating an audience that may have gained new failures.
+    const existing = await this.jobs.findOneBy({ createdBy, requestId: dto.requestId });
+    if (existing) return { alreadyQueued: true, total: null };
+    this.mailer();
+    const selected = new Map<string, AdminEmailRecipient>();
+    for (const selection of dto.selections) {
+      if (!selection.selectAll && !selection.ids?.length) continue;
+      const qb = this.failedAudience(selection);
+      if (!selection.selectAll) qb.andWhere('r.id IN (:...ids)', { ids: selection.ids });
+      if (selection.selectAll && selection.excludedIds?.length) qb.andWhere('r.id NOT IN (:...excluded)', { excluded: selection.excludedIds });
+      const rows = await qb.limit(20001).getMany();
+      if (!selection.selectAll && rows.length !== selection.ids.length) throw new BadRequestException('Some selected failed emails are no longer available. Refresh the list.');
+      for (const row of rows) selected.set(row.id, row);
+    }
+    if (!selected.size) throw new BadRequestException('Select at least one failed email.');
+    if (selected.size > 20000) throw new BadRequestException('Select at most 20,000 failed emails at a time.');
+    const groups = new Map<string, Map<string, AdminEmailRecipient>>();
+    for (const row of selected.values()) {
+      if (!isEmail(row.email.trim())) throw new BadRequestException('The selection includes an invalid email address. Exclude it and try again.');
+      if (!groups.has(row.campaignId)) groups.set(row.campaignId, new Map());
+      groups.get(row.campaignId)!.set(row.email.trim().toLowerCase(), row);
+    }
+    const campaignIds = [...groups.keys()].sort();
+    const sources = await this.jobs.createQueryBuilder('c').addSelect('c.imageBase64').where('c.id IN (:...ids)', { ids: campaignIds }).getMany();
+    if (sources.length !== campaignIds.length) throw new BadRequestException('An original campaign is unavailable. Refresh the failed emails list.');
+    const total = [...groups.values()].reduce((count, rows) => count + rows.size, 0);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        await this.db.transaction(async manager => {
+        for (const [index, sourceId] of campaignIds.entries()) {
+          const source = sources.find(item => item.id === sourceId)!;
+          const id = randomUUID();
+          const hash = createHash('sha256').update(`${dto.requestId}:${sourceId}`).digest('hex');
+          const requestId = index === 0 ? dto.requestId : `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+          const rows = [...groups.get(sourceId)!.values()];
+          await manager.getRepository(AdminEmailCampaign).insert({
+            id, createdBy, requestId, subject: source.subject, message: source.message, imageBase64: source.imageBase64,
+            audience: dto.selections.length === 1 ? dto.selections[0].gender : 'all', total: rows.length,
+          });
+          for (let offset = 0; offset < rows.length; offset += 500) {
+            await manager.getRepository(AdminEmailRecipient).insert(rows.slice(offset, offset + 500).map(row => ({
+              id: randomUUID(), campaignId: id, userId: row.userId, name: row.name, email: row.email.trim().toLowerCase(), status: 'pending' as const,
+            })));
+          }
+        }
+        await manager.getRepository(AuditLog).insert({ userId: createdBy, user: 'Super Admin', activity: `Queued ${total} failed emails for resend`, action: 'Queued', module: 'Email Send', role: 'super_admin' });
+        });
+        return { alreadyQueued: false, total };
+      } catch (error) {
+        if (['ER_DUP_ENTRY', 'ER_LOCK_DEADLOCK'].includes(error?.code)) {
+          if (await this.jobs.findOneBy({ createdBy, requestId: dto.requestId })) return { alreadyQueued: true, total: null };
+          // Only rolled-back database writes are retried, never SMTP delivery.
+          if (error.code === 'ER_LOCK_DEADLOCK' && attempt < 2) continue;
+        }
+        throw error;
+      }
+    }
   }
 
   private smtpConfigured() {
