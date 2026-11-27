@@ -9,7 +9,7 @@ import { User } from '../users/user.entity';
 import { AuditLog } from '../platform/audit-log.entity';
 import { renderEmail } from '../mail/email-layout';
 import { AdminEmailCampaign, AdminEmailRecipient } from './admin-email.entity';
-import { EmailAudienceDto, EmailRecipientsQueryDto, SendAdminEmailDto } from './admin-email.dto';
+import { EmailAudienceDto, EmailRecipientsQueryDto, FailedEmailsQueryDto, SendAdminEmailDto } from './admin-email.dto';
 
 const GENDERS = {
   female: ['female', 'woman', 'women', 'girl', 'ladies', 'f'],
@@ -22,6 +22,9 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
   private timer?: ReturnType<typeof setInterval>;
   private busy = false;
   private stopping = false;
+  private queueFailures = 0;
+  private nextQueueAttemptAt = 0;
+  private queueReady = false;
   private transport?: nodemailer.Transporter;
 
   constructor(
@@ -32,8 +35,31 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit() {
-    this.timer = setInterval(() => { void this.processQueue().catch(() => this.logger.error('Email queue processing failed.')); }, 2000);
+    this.timer = setInterval(() => { void this.runQueueCycle(); }, 2000);
     this.timer.unref();
+  }
+
+  private async runQueueCycle() {
+    if (this.busy || this.stopping || !this.smtpConfigured() || Date.now() < this.nextQueueAttemptAt) return;
+    try {
+      await this.processQueue();
+      if (!this.queueReady || this.queueFailures > 0) {
+        this.logger.log(this.queueFailures > 0 ? 'Email queue recovered and is ready.' : 'Email queue ready.');
+        this.queueReady = true;
+      }
+      this.queueFailures = 0;
+      this.nextQueueAttemptAt = 0;
+    } catch (error: any) {
+      const rawCode = error?.driverError?.code || error?.code;
+      const code = typeof rawCode === 'string' && /^[A-Z0-9_]{1,48}$/.test(rawCode) ? rawCode : 'UNKNOWN';
+      const retryMs = Math.min(60000, 2000 * 2 ** Math.min(++this.queueFailures, 5));
+      this.nextQueueAttemptAt = Date.now() + retryMs;
+      const hint = ['ER_NO_SUCH_TABLE', 'ER_BAD_FIELD_ERROR'].includes(code) ? ' Apply pending database migrations.' : '';
+      const table = String(error?.driverError?.sqlMessage || error?.sqlMessage || '')
+        .match(/Table '[^']*\.(admin_email_campaigns|admin_email_recipients)' doesn't exist/i)?.[1];
+      // Error codes are useful without exposing SQL, recipients or SMTP credentials.
+      this.logger.error(`Email queue processing failed (${code}${table ? `: ${table}` : ''}).${hint} Retrying in ${retryMs / 1000}s.`);
+    }
   }
 
   onModuleDestroy() {
@@ -47,7 +73,14 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
       .select(['u.id', 'u.name', 'u.email', 'u.gender'])
       .where('u.role = :role', { role: 'user' })
       .andWhere("u.email IS NOT NULL AND TRIM(u.email) <> ''");
-    if (query.audience && query.audience !== 'all') {
+    if (query.audience === 'inactive') {
+      // Never-seen members become inactive seven days after registration.
+      // updatedAt also changes on admin edits, so it is not an activity signal.
+      qb.andWhere('u.isOnline = :online', { online: false })
+        .andWhere('COALESCE(u.lastSeen, u.createdAt) <= :inactiveBefore', {
+          inactiveBefore: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        });
+    } else if (query.audience && query.audience !== 'all') {
       qb.andWhere('LOWER(TRIM(u.gender)) IN (:...genders)', { genders: GENDERS[query.audience] });
     }
     if (query.search?.trim()) {
@@ -62,6 +95,29 @@ export class AdminEmailService implements OnModuleInit, OnModuleDestroy {
     const [users, total] = await this.audience(query).orderBy('u.email', 'ASC').addOrderBy('u.id', 'ASC')
       .skip((page - 1) * 50).take(50).getManyAndCount();
     return { users, total, page, limit: 50, smtpConfigured: this.smtpConfigured() };
+  }
+
+  async failures(query: FailedEmailsQueryDto) {
+    const page = query.page || 1;
+    // Keep the original recipient email/name even if the member is edited or deleted.
+    const qb = this.deliveries.createQueryBuilder('r')
+      .leftJoin(User, 'u', 'u.id = r.userId')
+      .leftJoin(AdminEmailCampaign, 'c', 'c.id = r.campaignId')
+      .where('r.status = :status', { status: 'failed' });
+    if (query.gender && query.gender !== 'all') {
+      qb.andWhere('LOWER(TRIM(u.gender)) IN (:...genders)', { genders: GENDERS[query.gender] });
+    }
+    if (query.search?.trim()) {
+      qb.andWhere('(LOCATE(:search, r.name) > 0 OR LOCATE(:search, r.email) > 0 OR LOCATE(:search, c.subject) > 0)', { search: query.search.trim() });
+    }
+    const total = await qb.getCount();
+    const failures = await qb.select('r.id', 'id').addSelect('r.userId', 'userId')
+      .addSelect('r.name', 'name').addSelect('r.email', 'email').addSelect('u.gender', 'gender')
+      .addSelect('r.campaignId', 'campaignId').addSelect('c.subject', 'subject')
+      .addSelect('r.error', 'error').addSelect('r.attemptedAt', 'attemptedAt').addSelect('r.createdAt', 'createdAt')
+      .orderBy('r.createdAt', 'DESC').addOrderBy('r.id', 'DESC')
+      .offset((page - 1) * 50).limit(50).getRawMany();
+    return { failures, total, page, limit: 50 };
   }
 
   private smtpConfigured() {

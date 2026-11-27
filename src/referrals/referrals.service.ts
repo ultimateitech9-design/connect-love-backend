@@ -27,7 +27,9 @@ export class ReferralsService {
     const invite = await manager.getRepository(ReferralCode).findOne({ where: [{ code }, { legacyCode: code }] });
     if (!invite) throw new BadRequestException('This referral link is invalid.');
     const inviter = await this.eligible(manager, invite.userId);
-    if (referralGroup(inviter.gender) !== referralGroup(gender)) return null;
+    // Native/Google onboarding can collect gender after creating the account.
+    // Capture that invitation now, but never issue money until eligibility is known.
+    if (gender?.trim() && referralGroup(inviter.gender) !== referralGroup(gender)) return null;
     return invite;
   }
 
@@ -37,9 +39,10 @@ export class ReferralsService {
     if (invite.userId === user.id) throw new BadRequestException('You cannot refer yourself.');
     if (!user.emailVerifiedAt) throw new BadRequestException('Verify your email to earn referral rewards.');
     const now = new Date();
-    const referral = manager.getRepository(Referral).create({ id: randomUUID(), referrerId: invite.userId, referredId: user.id, qualifiedAt: now });
+    const qualified = Boolean(referralGroup(user.gender));
+    const referral = manager.getRepository(Referral).create({ id: randomUUID(), referrerId: invite.userId, referredId: user.id, qualifiedAt: qualified ? now : null });
     await manager.getRepository(Referral).insert(referral);
-    await this.initialRewards(manager, referral, now);
+    if (qualified) await this.initialRewards(manager, referral, now);
   }
 
   private async initialRewards(manager: EntityManager, referral: Referral, earnedAt: Date) {
@@ -77,13 +80,13 @@ export class ReferralsService {
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
     if (!force && this.activityCache.get(userId) === day) return;
     try {
-      await this.db.transaction(async manager => {
+      const recorded = await this.db.transaction(async manager => {
         const referral = await manager.getRepository(Referral).findOne({ where: { referredId: userId }, lock: { mode: 'pessimistic_write' } });
-        if (!referral) return;
+        if (!referral) return true;
         const user = await manager.getRepository(User).findOne({ where: { id: userId }, lock: { mode: 'pessimistic_write' } });
-        if (!user || !referralGroup(user.gender) || user.role !== 'user' || user.status !== 'active' || !user.emailVerifiedAt) return;
+        if (!user || !referralGroup(user.gender) || user.role !== 'user' || user.status !== 'active' || !user.emailVerifiedAt) return false;
         const inviter = await manager.getRepository(User).findOne({ where: { id: referral.referrerId }, lock: { mode: 'pessimistic_write' } });
-        if (!inviter || referralGroup(inviter.gender) !== referralGroup(user.gender) || inviter.role !== 'user' || inviter.status !== 'active') return;
+        if (!inviter || referralGroup(inviter.gender) !== referralGroup(user.gender) || inviter.role !== 'user' || inviter.status !== 'active') return false;
         const rewards = manager.getRepository(ReferralReward);
         if (!referral.qualifiedAt) {
           referral.qualifiedAt = now;
@@ -101,7 +104,9 @@ export class ReferralsService {
           await rewards.insert({ id: randomUUID(), referralId: referral.id, userId, kind: 'activity_bonus', amountPaise: welcome.amountPaise,
             unlockAt: new Date(referral.qualifiedAt.getTime() + HOLD_MS) });
         }
+        return true;
       });
+      if (!recorded) return;
       if (this.activityCache.size >= 10000) this.activityCache.clear();
       this.activityCache.set(userId, day);
     } catch {

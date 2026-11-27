@@ -154,6 +154,30 @@ async function run(){
  assert(REFERRAL_CODE_PATTERN.test(namedA.code));assert(REFERRAL_CODE_PATTERN.test(oldCode));assert(!REFERRAL_CODE_PATTERN.test('suraj-123&admin=true'));
  const {validateSync}=require('class-validator'),{RegisterDto}=require('../dist/auth/dto/register.dto');
  assert(!validateSync(Object.assign(new RegisterDto(),{referralCode:namedA.code})).some(error=>error.property==='referralCode'),'HTTP signup validator accepts the named code');
+ // Native onboarding may supply gender after signup: capture first, qualify later.
+ const waitingWoman=await auth.register({name:'Gender collected later',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',otp:'123456',referralCode:namedA.code});
+ assert.equal((await refs.findOneBy({referredId:waitingWoman.user.id})).qualifiedAt,null);
+ assert.equal(await rewards.countBy({userId:waitingWoman.user.id}),0,'unknown gender cannot receive a guessed reward');
+ await referral.recordActivity(waitingWoman.user.id,true);
+ await users.update({id:waitingWoman.user.id},{gender:'female'});
+ await Promise.all([referral.recordActivity(waitingWoman.user.id),referral.recordActivity(waitingWoman.user.id)]);
+ const qualifiedWoman=await refs.findOneBy({referredId:waitingWoman.user.id});assert(qualifiedWoman.qualifiedAt);
+ assert.equal(await rewards.countBy({referralId:qualifiedWoman.id}),2,'same-day profile completion credits exactly once despite earlier unqualified login');
+ assert((await rewards.findBy({referralId:qualifiedWoman.id})).every(row=>row.amountPaise===10000));
+ const waitingMan=await auth.register({name:'Male profile later',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',otp:'123456',referralCode:maleInvite.code});
+ await referral.recordActivity(waitingMan.user.id,true);await users.update({id:waitingMan.user.id},{gender:'male'});await referral.recordActivity(waitingMan.user.id);
+ const qualifiedMan=await refs.findOneBy({referredId:waitingMan.user.id});assert.equal(await rewards.countBy({referralId:qualifiedMan.id}),2);assert((await rewards.findBy({referralId:qualifiedMan.id})).every(row=>row.amountPaise===5000));
+ const oldGoogleClient=process.env.GOOGLE_CLIENT_ID,googleEmail=`${randomUUID()}@example.test`;
+ try {
+  process.env.GOOGLE_CLIENT_ID='test-google-client';
+  auth.googleClient.verifyIdToken=async()=>({getPayload:()=>({email:googleEmail,email_verified:true,name:'Google invited member'})});
+  const google=await auth.googleLogin('verified-test-credential',{},namedA.code);
+  const captured=await refs.findOneBy({referredId:google.user.id});assert(captured);assert.equal(captured.qualifiedAt,null);assert.equal(await rewards.countBy({referralId:captured.id}),0);
+  await users.update({id:google.user.id},{gender:'female'});await referral.recordActivity(google.user.id);
+  assert.equal(await rewards.countBy({referralId:captured.id}),2);assert((await rewards.findBy({referralId:captured.id})).every(row=>row.amountPaise===10000));
+  await auth.googleLogin('verified-test-credential',{},maleInvite.code);assert.equal((await refs.findOneBy({referredId:google.user.id})).referrerId,legacyMember.id,'existing Google users cannot change their inviter');
+  assert.equal(await rewards.countBy({referralId:captured.id}),2);
+ } finally {if(oldGoogleClient===undefined)delete process.env.GOOGLE_CLIENT_ID;else process.env.GOOGLE_CLIENT_ID=oldGoogleClient;}
  console.log('PASS: women ₹100 each and men ₹50 each, same-gender verified signup, male welcome flag, historical amounts, 30-day holds, invitee-only activity bonus, 21-credit male withdrawal, mixed-size payouts, concurrency, rejection refunds, minimum withdrawal and coin isolation. No real users, emails or money affected.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1}).finally(async()=>{if(!db.isInitialized)return;for(const suffix of ['referral_rewards','referral_activity','referrals','referral_codes','coin_transactions','payout_accounts','agents','users']){const table=prefix+suffix;if(!/^test_ref_[a-f0-9]{12}_[a-z_]+$/.test(table))throw new Error('Unsafe cleanup');await db.query(`DROP TABLE IF EXISTS \`${table}\``);}await db.destroy();});

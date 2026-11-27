@@ -75,7 +75,7 @@ export class AuthController {
   @Post('google')
   @HttpCode(HttpStatus.OK)
   googleLogin(@Body() dto: GoogleAuthDto, @Req() request: Request) {
-    return this.authService.googleLogin(dto.credential, this.loginContext(request));
+    return this.authService.googleLogin(dto.credential, this.loginContext(request), dto.referralCode);
   }
 
   @Post('admin/login')

@@ -2,11 +2,17 @@ import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsOptional,
 import { Transform, Type } from 'class-transformer';
 
 export class EmailAudienceDto {
-  @IsOptional() @IsIn(['all', 'female', 'male']) audience: 'all' | 'female' | 'male' = 'all';
+  @IsOptional() @IsIn(['all', 'female', 'male', 'inactive']) audience: 'all' | 'female' | 'male' | 'inactive' = 'all';
   @IsOptional() @IsString() @MaxLength(100) search = '';
 }
 
 export class EmailRecipientsQueryDto extends EmailAudienceDto {
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000000) page = 1;
+}
+
+export class FailedEmailsQueryDto {
+  @IsOptional() @IsIn(['all', 'female', 'male']) gender: 'all' | 'female' | 'male' = 'all';
+  @IsOptional() @IsString() @MaxLength(100) search = '';
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000000) page = 1;
 }
 

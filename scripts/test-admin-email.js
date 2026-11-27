@@ -11,7 +11,7 @@ const { User } = require('../dist/users/user.entity');
 const { AuditLog } = require('../dist/platform/audit-log.entity');
 const { AdminEmailCampaign, AdminEmailRecipient } = require('../dist/admin-email/admin-email.entity');
 const { AdminEmailService } = require('../dist/admin-email/admin-email.service');
-const { SendAdminEmailDto, EmailRecipientsQueryDto } = require('../dist/admin-email/admin-email.dto');
+const { SendAdminEmailDto, EmailRecipientsQueryDto, FailedEmailsQueryDto } = require('../dist/admin-email/admin-email.dto');
 
 if (process.env.NODE_ENV === 'production' || !['localhost', '127.0.0.1'].includes(process.env.DB_HOST || 'localhost')) throw new Error('Local database only.');
 const prefix = `test_em_${randomUUID().replaceAll('-', '').slice(0, 12)}_`;
@@ -89,7 +89,48 @@ async function run() {
   const invalid = plainToInstance(SendAdminEmailDto, { ...dto, subject: ' ', selectAll: 'true', audience: 'invalid' });
   assert((await validate(invalid)).length >= 3);
   assert((await validate(plainToInstance(EmailRecipientsQueryDto, { page: '-1' }))).length);
-  console.log('PASS: gender filters, pagination, all-page selection, exclusions, idempotency, image validation, private delivery, HTML escaping, concurrent claims, failures, crash recovery, DTO validation. No real emails sent.');
+  assert.equal((await validate(plainToInstance(EmailRecipientsQueryDto, { audience: 'inactive' }))).length, 0);
+  const now = Date.now();
+  const cutoff = now - 7 * 86400000;
+  const inactiveFixtures = [
+    { name: 'Inactive Woman', gender: 'female', lastSeen: new Date(cutoff - 86400000), createdAt: new Date(cutoff - 86400000) },
+    { name: 'Inactive Man', gender: 'male', lastSeen: new Date(cutoff - 86400000), createdAt: new Date(cutoff - 86400000) },
+    { name: 'Inactive Boundary', gender: 'female', lastSeen: new Date(Math.floor(cutoff / 1000) * 1000), createdAt: new Date(cutoff - 86400000) },
+    { name: 'Inactive Never Seen', gender: 'male', lastSeen: null, createdAt: new Date(cutoff - 86400000) },
+    { name: 'Inactive Recent', gender: 'female', lastSeen: new Date(cutoff + 60000), createdAt: new Date(cutoff - 86400000) },
+    { name: 'Inactive New', gender: 'male', lastSeen: null, createdAt: new Date(now) },
+    { name: 'Inactive Online', gender: 'female', lastSeen: new Date(cutoff - 86400000), createdAt: new Date(cutoff - 86400000), isOnline: true },
+  ].map((user, i) => ({ id: randomUUID(), email: `inactive${i}@example.test`, password: 'unused', ...user }));
+  await users.insert(inactiveFixtures.map(user => ({ ...user })));
+  const inactiveQuery = { audience: 'inactive', search: 'Inactive', page: 1 };
+  const inactive = await service.recipients(inactiveQuery);
+  assert.equal(inactive.total, 4, 'inactive includes both genders, seven-day boundary and old never-seen accounts only');
+  assert.deepEqual(new Set(inactive.users.map(user => user.name)), new Set(inactiveFixtures.slice(0, 4).map(user => user.name)));
+  const inactiveCampaign = await service.enqueue({ ...dto, ...inactiveQuery, imageDataUrl: undefined, requestId: randomUUID(), excludedUserIds: [inactiveFixtures[0].id] }, admin.id);
+  assert.equal(inactiveCampaign.total, 3, 'inactive select-all applies the same server filter and exclusions');
+  assert.deepEqual(new Set((await deliveries.findBy({ campaignId: inactiveCampaign.id })).map(row => row.userId)), new Set(inactiveFixtures.slice(1, 4).map(user => user.id)));
+  await assert.rejects(service.enqueue({ ...dto, ...inactiveQuery, requestId: randomUUID(), selectAll: false, userIds: [inactiveFixtures[4].id] }, admin.id), /no longer available/);
+  await users.update(inactiveFixtures[1].id, { lastSeen: new Date() });
+  assert.equal((await service.recipients(inactiveQuery)).total, 3, 'returning members leave the inactive audience');
+  await deliveries.insert(women.slice(1, 52).map(user => ({ id: randomUUID(), campaignId: interrupted.id, userId: user.id, name: user.name, email: user.email, status: 'failed', error: 'Test failure' })));
+  await deliveries.insert({ id: randomUUID(), campaignId: interrupted.id, userId: randomUUID(), name: 'Former member', email: 'former@example.test', status: 'failed', error: 'Test failure' });
+  const failures = await service.failures({ gender: 'all', page: 1 });
+  assert.equal(failures.total, 54, 'only failed attempts are listed, not pending or successful deliveries');
+  assert.equal(failures.failures.length, 50);
+  assert.equal((await service.failures({ gender: 'all', page: 2 })).failures.length, 4);
+  const failedWomen = await service.failures({ gender: 'female', page: 1 });
+  assert.equal(failedWomen.total, 52, 'women filter normalizes gender aliases');
+  assert(failedWomen.failures.every(row => ['female', ' WOMEN '].includes(row.gender)));
+  const failedMen = await service.failures({ gender: 'male', page: 1 });
+  assert.equal(failedMen.total, 1); assert.equal(failedMen.failures[0].email, man.email);
+  assert.equal(failedMen.failures[0].subject, dto.subject);
+  assert.equal((await service.failures({ gender: 'all', search: '%', page: 1 })).total, 0);
+  const former = await service.failures({ gender: 'all', search: 'former@example.test', page: 1 });
+  assert.equal(former.total, 1); assert.equal(former.failures[0].gender, null, 'deleted members remain visible in all failed emails');
+  assert.equal((await service.failures({ gender: 'all', search: dto.subject, page: 1 })).total, 54, 'campaign subjects are searchable');
+  assert((await validate(plainToInstance(FailedEmailsQueryDto, { gender: 'invalid', page: 0 }))).length >= 2);
+  console.log('PASS: paginated failed-email history, women/men filters, saved recipient details, campaign search, deleted members, and query validation.');
+  console.log('PASS: gender and 7-day inactive filters, pagination, all-page selection, exclusions, idempotency, image validation, private delivery, HTML escaping, concurrent claims, failures, crash recovery, DTO validation. No real emails sent.');
 }
 
 run().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

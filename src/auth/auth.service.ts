@@ -199,7 +199,7 @@ export class AuthService {
       planExpiresAt: null,
       status: 'active',
       emailVerifiedAt: new Date(),
-      referralWelcomePending: Boolean(referralGroup(dto.gender)),
+      referralWelcomePending: !dto.gender || Boolean(referralGroup(dto.gender)),
     });
     const saved = await this.userRepo.manager.transaction(async manager => {
       const savedUser = await manager.getRepository(User).save(user);
@@ -249,7 +249,7 @@ export class AuthService {
     };
   }
 
-  async googleLogin(credential: string, context: LoginContext = {}) {
+  async googleLogin(credential: string, context: LoginContext = {}, referralCode?: string) {
     const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
     if (!clientId) {
       throw new UnauthorizedException('Google sign-in is not configured on the server.');
@@ -283,8 +283,9 @@ export class AuthService {
         user = await this.userRepo.save(user);
       }
     } else {
+      if (referralCode) await this.referrals.validateInvite(referralCode);
       const password = await bcrypt.hash(randomUUID(), 12);
-      user = await this.userRepo.save(this.userRepo.create({
+      const draft = this.userRepo.create({
         name: payload.name?.trim() || email.split('@')[0],
         email,
         password,
@@ -296,7 +297,12 @@ export class AuthService {
         onboardingCompleted: false,
         referralWelcomePending: true,
         emailVerifiedAt: new Date(),
-      }));
+      });
+      user = await this.userRepo.manager.transaction(async manager => {
+        const saved = await manager.getRepository(User).save(draft);
+        if (referralCode) await this.referrals.attachToSignup(manager, referralCode, saved);
+        return saved;
+      });
       isNewUser = true;
       this.registrationOtpService.sendWelcomeEmail(user.email, user.name);
     }
