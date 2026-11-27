@@ -18,6 +18,7 @@ import { UsersService } from '../users/users.service';
 import { MatchesService } from '../matches/matches.service';
 import { VideoCall } from './video-call.entity';
 import { DirectCallsService, UPGRADE_REQUIRED } from '../direct-calls/direct-calls.service';
+import { ReferralsService } from '../referrals/referrals.service';
 
 /** Grace period before a direct call is ended because a participant went offline. */
 const OFFLINE_END_DELAY_MS = 20_000;
@@ -45,13 +46,18 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
   private readonly matchChanged = (match: { id: string; senderId: string; receiverId: string }) => {
     this.server?.to(`user:${match.receiverId}`).to(`user:${match.senderId}`).emit('matchChanged', match);
   };
+  private readonly referralChanged = (userId: string) => {
+    this.server?.to(`user:${userId}`).emit('referralBalanceChanged');
+  };
   onModuleInit() {
     this.usersService.profileVisitorEvents.on('changed', this.visitorChanged);
     this.matchesService.matchEvents.on('changed', this.matchChanged);
+    this.referrals.walletEvents.on('changed', this.referralChanged);
   }
   onModuleDestroy() {
     this.usersService.profileVisitorEvents.off('changed', this.visitorChanged);
     this.matchesService.matchEvents.off('changed', this.matchChanged);
+    this.referrals.walletEvents.off('changed', this.referralChanged);
   }
   @WebSocketServer()
   server: Server;
@@ -73,6 +79,7 @@ export class MessagesGateway implements OnGatewayConnection, OnGatewayDisconnect
     private readonly matchesService: MatchesService,
     private readonly jwtService: JwtService,
     private readonly directCalls: DirectCallsService,
+    private readonly referrals: ReferralsService,
   ) {}
 
   private clearCallTimers(callId: string) {

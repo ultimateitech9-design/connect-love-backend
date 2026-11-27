@@ -206,6 +206,7 @@ export class AuthService {
       if (referralCode) await this.referrals.attachToSignup(manager, referralCode, savedUser);
       return savedUser;
     });
+    if (referralCode) await this.referrals.publishSignup(saved.id);
     this.registrationOtpService.sendWelcomeEmail(saved.email, saved.name);
     const { password: _, ...safe } = saved as any;
     return { message: 'Account created successfully', user: safe };
@@ -304,6 +305,7 @@ export class AuthService {
         return saved;
       });
       isNewUser = true;
+      if (referralCode) await this.referrals.publishSignup(user.id);
       this.registrationOtpService.sendWelcomeEmail(user.email, user.name);
     }
 

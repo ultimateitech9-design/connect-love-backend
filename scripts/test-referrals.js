@@ -24,6 +24,7 @@ async function run(){
  const man={...woman,id:randomUUID(),email:`${randomUUID()}@example.test`,name:'Man',gender:'male'};
  await users.insert([{...woman},{...man}]);
  const referral=new ReferralsService(db),payouts=new PayoutsService(db,db.getRepository(PayoutAccount));
+ const walletUpdates=[];referral.walletEvents.on('changed',userId=>walletUpdates.push(userId));
  payouts.notifyWithdrawalStatus=async()=>{};
  const invite=await referral.summary(woman.id);
  assert.match(invite.code,/^inviter-[a-f0-9]{6}$/);assert.equal((await referral.summary(woman.id)).code,invite.code);
@@ -35,6 +36,8 @@ async function run(){
  const auth=new AuthService(users,audit,{}, {sign:()=> 'test-token'},otp,referral);
  const signup=await auth.register({name:'Invited woman',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'female',otp:'123456',referralCode:invite.code});
  const referredId=signup.user.id;
+ assert.deepEqual(walletUpdates,[woman.id,referredId],'both wallets notified after verified signup commits');
+ for(const userId of [woman.id,referredId]){const balance=await referral.summary(userId);assert.equal(balance.availablePaise+balance.lockedPaise,10000,'both balance boxes include the immediate 100-rupee credit');}
  assert.equal(signup.user.referralWelcomePending,true);
  await referral.dismissWelcome(referredId);assert.equal((await users.findOneBy({id:referredId})).referralWelcomePending,false,'welcome dismissal persists on the account');
  const maleSignup=await auth.register({name:'Male via invitation',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'male',otp:'123456',referralCode:invite.code});
@@ -102,6 +105,8 @@ async function run(){
  // Men use the same transactional flow with half-size credits and bonus.
  const invitedMan=await auth.register({name:'Invited man',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',gender:'male',otp:'123456',referralCode:maleInvite.code});
  assert.equal(invitedMan.user.referralWelcomePending,true);
+ assert.deepEqual(walletUpdates.slice(-2),[man.id,invitedMan.user.id]);
+ for(const userId of [man.id,invitedMan.user.id]){const balance=await referral.summary(userId);assert.equal(balance.availablePaise+balance.lockedPaise,5000,'both male balance boxes include the immediate 50-rupee credit');}
  let maleRewards=await rewards.findBy({userId:invitedMan.user.id});assert.equal(maleRewards.length,1);assert.equal(maleRewards[0].amountPaise,5000);
  assert.equal((await rewards.findOneBy({userId:man.id,kind:'invitation'})).amountPaise,5000);
  const maleRelation=await refs.findOneBy({referredId:invitedMan.user.id});
@@ -156,6 +161,7 @@ async function run(){
  assert(!validateSync(Object.assign(new RegisterDto(),{referralCode:namedA.code})).some(error=>error.property==='referralCode'),'HTTP signup validator accepts the named code');
  // Native onboarding may supply gender after signup: capture first, qualify later.
  const waitingWoman=await auth.register({name:'Gender collected later',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',otp:'123456',referralCode:namedA.code});
+ assert(!walletUpdates.includes(waitingWoman.user.id),'no balance notification for an unqualified signup');
  assert.equal((await refs.findOneBy({referredId:waitingWoman.user.id})).qualifiedAt,null);
  assert.equal(await rewards.countBy({userId:waitingWoman.user.id}),0,'unknown gender cannot receive a guessed reward');
  await referral.recordActivity(waitingWoman.user.id,true);
@@ -164,6 +170,8 @@ async function run(){
  const qualifiedWoman=await refs.findOneBy({referredId:waitingWoman.user.id});assert(qualifiedWoman.qualifiedAt);
  assert.equal(await rewards.countBy({referralId:qualifiedWoman.id}),2,'same-day profile completion credits exactly once despite earlier unqualified login');
  assert((await rewards.findBy({referralId:qualifiedWoman.id})).every(row=>row.amountPaise===10000));
+ assert.equal(walletUpdates.filter(id=>id===waitingWoman.user.id).length,1,'profile completion notifies newly eligible invitee once');
+ assert(walletUpdates.includes(qualifiedWoman.referrerId));
  const waitingMan=await auth.register({name:'Male profile later',email:`${randomUUID()}@example.test`,password:'TestPassword123!',birthDate:'1995-01-01',otp:'123456',referralCode:maleInvite.code});
  await referral.recordActivity(waitingMan.user.id,true);await users.update({id:waitingMan.user.id},{gender:'male'});await referral.recordActivity(waitingMan.user.id);
  const qualifiedMan=await refs.findOneBy({referredId:waitingMan.user.id});assert.equal(await rewards.countBy({referralId:qualifiedMan.id}),2);assert((await rewards.findBy({referralId:qualifiedMan.id})).every(row=>row.amountPaise===5000));

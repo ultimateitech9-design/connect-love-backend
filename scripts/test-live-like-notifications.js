@@ -48,7 +48,8 @@ test('committed likes reach only authenticated participants over websocket and p
     updatePresence: async () => {}, visiblePresence: async () => ({}),
   };
   const jwt = new JwtService({ secret: process.env.JWT_SECRET });
-  const gateway = new MessagesGateway({}, { pendingRingsFor: async () => [] }, users, matches, jwt, {});
+  const referrals = { walletEvents: new EventEmitter() };
+  const gateway = new MessagesGateway({}, { pendingRingsFor: async () => [] }, users, matches, jwt, {}, referrals);
   gateway.server = server;
   gateway.onModuleInit();
   server.on('connection', socket => { void gateway.handleConnection(socket); });
@@ -74,6 +75,15 @@ test('committed likes reach only authenticated participants over websocket and p
   const receiverPhone = await connect('receiver', 'polling');
   const sender = await connect('sender', 'websocket');
   const stranger = await connect('stranger', 'websocket');
+  let unrelatedWallets = 0;
+  stranger.on('referralBalanceChanged', () => unrelatedWallets++);
+  const receiverWallet = nextEvent(receiver, 'referralBalanceChanged');
+  const phoneWallet = nextEvent(receiverPhone, 'referralBalanceChanged');
+  const senderWallet = nextEvent(sender, 'referralBalanceChanged');
+  referrals.walletEvents.emit('changed', 'receiver');
+  referrals.walletEvents.emit('changed', 'sender');
+  await Promise.all([receiverWallet, phoneWallet, senderWallet]);
+  assert.equal(unrelatedWallets, 0, 'only both credited users receive balance refresh events across their devices');
   let unrelated = 0;
   stranger.on('matchChanged', () => unrelated++);
   let published = 0;

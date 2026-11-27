@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { DataSource, EntityManager, In, Not, IsNull } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { EventEmitter } from 'events';
 import { User } from '../users/user.entity';
 import { CoinTransaction } from '../users/coin-transaction.entity';
 import { Referral, ReferralActivity, ReferralCode, ReferralReward } from './referral.entity';
@@ -11,9 +12,25 @@ const HOLD_MS = REFERRAL_HOLD_DAYS * 86400000;
 
 @Injectable()
 export class ReferralsService {
+  readonly walletEvents = new EventEmitter();
   private readonly logger = new Logger(ReferralsService.name);
   private readonly activityCache = new Map<string, string>();
   constructor(private readonly db: DataSource) {}
+
+  private notifyWallets(userIds: string[]) {
+    for (const userId of new Set(userIds)) this.walletEvents.emit('changed', userId);
+  }
+
+  /** Call after the account/referral transaction commits, never from inside it. */
+  async publishSignup(userId: string) {
+    try {
+      const referral = await this.db.getRepository(Referral).findOneBy({ referredId: userId });
+      if (referral?.qualifiedAt) this.notifyWallets([referral.referrerId, referral.referredId]);
+    } catch {
+      // A notification problem must not undo a successfully created account.
+      this.logger.warn('Referral balance notification unavailable; wallets will refresh on reconnect.');
+    }
+  }
 
   async eligible(manager: EntityManager, id: string) {
     const user = await manager.getRepository(User).findOneBy({ id });
@@ -79,6 +96,7 @@ export class ReferralsService {
     const now = new Date();
     const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
     if (!force && this.activityCache.get(userId) === day) return;
+    const changedWallets: string[] = [];
     try {
       const recorded = await this.db.transaction(async manager => {
         const referral = await manager.getRepository(Referral).findOne({ where: { referredId: userId }, lock: { mode: 'pessimistic_write' } });
@@ -94,6 +112,7 @@ export class ReferralsService {
           // Complete invitations created by an earlier release, without issuing
           // a second reward for registrations already credited atomically.
           await this.initialRewards(manager, referral, now);
+          changedWallets.push(referral.referrerId, referral.referredId);
         }
         await manager.getRepository(ReferralActivity).createQueryBuilder().insert().values({ referralId: referral.id, activeDate: day }).orIgnore().execute();
         const activeDays = await manager.getRepository(ReferralActivity).countBy({ referralId: referral.id });
@@ -103,10 +122,12 @@ export class ReferralsService {
           const welcome = await rewards.findOneByOrFail({ referralId: referral.id, userId, kind: 'welcome' });
           await rewards.insert({ id: randomUUID(), referralId: referral.id, userId, kind: 'activity_bonus', amountPaise: welcome.amountPaise,
             unlockAt: new Date(referral.qualifiedAt.getTime() + HOLD_MS) });
+          changedWallets.push(userId);
         }
         return true;
       });
       if (!recorded) return;
+      this.notifyWallets(changedWallets);
       if (this.activityCache.size >= 10000) this.activityCache.clear();
       this.activityCache.set(userId, day);
     } catch {
